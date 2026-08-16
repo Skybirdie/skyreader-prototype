@@ -467,6 +467,7 @@ display:none!important;
 .viewerContinueCard{
 display:flex;
 align-items:center;
+overflow: hidden;
 gap:14px;
 padding:12px 16px;
 border-radius:16px;
@@ -583,6 +584,7 @@ min-width:0;
 
 .viewerContinueCard{
 min-width:0;
+overflow: hidden;
 }
 
 .viewerContinueText{
@@ -624,6 +626,7 @@ margin-bottom:10px;
 gap:12px;
 padding:10px 12px;
 border-radius:14px;
+overflow: hidden;
 }
 
 #continueCard .thumbnailPlaceholder,
@@ -635,15 +638,30 @@ flex:0 0 50px;
 
 #continueCard .placeholderText{
 min-width:0;
+overflow: hidden;
+text-overflow: ellipsis;
+display: -webkit-box;
+-webkit-line-clamp: 3;
+-webkit-box-orient: vertical;
 }
 
 #continueCard .placeholderText h3{
 font-size:14px;
 line-height:1.25;
+overflow: hidden;
+text-overflow: ellipsis;
+display: -webkit-box;
+-webkit-line-clamp: 3;
+-webkit-box-orient: vertical;
 }
 
 #continueCard .placeholderText p{
 font-size:11px;
+overflow: hidden;
+text-overflow: ellipsis;
+display: -webkit-box;
+-webkit-line-clamp: 3;
+-webkit-box-orient: vertical;
 }
 
 #recentSection{
@@ -680,7 +698,7 @@ grid-template-columns:none;
 #viewerShelfView .bookCard{
 width:132px;
 flex:0 0 132px;
-
+overflow: hidden;
 }
 
 #viewerShelfView .bookCard:nth-child(5n){
@@ -693,10 +711,20 @@ aspect-ratio:2/3;
 
 #viewerShelfView .bookTitle{
 font-size:12px;
+overflow: hidden;
+text-overflow: ellipsis;
+display: -webkit-box;
+-webkit-line-clamp: 3;
+-webkit-box-orient: vertical;
 }
 
 #viewerShelfView .bookSubtitle{
 font-size:10px;
+overflow: hidden;
+text-overflow: ellipsis;
+display: -webkit-box;
+-webkit-line-clamp: 3;
+-webkit-box-orient: vertical;
 }
 
 }
@@ -715,6 +743,7 @@ max-height:285px;
 #viewerShelfView .bookCard{
 width:116px;
 flex-basis:116px;
+overflow: hidden;
 }
 }
 
@@ -805,6 +834,7 @@ border-radius:0;
     gap:9px;
     border-radius:12px;
     box-shadow:0 5px 14px rgba(0,0,0,.07);
+overflow: hidden;
   }
 
   #continueCard .coverPlaceholder,
@@ -821,11 +851,17 @@ border-radius:0;
     min-width:0;
     max-width:100%;
     overflow:hidden;
+text-overflow: ellipsis;
+display: -webkit-box;
+-webkit-line-clamp: 3;
+-webkit-box-orient: vertical;
   }
 
   #continueCard .placeholderText h3{
     font-size:12px;
     line-height:1.2;
+overflow: hidden;
+text-overflow: ellipsis;
     display:-webkit-box;
     -webkit-line-clamp:2;
     -webkit-box-orient:vertical;
@@ -835,8 +871,12 @@ border-radius:0;
     font-size:10px;
     line-height:1.2;
     white-space:nowrap;
-    text-overflow:ellipsis;
-  }
+overflow: hidden;
+text-overflow: ellipsis;
+display: -webkit-box;
+-webkit-line-clamp: 3;
+-webkit-box-orient: vertical;
+    }
 
   /* Library content occupies the remaining horizontal space. */
   #recentSection{
@@ -972,6 +1012,7 @@ filter:drop-shadow(0px 1px 1px rgb(0 0 0 / 0.4));
 #readerPanel #toolbar #viewerFullscreenButton{
   top:14px;
 }
+
 
 /* The fullscreen/focus control is part of the toolbar, immediately to the
    right of the mute control. It inherits the toolbar's visibility state. */
@@ -1329,12 +1370,14 @@ html[data-theme="dark"] .bookCard::before{background:rgba(30,33,38,.88);}
 }
 .viewerLibraryHero{flex:1 1 25%;min-height:0;margin:0 auto;padding:4px 0;width:100%;}
 .viewerContinue{flex:1 1 25%;min-height:0;width:min(560px,100%);margin:0 auto;padding:4px 0;display:flex;align-items:center;}
-.viewerContinueCard{width:100%;max-height:100%;padding:clamp(7px,1vh,12px) clamp(10px,1.5vw,16px);}
+.viewerContinueCard{width:100%;max-height:100%;padding:clamp(7px,1vh,12px) clamp(10px,1.5vw,16px);overflow: hidden;}
 #viewerLibraryScroll{flex:2 1 50%;min-height:0;max-height:none;overflow:hidden;width:100%;padding:4px 4px 8px;}
 #viewerShelfView{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));grid-auto-rows:minmax(0,1fr);gap:clamp(8px,1vw,14px);height:100%;overflow:hidden;}
-#viewerShelfView .bookCard{height:100%;min-height:0;padding:clamp(5px,0.8vw,10px);}
+#viewerShelfView .bookCard{height:100%;min-height:0;padding:clamp(5px,0.8vw,10px);overflow: hidden;}
 #viewerShelfView .bookThumbnail{aspect-ratio:2/3;min-height:0;max-height:calc(100% - 28px);}
-#viewerShelfView .bookTitle{font-size:clamp(10px,1.3vw,14px);margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+#viewerShelfView .bookTitle{font-size:clamp(10px,1.3vw,14px);margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display: -webkit-box;
+-webkit-line-clamp: 3;
+-webkit-box-orient: vertical;}
 #viewerShelfView .bookSubtitle{display:none;}
 #viewerLibrary:not(:has(.viewerContinue:not(.hidden))) .viewerLibraryHero{flex-basis:33.333%;}
 #viewerLibrary:not(:has(.viewerContinue:not(.hidden))) #viewerLibraryScroll{flex-basis:66.666%;}
@@ -1348,7 +1391,9 @@ html[data-theme="dark"] .bookCard::before{background:rgba(30,33,38,.88);}
   #shelfView{grid-template-columns:repeat(auto-fit,minmax(62px,1fr));grid-auto-rows:1fr;gap:clamp(5px,1vw,10px);padding:2px;}
   #shelfView .bookCard,#shelfView .bookCard:nth-child(5n){grid-column:auto;min-height:0;height:100%;padding:4px;}
   #shelfView .bookThumbnail{aspect-ratio:2/3;min-height:0;max-height:calc(100% - 20px);}
-  #shelfView .bookTitle{font-size:clamp(9px,1.7vw,12px);margin:4px 1px 0;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  #shelfView .bookTitle{font-size:clamp(9px,1.7vw,12px);margin:4px 1px 0;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display: -webkit-box;
+-webkit-line-clamp: 3;
+-webkit-box-orient: vertical;}
   #shelfView .bookSubtitle{display:none;}
   #listView{overflow:hidden;}
   #listView .listItem{min-height:0;height:100%;}
@@ -1460,6 +1505,7 @@ html[data-theme="dark"] .bookCard::before{background:rgba(30,33,38,.88);}
     max-height:100% !important;
     min-height:0 !important;
     padding:6px 10px !important;
+overflow: hidden;
   }
 
   .viewerContinueCard img{
@@ -1836,6 +1882,10 @@ html[data-theme="dark"] .bookCard::before{background:rgba(30,33,38,.88);}
     padding:6px 9px !important;
     gap:10px !important;
     border-radius:12px !important;
+text-overflow: ellipsis;
+display: -webkit-box;
+-webkit-line-clamp: 3;
+-webkit-box-orient: vertical;
   }
   #continueCard .coverPlaceholder,
   #continueCard .thumbnailPlaceholder{
@@ -1848,10 +1898,20 @@ html[data-theme="dark"] .bookCard::before{background:rgba(30,33,38,.88);}
   #continueCard .placeholderText h3{
     font-size:12px !important;
     line-height:1.15 !important;
+overflow: hidden;
+text-overflow: ellipsis;
+display: -webkit-box;
+-webkit-line-clamp: 3;
+-webkit-box-orient: vertical;
   }
   #continueCard .placeholderText p{
     font-size:10px !important;
     line-height:1.15 !important;
+overflow: hidden;
+text-overflow: ellipsis;
+display: -webkit-box;
+-webkit-line-clamp: 3;
+-webkit-box-orient: vertical;
   }
 }
 
@@ -1859,7 +1919,7 @@ html[data-theme="dark"] .bookCard::before{background:rgba(30,33,38,.88);}
 #readerPanel #toolbar #rotateButton,
 #readerPanel #toolbar #muteButton,
 #readerPanel #toolbar #viewerFullscreenButton{
-  color:#fff !important;
+  color:#fff !important; 
 }
 #readerPanel #toolbar #rotateButton svg,
 #readerPanel #toolbar #muteButton svg,
