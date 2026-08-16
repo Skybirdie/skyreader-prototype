@@ -1,0 +1,30 @@
+{
+
+  "books": [
+    {
+      "id": "sample",
+      "title": "Roboto Specimen Book",
+      "subtitle": "Sample Magazine",
+      "thumbnail": "assets/thumbnails/Roboto_Specimen_Image.jpg",
+      "pdf": "pdf/Roboto_Specimen_Book.pdf"
+    },
+    {
+      "id": "sample2",
+      "title": "The Double Case - Sine Rule",
+      "subtitle": "Sample Magazine2",
+      "thumbnail": "assets/thumbnails/The Double Case - Sine Rule.jpg",
+      "pdf": "pdf/The Double Case - Sine Rule.pdf"
+    },
+    {
+      "id": "sample3",
+      "title": "anomaly by JaeRa",
+      "subtitle": "Sample Magazine2",
+      "thumbnail": "assets/thumbnails/anomaly-by-jaera.jpg",
+      "pdf": "pdf/anomaly by JaeRa.pdf"
+    }
+
+  ]
+}
+
+
+
