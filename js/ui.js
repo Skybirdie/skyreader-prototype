@@ -38,6 +38,7 @@ let initialized=false;
 let controlsVisible=true;
 
 let sidebarVisible=true;
+let libraryRevealTimer=null;
 
 let fullscreen=false;
 
@@ -1462,18 +1463,40 @@ Reader.page();
 }
 
 /*-------------------------------------------------------
+  Reader Reset
+-------------------------------------------------------*/
+
+ui.resetReaderInteractionState=function(){
+    zoom=1; panX=0; panY=0; rotation=0;
+    panActive=false; panPointerId=null; panLastX=0; panLastY=0;
+    touchStartX=0; touchStartY=0; pinchDistance=0; pinching=false;
+    if(dom.pageContainer){
+        dom.pageContainer.style.transition="none";
+        dom.pageContainer.style.transform="translate(0px,0px) rotate(0deg) scale(1)";
+    }
+};
+
+/*-------------------------------------------------------
   Library Animation
 -------------------------------------------------------*/
 
 ui.showLibrary=function(delayReturn=false){
 
+if(libraryRevealTimer){
+    window.clearTimeout(libraryRevealTimer);
+    libraryRevealTimer=null;
+}
+
 const reveal=()=>{
 
+libraryRevealTimer=null;
 sidebarVisible=true;
 
 if(typeof SkyReader!=="undefined" &&
    typeof SkyReader.showViewerLibrary==="function"){
-    SkyReader.showViewerLibrary();
+    /* Immediate library displays (initial load / explicit toggle) should not
+       replay the return animation. Delayed book-close returns still animate. */
+    SkyReader.showViewerLibrary(Boolean(delayReturn));
 }
 
 if(dom.library){
@@ -1489,7 +1512,7 @@ dom.library.classList.remove(
 };
 
 if(delayReturn){
-    window.setTimeout(reveal,1000);
+    libraryRevealTimer=window.setTimeout(reveal,1000);
 }else{
     reveal();
 }
@@ -1497,6 +1520,11 @@ if(delayReturn){
 };
 
 ui.hideLibrary=function(){
+
+if(libraryRevealTimer){
+    window.clearTimeout(libraryRevealTimer);
+    libraryRevealTimer=null;
+}
 
 sidebarVisible=false;
 
@@ -1563,6 +1591,11 @@ dom.loading.classList.remove("visible");
 function beginBookOpen(text="Loading..."){
 
     showLoading(text);
+
+    if(libraryRevealTimer){
+        window.clearTimeout(libraryRevealTimer);
+        libraryRevealTimer=null;
+    }
 
     sidebarVisible=false;
 
@@ -1741,9 +1774,8 @@ updatePageIndicator();
 
 updateProgress();
 
-/* Give the completed reader a deliberate one-second pause before
-   restoring the Start Reading/library landing. */
-ui.showLibrary(true);
+/* Library return is owned by Reader.close() so every close route uses
+   exactly one authoritative delayed return. */
 
 }
 

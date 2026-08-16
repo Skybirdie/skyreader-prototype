@@ -192,7 +192,7 @@ async function buildLibrary(){
 
     SkyReader.filteredLibrary = [...SkyReader.library];
 
-    Library.build();
+    Library.initialize();
 
     log(
 

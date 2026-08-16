@@ -364,6 +364,7 @@ return;
 
 }
 
+/* Persist only the publication/page memory used by Read Again. */
 saveReadingPosition();
 
 Renderer.close();
@@ -373,10 +374,19 @@ const previousBook=currentBook;
 currentBook=null;
 
 currentPage=1;
-
 totalPages=0;
-
 loading=false;
+
+if(typeof SkyReader!=="undefined" && typeof SkyReader.resetViewer==="function")
+    SkyReader.resetViewer();
+
+if(typeof UI!=="undefined" && typeof UI.resetReaderInteractionState==="function")
+    UI.resetReaderInteractionState();
+
+/* Persist the preserved resume fields while forcing transient zoom state
+   back to its clean default. */
+if(typeof StorageManager!=="undefined" && typeof StorageManager.save==="function")
+    StorageManager.save();
 
 emit(
 
@@ -385,6 +395,13 @@ emit(
 previousBook
 
 );
+
+/* Every legitimate book-close route funnels through Reader.close().
+   Own the single one-second Viewer Library return here so toolbar,
+   mouse-wheel/final-spread, direct-page, and Escape closes behave alike.
+   Opening a new book immediately cancels this timer via beginBookOpen(). */
+if(typeof UI!=="undefined" && typeof UI.showLibrary==="function")
+    UI.showLibrary(true);
 
 };
 

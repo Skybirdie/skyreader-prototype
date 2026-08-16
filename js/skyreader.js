@@ -224,29 +224,30 @@ this.selectors.loadingText.textContent=message;
 
 resetViewer(){
 
+/* Transient reader state only. SkyReader.resume is deliberately preserved
+   because it is the sole reading-memory state used by Read Again. */
+this.currentMagazine=null;
 this.currentPage=0;
-
 this.pageCount=0;
-
+this.currentCanvas=null;
+this.currentPDF=null;
+this.currentViewport=null;
 this.zoom=1;
-
 this.rotation=0;
-
 this.panX=0;
-
 this.panY=0;
-
 this.pageWidth=0;
-
 this.pageHeight=0;
-
 this.pageRatio=1;
-
 this.renderQueue=[];
-
+this.rendering=false;
 this.renderedPages.clear();
-
 this.pageCache.clear();
+this.thumbnails.clear();
+this.touch={startX:0,startY:0,lastX:0,lastY:0,pinching:false,startDistance:0};
+this.mouse={dragging:false,wheelLock:false};
+this.animation.rotating=false;
+this.animation.turning=false;
 
 },
 
@@ -286,7 +287,7 @@ panel.classList.toggle("open",this.ui.libraryOpen);
 
 },
 
-showViewerLibrary(){
+showViewerLibrary(animate=true){
 
 const landing=this.selectors.viewerLibrary;
 if(!landing)return;
@@ -294,8 +295,10 @@ if(!landing)return;
 landing.classList.remove("isLeaving");
 landing.classList.remove("isOpening");
 landing.classList.remove("isReturning");
-void landing.offsetWidth;
-landing.classList.add("isReturning");
+if(animate){
+    void landing.offsetWidth;
+    landing.classList.add("isReturning");
+}
 
 if(typeof Library!=="undefined" && typeof Library.buildViewerLibrary==="function"){
     Library.buildViewerLibrary();

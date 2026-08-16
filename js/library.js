@@ -378,6 +378,8 @@ search.select();
 
 search.addEventListener("keydown",event=>{
 if(event.key==="Escape"){
+event.preventDefault();
+event.stopPropagation();
 search.value="";
 this.filter("");
 const wrapper=document.getElementById("searchWrapper");

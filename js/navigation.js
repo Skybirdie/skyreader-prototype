@@ -310,11 +310,6 @@ navigation.next = async function(){
         AudioController.readerClosed();
         currentBook=null;
 
-        if(typeof UI!=="undefined" &&
-           typeof UI.showLibrary==="function"){
-            UI.showLibrary(true);
-        }
-
         return true;
     }
 
@@ -396,6 +391,15 @@ navigation.openMagazine = async function(book,startPage=null){
 
         try{
             currentBook=book;
+
+            /* A new opening transaction owns the viewer immediately. Cancel
+               any delayed return from the book that just closed and hide the
+               Viewer Library before Reader.open() begins. */
+            if(typeof UI!=="undefined" && typeof UI.beginBookOpen==="function")
+                UI.beginBookOpen("Loading...");
+            else if(typeof UI!=="undefined" && typeof UI.hideLibrary==="function")
+                UI.hideLibrary();
+
             await Reader.open(book,startPage);
 
             /* Do not publish a superseded transaction as the active book. */
@@ -455,10 +459,6 @@ async function(){
         
 
         Reader.close();
-
-        /* Direct close/return uses the same deliberate one-second pause as
-           the normal final-spread navigation path. */
-        UI.showLibrary(true);
 
         AudioController.readerClosed();
 
@@ -529,6 +529,14 @@ function onKeyDown(event){
     if(previousKey){
         event.preventDefault();
         navigation.previous();
+        return;
+    }
+
+    /* Escape belongs to the Library publication search while its field is
+       focused. Do not let the global reader Escape path close the book or
+       schedule a Viewer Library landing. */
+    if(event.key==="Escape" && event.target &&
+       event.target.id==="searchBox"){
         return;
     }
 
