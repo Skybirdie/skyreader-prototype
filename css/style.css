@@ -417,7 +417,7 @@ height:36px;
 }
 
 .viewerLibraryHero h2{
-font-size:clamp(24px,3vw,34px);
+font-size:clamp(24px,2vw,34px);
 font-weight:700;
 letter-spacing:-.02em;
 }
@@ -498,14 +498,14 @@ min-width:0;
 }
 
 .viewerContinueText strong{
-font-size:14px;
+font-size:clamp(15px,2vw,21px);
 overflow:hidden;
 text-overflow:ellipsis;
 white-space:nowrap;
 }
 
 .viewerContinueText span{
-font-size:12px;
+font-size:10px;
 color:var(--muted);
 }
 
@@ -593,6 +593,7 @@ flex:1 1 auto;
 }
 
 .viewerContinueText strong{
+font-size:clamp(15px,2vw,21px);
 white-space:normal;
 overflow:visible;
 text-overflow:clip;
@@ -618,7 +619,7 @@ padding:12px 14px 10px;
 }
 
 #continueReading h2{
-font-size:17px;
+font-size:clamp(15px,2vw,21px);
 margin-bottom:10px;
 }
 
@@ -710,7 +711,7 @@ aspect-ratio:2/3;
 }
 
 #viewerShelfView .bookTitle{
-font-size:12px;
+font-size:clamp(15px,2vw,21px);
 overflow: hidden;
 text-overflow: ellipsis;
 display: -webkit-box;
@@ -719,7 +720,7 @@ display: -webkit-box;
 }
 
 #viewerShelfView .bookSubtitle{
-font-size:10px;
+font-size:clamp(10px,2vw,13px);
 overflow: hidden;
 text-overflow: ellipsis;
 display: -webkit-box;
@@ -822,7 +823,7 @@ border-radius:0;
   }
 
   #continueReading h2{
-    font-size:14px;
+font-size:clamp(15px,2vw,21px);
     margin:0 0 7px;
   }
 
@@ -858,7 +859,7 @@ display: -webkit-box;
   }
 
   #continueCard .placeholderText h3{
-    font-size:12px;
+font-size:clamp(15px,2vw,21px);
     line-height:1.2;
 overflow: hidden;
 text-overflow: ellipsis;
@@ -868,7 +869,7 @@ text-overflow: ellipsis;
   }
 
   #continueCard .placeholderText p{
-    font-size:10px;
+ font-size:clamp(10px,2vw,13px);
     line-height:1.2;
     white-space:nowrap;
 overflow: hidden;
@@ -1099,7 +1100,7 @@ filter:drop-shadow(0px 1px 1px rgb(0 0 0 / 0.4));
     margin:0 !important;
     display:flex !important;
     align-items:center !important;
-    font-size:12px !important;
+font-size:clamp(15px,2vw,21px) !important;
     line-height:1 !important;
   }
 
@@ -1477,7 +1478,7 @@ html[data-theme="dark"] .bookCard::before{background:rgba(30,33,38,.88);}
   }
 
   .viewerLibraryHero h2{
-    font-size:clamp(17px,3vw,26px) !important;
+    font-size:clamp(17px,2vw,26px) !important;
   }
 
   .viewerLibraryHero p{

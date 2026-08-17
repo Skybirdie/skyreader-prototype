@@ -408,11 +408,11 @@ Reader.on(
 
 (percent,text)=>{
 
-if(dom.loading){
+if(dom.loadingText){
 
-dom.loading.textContent=text;
+ dom.loadingText.textContent=text;
 
-}
+ }
 
 if(dom.progress){
 
@@ -428,11 +428,11 @@ Reader.on(
 
 (book,pages)=>{
 
-if(dom.loading){
+if(dom.loadingText){
 
-dom.loading.textContent="";
+ dom.loadingText.textContent="";
 
-}
+ }
 
 });
 
