@@ -313,12 +313,20 @@ renderer.open=async function(book,options={}){
 
         renderer.resize();
 
-        emit("ready",book,pageCount);
+        /*
+         * Initial spread: desktop two-page view needs both visible pages
+         * ready before the reader is released. Mobile/single-page view
+         * keeps the original page-1-only startup path.
+         */
+        const initialPages=(singlePage || pageCount===1) ? [1] : [1,2];
 
-        /* Render the first page immediately. */
-        await renderPage(1,true,token);
+        await Promise.all(
+            initialPages.map(pageNumber=>renderPage(pageNumber,true,token))
+        );
 
         if(token!==openToken) return;
+
+        emit("ready",book,pageCount);
 
         /* Prepare and restore a requested/saved spread after page 1 is visible. */
         if(requestedStart>1){
