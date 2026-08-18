@@ -69,6 +69,75 @@ function alphabetical(){
 }
 
 /*-------------------------------------------------------
+ Book Date Parser
+
+ Contract format:
+ YYYYMMDDHHmm
+  |   | | | |
+  |   | | | +-- minute
+  |   | | +---- hour
+  |   | +------ day
+  |   +-------- month
+  +------------ year
+
+ The contract uses human-readable month numbering (01-12).
+ JavaScript Date uses zero-based months (0-11), so the month
+ is converted explicitly below. Invalid or normalized dates
+ are rejected rather than silently interpreted differently.
+-------------------------------------------------------*/
+
+function parseBookDate(value){
+
+    if(typeof value!=="string") return 0;
+
+    const match=value.match(
+
+        /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})$/
+
+    );
+
+    if(!match) return 0;
+
+    const year=Number(match[1]);
+    const month=Number(match[2]);
+    const day=Number(match[3]);
+    const hour=Number(match[4]);
+    const minute=Number(match[5]);
+
+    if(
+        month<1 || month>12 ||
+        day<1 || day>31 ||
+        hour<0 || hour>23 ||
+        minute<0 || minute>59
+    ){
+        return 0;
+    }
+
+    const date=new Date(
+
+        year,
+        month-1,
+        day,
+        hour,
+        minute
+
+    );
+
+    if(
+        date.getFullYear()!==year ||
+        date.getMonth()!==month-1 ||
+        date.getDate()!==day ||
+        date.getHours()!==hour ||
+        date.getMinutes()!==minute
+    ){
+        return 0;
+    }
+
+    return date.getTime();
+
+}
+
+/*-------------------------------------------------------
  Newest
 -------------------------------------------------------*/
 
@@ -78,21 +147,8 @@ function newest(){
 
         (a,b)=>
 
-        new Date(
-
-            b.date||
-
-            0
-
-        )-
-
-        new Date(
-
-            a.date||
-
-            0
-
-        )
+        parseBookDate(b.date)-
+        parseBookDate(a.date)
 
     );
 
@@ -108,26 +164,12 @@ function oldest(){
 
         (a,b)=>
 
-        new Date(
-
-            a.date||
-
-            0
-
-        )-
-
-        new Date(
-
-            b.date||
-
-            0
-
-        )
+        parseBookDate(a.date)-
+        parseBookDate(b.date)
 
     );
 
 }
-
 /*-------------------------------------------------------
  Favorites
 -------------------------------------------------------*/

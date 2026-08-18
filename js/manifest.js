@@ -1,94 +1,203 @@
 "use strict";
 
+/*
+=========================================================
+
+ SkyReader Manifest / Data Boundary
+
+ Responsibilities
+
+ • Load the current book data source
+ • Normalize and validate book records
+ • Expose normalized books to the engine
+ • Keep the source implementation separate from consumers
+
+ The current prototype fallback source is library.json.
+ GlideContract is checked first when Glide supplies a contract.
+ The engine receives the same normalized book objects regardless
+ of which source supplied them.
+
+=========================================================
+*/
+
 window.Manifest={
 
-url:"library.json",
+/*-------------------------------------------------------
+ Data Source
+-------------------------------------------------------*/
 
-async load(){
+source:{
 
-SkyReader.setLoading(5,"Loading library...");
+    url:"library.json",
 
-try{
+    async load(){
 
-const response=await fetch(this.url);
+        const response=await fetch(this.url);
 
-if(!response.ok){
+        if(!response.ok){
 
-throw new Error("Unable to load library.json");
+            throw new Error("Unable to load library.json");
 
-}
+        }
 
-const manifest=await response.json();
+        return response.json();
 
-this.validate(manifest);
-
-SkyReader.library=manifest.books;
-
-SkyReader.filteredLibrary=[...manifest.books];
-
-SkyReader.settings.background=
-
-manifest.background||
-
-SkyReader.settings.background;
-
-document.getElementById("viewerBackground").style.backgroundImage=
-
-`url('${SkyReader.settings.background}')`;
-
-SkyReader.setLoading(20,"Library loaded");
-
-return manifest;
-
-}
-
-catch(error){
-
-console.error(error);
-
-SkyReader.setStatus(error.message);
-
-throw error;
-
-}
+    }
 
 },
 
+/*-------------------------------------------------------
+ Internal Normalized Manifest
+-------------------------------------------------------*/
+
+_data:null,
+
+/*-------------------------------------------------------
+ Load
+
+ Loads from the configured source, then normalizes the data
+ before exposing it to the rest of SkyReader.
+-------------------------------------------------------*/
+
+async load(){
+
+    SkyReader.setLoading(5,"Loading library...");
+
+    try{
+
+        const rawManifest=GlideContract.available()
+                ? await GlideContract.load()
+                : await this.source.load();
+
+        const manifest=this.normalize(rawManifest);
+
+        this._data=manifest;
+
+        SkyReader.library=[...manifest.books];
+
+        SkyReader.filteredLibrary=[...manifest.books];
+
+        SkyReader.settings.background=
+
+            manifest.background||
+
+            SkyReader.settings.background;
+
+        document.getElementById("viewerBackground").style.backgroundImage=
+
+            `url('${SkyReader.settings.background}')`;
+
+        SkyReader.setLoading(20,"Library loaded");
+
+        return manifest;
+
+    }
+
+    catch(error){
+
+        console.error(error);
+
+        SkyReader.setStatus(error.message);
+
+        throw error;
+
+    }
+
+},
+
+/*-------------------------------------------------------
+ Books
+
+ Returns the normalized book collection.
+ Consumers do not need to know which data source supplied it.
+-------------------------------------------------------*/
+
+books(){
+
+    return this._data
+
+        ? [...this._data.books]
+
+        : [];
+
+},
+
+/*-------------------------------------------------------
+ Normalize
+
+ Converts a source payload into the contract expected by the
+ SkyReader engine.
+-------------------------------------------------------*/
+
+normalize(rawManifest){
+
+    if(!rawManifest || typeof rawManifest!=="object")
+
+        throw new Error("Invalid manifest.");
+
+    if(!Array.isArray(rawManifest.books))
+
+        throw new Error("Manifest missing books.");
+
+    const books=rawManifest.books.map((book,index)=>{
+
+        const normalized={
+
+            id:book.id||("book_"+index),
+
+            title:book.title,
+
+            subtitle:book.subtitle||"",
+
+            thumbnail:book.thumbnail||"assets/default-thumbnail.png",
+
+            pdf:book.pdf,
+
+            author:book.author||"",
+
+            category:book.category||"",
+
+            pageCount:book.pageCount||"unknown",
+
+            date:book.date||""
+
+        };
+
+        if(!normalized.title)
+
+            throw new Error("Book title missing.");
+
+        if(!normalized.pdf)
+
+            throw new Error(
+
+                normalized.title+
+
+                " has no PDF."
+
+            );
+
+        return normalized;
+
+    });
+
+    return{
+
+        books,
+
+        background:rawManifest.background||null
+
+    };
+
+},
+
+/*-------------------------------------------------------
+ Backward-Compatible Validation Entry Point
+-------------------------------------------------------*/
+
 validate(manifest){
 
-if(typeof manifest!=="object")
-
-throw new Error("Invalid manifest.");
-
-if(!Array.isArray(manifest.books))
-
-throw new Error("Manifest missing books.");
-
-manifest.books.forEach((book,index)=>{
-
-if(!book.id)
-
-book.id="book_"+index;
-
-if(!book.title)
-
-throw new Error("Book title missing.");
-
-if(!book.pdf)
-
-throw new Error(
-
-book.title+
-
-" has no PDF."
-
-);
-
-if(!book.thumbnail)
-
-book.thumbnail="assets/default-thumbnail.png";
-
-});
+    return this.normalize(manifest);
 
 }
 
