@@ -12,17 +12,7 @@
       "pageCount": "unknown",
       "Date": "202607200700"
     },
-    {
-      "id": "sample2",
-      "title": "The Double Case - Sine Rule",
-      "subtitle": "Sample Magazine2",
-      "thumbnail": "assets/thumbnails/The Double Case - Sine Rule.jpg",
-      "pdf": "pdf/The Double Case - Sine Rule.pdf",
-      "author": "Sky",
-      "category": "Education",
-      "pageCount": "unknown",
-      "Date": "202603201830"
-    },
+
     {
       "id": "sample3",
       "title": "Successful-Drawing",
@@ -47,19 +37,6 @@
       "category": "General",
       "pageCount": "2",
       "Date": "202607200807"
-    }
-,
-
-    {
-      "id": "sample5",
-      "title": "Light",
-      "subtitle": "Sample Magazine5",
-      "thumbnail": "assets/thumbnails/light.jpg",
-      "pdf": "pdf/Light.pdf",
-      "author": "Andrew L.",
-      "category": "General",
-      "pageCount": "2",
-      "Date": "202607200808"
     }
 ,
 
