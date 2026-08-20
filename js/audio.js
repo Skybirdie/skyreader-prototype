@@ -9,102 +9,108 @@ window.AudioController=(function(){
     const listeners=new Map();
 
     class AudioPool{
-        constructor(urls,size=3,volumeScale=1){
-            this.urls=(Array.isArray(urls)?urls:[urls]).filter(Boolean);
+        constructor(url,size=3,volumeScale=1){
+            this.url=url;
             this.size=size;
             this.volumeScale=Math.max(0,Math.min(1,Number(volumeScale)||0));
             this.index=0;
             this.players=[];
-            this.sourceIndex=0;
-            this.ready=false;
             this.failed=false;
-            this.build(this.urls[0]);
+            this.ready=false;
+            this.readyPromise=this.build();
         }
-        build(url){
-            this.players=[];
-            if(!url){ this.failed=true; return; }
-            for(let i=0;i<this.size;i++){
-                const p=new Audio(url);
-                p.preload="auto";
-                p.volume=masterVolume*this.volumeScale;
-                p.addEventListener("error",()=>this.tryFallback(),{once:true});
-                this.players.push(p);
-            }
-        }
-        tryFallback(){
-            if(this.failed) return;
-            this.sourceIndex++;
-            if(this.sourceIndex>=this.urls.length){ this.failed=true; return; }
-            this.build(this.urls[this.sourceIndex]);
-            this.players.forEach(p=>{ try{ p.load(); }catch(e){} });
+        build(){
+            if(!this.url){ this.failed=true; return Promise.resolve(false); }
+            let remaining=this.size;
+            let settled=false;
+            return new Promise(resolve=>{
+                const finish=(ok)=>{
+                    if(settled)return;
+                    settled=true;
+                    this.ready=!!ok;
+                    if(!ok)this.failed=true;
+                    resolve(!!ok);
+                };
+                for(let i=0;i<this.size;i++){
+                    const p=new Audio();
+                    p.preload="auto";
+                    p.src=this.url;
+                    p.volume=masterVolume*this.volumeScale;
+                    p.addEventListener("canplaythrough",()=>finish(true),{once:true});
+                    p.addEventListener("canplay",()=>finish(true),{once:true});
+                    p.addEventListener("loadeddata",()=>finish(true),{once:true});
+                    p.addEventListener("error",()=>{ remaining--; if(remaining<=0)finish(false); },{once:true});
+                    this.players.push(p);
+                    try{p.load();}catch(e){remaining--; if(remaining<=0)finish(false);}
+                }
+                // Never block app startup forever if a browser keeps the preload pending.
+                setTimeout(()=>finish(this.players.some(p=>p.readyState>=2)),4000);
+            });
         }
         next(){ const p=this.players[this.index]; this.index=(this.index+1)%Math.max(1,this.players.length); return p; }
-        preload(){ this.players.forEach(p=>{ try{p.load();}catch(e){} }); }
+        preload(){ this.players.forEach(p=>{try{p.load();}catch(e){}}); return this.readyPromise; }
         play(){
-            if(muted || this.failed || !this.players.length) return false;
+            if(muted || this.failed || !this.players.length)return false;
             const p=this.next();
-            try{ p.pause(); p.currentTime=0; p.volume=masterVolume*this.volumeScale; p.play().catch(()=>{}); return true; }catch(e){ return false; }
+            try{
+                p.pause();
+                p.currentTime=0;
+                p.volume=masterVolume*this.volumeScale;
+                const result=p.play();
+                if(result&&typeof result.catch==='function')result.catch(()=>{});
+                return true;
+            }catch(e){return false;}
         }
-        stop(){ this.players.forEach(p=>{try{p.pause();p.currentTime=0;}catch(e){}}); }
-        setVolume(v){ this.players.forEach(p=>p.volume=v*this.volumeScale); }
+        stop(){this.players.forEach(p=>{try{p.pause();p.currentTime=0;}catch(e){}});}
+        setVolume(v){this.players.forEach(p=>p.volume=v*this.volumeScale);}
     }
 
-    function emit(event,data){ const list=listeners.get(event); if(list) list.forEach(fn=>{try{fn(data);}catch(e){}}); }
-
-    audio.register=function(name,urls,poolSize=3,volumeScale=1){ if(!name || !urls) return false; sounds.set(name,new AudioPool(urls,poolSize,volumeScale)); return true; };
-    audio.play=function(name){ const pool=sounds.get(name); return pool?pool.play():false; };
-    audio.preload=function(){ sounds.forEach(pool=>pool.preload()); };
-    audio.has=function(name){ return sounds.has(name); };
+    function emit(event,data){const list=listeners.get(event);if(list)list.forEach(fn=>{try{fn(data);}catch(e){}});}
+    audio.register=function(name,url,poolSize=3,volumeScale=1){if(!name||!url)return false;sounds.set(name,new AudioPool(url,poolSize,volumeScale));return true;};
+    audio.play=function(name){const pool=sounds.get(name);return pool?pool.play():false;};
+    audio.preload=function(){return Promise.allSettled(Array.from(sounds.values(),pool=>pool.preload()));};
+    audio.ready=function(name){const pool=sounds.get(name);return pool?pool.readyPromise:Promise.resolve(false);};
+    audio.has=function(name){return sounds.has(name);};
     audio.available=audio.has;
-    audio.list=function(){ return Array.from(sounds.keys()); };
-    audio.stop=function(name){ const pool=sounds.get(name); if(pool) pool.stop(); };
-    audio.stopAll=function(){ sounds.forEach(pool=>pool.stop()); };
-    audio.pauseAll=function(){ sounds.forEach(pool=>pool.players.forEach(p=>p.pause())); };
+    audio.list=function(){return Array.from(sounds.keys());};
+    audio.stop=function(name){const pool=sounds.get(name);if(pool)pool.stop();};
+    audio.stopAll=function(){sounds.forEach(pool=>pool.stop());};
+    audio.pauseAll=function(){sounds.forEach(pool=>pool.players.forEach(p=>p.pause()));};
     audio.resumeAll=function(){};
-    audio.setVolume=function(v){ masterVolume=Math.max(0,Math.min(1,v)); sounds.forEach(pool=>pool.setVolume(masterVolume)); };
-    audio.volume=function(){ return masterVolume; };
-    audio.mute=function(){ muted=true; audio.stopAll(); };
-    audio.unmute=function(){ muted=false; };
-    audio.toggleMute=function(){ muted=!muted; if(muted) audio.stopAll(); return muted; };
-    audio.isMuted=function(){ return muted; };
-    audio.on=function(event,fn){ if(!listeners.has(event)) listeners.set(event,[]); listeners.get(event).push(fn); };
-    audio.off=function(event,fn){ const a=listeners.get(event); if(!a)return; const i=a.indexOf(fn); if(i>=0)a.splice(i,1); };
+    audio.setVolume=function(v){masterVolume=Math.max(0,Math.min(1,v));sounds.forEach(pool=>pool.setVolume(masterVolume));};
+    audio.volume=function(){return masterVolume;};
+    audio.mute=function(){muted=true;audio.stopAll();};
+    audio.unmute=function(){muted=false;};
+    audio.toggleMute=function(){muted=!muted;if(muted)audio.stopAll();return muted;};
+    audio.isMuted=function(){return muted;};
+    audio.on=function(event,fn){if(!listeners.has(event))listeners.set(event,[]);listeners.get(event).push(fn);};
+    audio.off=function(event,fn){const a=listeners.get(event);if(!a)return;const i=a.indexOf(fn);if(i>=0)a.splice(i,1);};
     audio.emit=emit;
 
-    // Production audio. Each list ends with a known-safe fallback.
-    /* Build-time availability was checked before packaging. This avoids probing
-       absent files in the browser and therefore avoids avoidable 404 console noise. */
-    audio.register("pageTurn",
-        "https://storage.googleapis.com/glide-prod.appspot.com/uploads-v2/QFKiEO3I2ZKX7y8dVj5p/pub/xpb3Na1EwmKTy0uIJ6nt/freesound_community-one-page-book-flip-101928.mp3",5);
-    /* Book selection intentionally has NO click fallback. In this packaged build
-       select.mp3 is not present, so the action remains silent rather than
-       requesting a missing file or substituting click.mp3. If select.mp3 is
-       packaged in a future build, register it here at SELECT_VOLUME_SCALE. */
-    const SELECT_VOLUME_SCALE=1.5; // 90% of the master volume
-    const HAS_PACKAGED_SELECT_SOUND=false;
-    if(HAS_PACKAGED_SELECT_SOUND){
-        audio.register("bookSelect","assets/audio/click.mp3",3,SELECT_VOLUME_SCALE);
-    }
-    audio.register("bookClose","assets/audio/select.mp3",2);
-    audio.register("libraryOpen","assets/audio/open.mp3",2);
-    audio.register("libraryClose","assets/audio/close.mp3",2);
+    // Strict production mapping: one action, one sound, no fallback substitution.
+    const SELECT_VOLUME_SCALE=10.0;
+    const CLOSE_VOLUME_SCALE=0.5;
+    audio.register("bookSelect","assets/audio/select.mp3",3,SELECT_VOLUME_SCALE);
+    audio.register("pageTurn","assets/audio/pageturn.mp3",5,1);
+    audio.register("bookClose","assets/audio/close.mp3",2,CLOSE_VOLUME_SCALE);
+    audio.register("libraryOpen","assets/audio/open.mp3",2,1);
 
-    audio.playPageTurn=function(){ return audio.play("pageTurn"); };
-    audio.playSelect=function(){ return audio.has("bookSelect") ? audio.play("bookSelect") : false; };
-    audio.playBookClose=function(){ return audio.play("bookClose"); };
-    audio.playOpen=function(){ return audio.play("libraryOpen"); };
-    audio.playClose=function(){ return audio.play("libraryClose"); };
-    audio.pageTurn=function(direction){ audio.playPageTurn(); emit("pageTurn",{direction,time:performance.now()}); };
-    audio.readerOpened=function(book){ emit("readerOpened",book); };
-    audio.readerClosed=function(){ emit("readerClosed"); };
-    audio.pageChanged=function(page){ emit("pageChanged",page); };
-    audio.initialize=function(){ audio.preload(); };
-    audio.version="1.1.0";
+    audio.playSelect=function(){return audio.play("bookSelect");};
+    audio.playPageTurn=function(){return audio.play("pageTurn");};
+    audio.playBookClose=function(){return audio.play("bookClose");};
+    audio.playOpen=function(){return audio.play("libraryOpen");};
+    audio.pageTurn=function(direction){audio.playPageTurn();emit("pageTurn",{direction,time:performance.now()});};
+    audio.readerOpened=function(book){emit("readerOpened",book);};
+    audio.readerClosed=function(){emit("readerClosed");};
+    audio.pageChanged=function(page){emit("pageChanged",page);};
+    audio.initialize=function(){audio.preload();};
+    audio.version="1.1.1";
 
     function unlock(){
-        if(unlocked) return;
+        if(unlocked)return;
         unlocked=true;
-        // Do not force playback: just allow normal user-initiated playback to proceed.
+        // The same first trusted interaction that unlocks browser audio also reasserts preload.
+        audio.preload();
     }
     ["pointerdown","touchstart","keydown"].forEach(type=>window.addEventListener(type,unlock,{once:true,passive:true}));
     audio.initialize();

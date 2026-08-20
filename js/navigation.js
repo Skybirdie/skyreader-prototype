@@ -295,7 +295,7 @@ navigation.next = async function(){
         Sky180FlipEngine.isTwoPageDocument();
 
     if(twoPageDocument){
-        Reader.close();
+        Reader.close({playSound:true});
         AudioController.readerClosed();
         currentBook=null;
         return true;
@@ -315,7 +315,7 @@ navigation.next = async function(){
 
     if(page >= finalSpreadStart){
 
-        Reader.close();
+        Reader.close({playSound:true});
         AudioController.readerClosed();
         currentBook=null;
 
@@ -365,7 +365,7 @@ navigation.openMagazine = async function(book,startPage=null){
        initialization path. */
     if(!openingPromise && Reader.isOpen() && currentBook && currentBook.id===book.id){
         if(Number(startPage)===1){
-            Reader.close();
+            Reader.close({playSound:false});
             AudioController.readerClosed();
             currentBook=null;
         }else{
@@ -382,7 +382,7 @@ navigation.openMagazine = async function(book,startPage=null){
 
     /* If a different book is already fully open, close it before replacing it. */
     if(!openingPromise && Reader.isOpen() && currentBook && currentBook.id!==book.id){
-        Reader.close();
+        Reader.close({playSound:false});
         AudioController.readerClosed();
         currentBook=null;
     }
@@ -427,7 +427,7 @@ navigation.openMagazine = async function(book,startPage=null){
         }catch(error){
             if(serial===openingSerial){
                 if(Reader.isOpen()){
-                    try{ Reader.close(); }catch(e){}
+                    try{ Reader.close({playSound:false}); }catch(e){}
                 }
                 currentBook=null;
 
@@ -472,7 +472,7 @@ async function(){
 
         
 
-        Reader.close();
+        Reader.close({playSound:true});
 
         AudioController.readerClosed();
 

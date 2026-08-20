@@ -354,7 +354,7 @@ return currentBook!==null;
   Closing
 -------------------------------------------------------*/
 
-reader.close=function(){
+reader.close=function(options={playSound:true}){
 
 openGeneration++;
 
@@ -366,7 +366,8 @@ return;
 
 /* Centralized production close sound. Missing audio is safely ignored by
    AudioController, and mute applies before any playback attempt. */
-if(window.AudioController && typeof AudioController.playBookClose==="function"){
+const playSound = options && options.playSound === true;
+if(playSound && window.AudioController && typeof AudioController.playBookClose==="function"){
     AudioController.playBookClose();
 }
 
