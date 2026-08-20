@@ -6,21 +6,98 @@
       "title": "Roboto Specimen Book",
       "subtitle": "Sample Magazine",
       "thumbnail": "assets/thumbnails/Roboto_Specimen_Image.jpg",
-      "pdf": "pdf/Roboto_Specimen_Book.pdf"
+      "pdf": "pdf/Roboto_Specimen_Book.pdf",
+      "author": "unknown",
+      "category": "unknown",
+      "pageCount": "unknown",
+      "Date": "202607200700"
     },
     {
       "id": "sample2",
       "title": "The Double Case - Sine Rule",
       "subtitle": "Sample Magazine2",
       "thumbnail": "assets/thumbnails/The Double Case - Sine Rule.jpg",
-      "pdf": "pdf/The Double Case - Sine Rule.pdf"
+      "pdf": "pdf/The Double Case - Sine Rule.pdf",
+      "author": "Sky",
+      "category": "Education",
+      "pageCount": "unknown",
+      "Date": "202603201830"
     },
     {
       "id": "sample3",
       "title": "Successful-Drawing",
       "subtitle": "Sample Magazine3",
       "thumbnail": "assets/thumbnails/Successful-Drawing.jpg",
-      "pdf": "pdf/andrew-loomis-successful-drawing.pdf"
+      "pdf": "pdf/andrew-loomis-successful-drawing.pdf",
+      "author": "Andrew L.",
+      "category": "Art",
+      "pageCount": "151",
+      "Date": "202607200800"
+    }
+
+,
+
+    {
+      "id": "sample4",
+      "title": "Trees",
+      "subtitle": "Sample Magazine4",
+      "thumbnail": "assets/thumbnails/trees.jpg",
+      "pdf": "pdf/Trees.pdf",
+      "author": "Andrew L.",
+      "category": "General",
+      "pageCount": "2",
+      "Date": "202607200807"
+    }
+,
+
+    {
+      "id": "sample5",
+      "title": "Light",
+      "subtitle": "Sample Magazine5",
+      "thumbnail": "assets/thumbnails/light.jpg",
+      "pdf": "pdf/Light.pdf",
+      "author": "Andrew L.",
+      "category": "General",
+      "pageCount": "2",
+      "Date": "202607200808"
+    }
+,
+
+    {
+      "id": "sample6",
+      "title": "Source",
+      "subtitle": "Sample Magazine6",
+      "thumbnail": "assets/thumbnails/source.jpg",
+      "pdf": "pdf/Source.pdf",
+      "author": "Andrew L.",
+      "category": "General",
+      "pageCount": "2",
+      "Date": "202607200809"
+    }
+,
+
+    {
+      "id": "sample7",
+      "title": "Water, living waters never run dry; you will never thirst",
+      "subtitle": "Sample Magazine7",
+      "thumbnail": "assets/thumbnails/water.jpg",
+      "pdf": "pdf/Water, living waters never run dry; you will never thirst.pdf",
+      "author": "Andrew L.",
+      "category": "General",
+      "pageCount": "2",
+      "Date": "202607200810"
+    },
+
+    {
+      "id": "sample8",
+      "title": "Khurasan",
+      "subtitle": "Sample Magazine7",
+      "thumbnail": "assets/thumbnails/khurasan.jpg",
+      "pdf": "pdf/Khurasan Read Me New.pdf",
+      "author": "Andrew L.",
+      "category": "General",
+      "pageCount": "2",
+      "Date": "202607200810"
     }
 
   ]

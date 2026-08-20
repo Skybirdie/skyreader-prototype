@@ -1,967 +1,854 @@
+/* ============================================================
+   SkyReader — Production CSS foundation
+   Step 4.2: consolidated after CosmeticFinish12.
+
+   Ownership:
+   - style.css  = application shell, theme, Library, viewer landing,
+                  responsive drawer, top-bar search, reader controls.
+   - reader.css = PDF viewer/PageFlip surface, status/loading internals.
+   - library.css = small reusable Library content primitives only.
+
+   The former experimental responsive Library/lower-shelf rules have been
+   removed. There is one Library DOM and one responsive Library system.
+   ============================================================ */
+
 :root{
---bg:#eef1f5;
---panel:#ffffff;
---panel2:#f8f9fb;
---text:#222;
---muted:#666;
---line:#e2e6ea;
---shadow:0 12px 35px rgba(0,0,0,.18);
---radius:24px;
---toolbar-height:72px;
---header-height:68px;
---status-height:34px;
---transition:.28s cubic-bezier(.25,.8,.25,1);
---icon-size:22px;
---button-size:32px;
+  --bg:#eef1f5;
+  --panel:#fff;
+  --panel2:#f8f9fb;
+  --card:#fff;
+  --card-soft:#fafbfc;
+  --text:#222831;
+  --muted:#66707a;
+  --line:#e0e4e8;
+  --viewer-overlay:rgba(255,255,255,.72);
+  --control-bg:rgba(255,255,255,.46);
+  --control-text:#20252b;
+  --hero-surface:rgba(255,255,255,.72);
+  --hero-icon:#4f5963;
+  --soft-shadow:0 8px 22px rgba(0,0,0,.10);
+  --hover-shadow:0 14px 30px rgba(0,0,0,.16);
+  --library-gap:10px;
+  --header-height:clamp(44px,5.5vh,68px);
+  --toolbar-height:clamp(42px,5.5vh,72px);
+  --status-height:clamp(24px,3vh,34px);
+  --transition:.28s cubic-bezier(.25,.8,.25,1);
+  --icon-size:22px;
+  --button-size:32px;
 }
+
+html[data-theme="dark"]{
+  --bg:#0d0f12;
+  --panel:#171a1f;
+  --panel2:#111419;
+  --card:#20252b;
+  --card-soft:#1b1f24;
+  --text:#f4f6f8;
+  --muted:#b6bec7;
+  --line:#363d46;
+  --viewer-overlay:rgba(9,11,14,.78);
+  --control-bg:rgba(12,15,20,.60);
+  --control-text:#f3f6f8;
+  --hero-surface:rgba(27,31,37,.78);
+  --hero-icon:#eef2f5;
+  --soft-shadow:0 8px 24px rgba(0,0,0,.34);
+  --hover-shadow:0 16px 34px rgba(0,0,0,.48);
+}
+
+/* ---------- Global shell ---------- */
 
 *{
-margin:0;
-padding:0;
-box-sizing:border-box;
--webkit-tap-highlight-color:transparent;
+  margin:0;
+  padding:0;
+  box-sizing:border-box;
+  -webkit-tap-highlight-color:transparent;
 }
 
-html,body{
-width:100%;
-height:100%;
-overflow:hidden;
-background:var(--bg);
-font-family:Inter,Arial,sans-serif;
-color:var(--text);
+html,
+body{
+  width:100%;
+  height:100%;
+  min-height:100%;
+  overflow:hidden;
+  background:var(--bg);
+  color:var(--text);
+  font-family:Inter,Arial,sans-serif;
 }
 
 body{
-display:flex;
-justify-content:center;
-align-items:center;
+  display:flex;
+  justify-content:center;
+  align-items:center;
 }
 
 #app{
-width:100vw;
-height:100vh;
-display:flex;
-flex-direction:column;
-overflow:hidden;
-background:rgba(255,255,255,.92);
-padding:10px 0 10px 0;
-
+  width:100vw;
+  height:100dvh;
+  min-height:100svh;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  background:var(--panel);
+  padding:clamp(4px,1vh,10px) 0;
 }
 
 #topBar{
-height:var(--header-height);
-display:flex;
-align-items:center;
-justify-content:space-between;
-padding:0 18px;
-background:rgba(255,255,255,.92);
-backdrop-filter:blur(14px);
-z-index:100;
+  height:var(--header-height);
+  min-height:var(--header-height);
+  flex:0 0 var(--header-height);
+  display:grid;
+  grid-template-columns:1fr auto 1fr;
+  align-items:center;
+  padding-inline:clamp(8px,1.5vw,18px);
+  background:color-mix(in srgb,var(--panel) 86%,transparent);
+  color:var(--text);
+  backdrop-filter:blur(14px);
+  z-index:100;
 }
 
-.tinylogo-image{
-width: 50px;
-margin-bottom:-17px;
+#topBar #appTitle{
+  grid-column:2;
+  min-width:0;
+  max-width:70vw;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  text-align:center;
+  font-size:clamp(15px,2.2vh,22px);
+  font-weight:700;
+  letter-spacing:.4px;
+  user-select:none;
 }
 
+#settingsButton{
+  grid-column:3;
+  justify-self:end;
+}
 
-#appTitle{
-font-size:22px;
-font-weight:700;
-letter-spacing:.4px;
-user-select:none;
+#topBar .iconButton{
+  width:clamp(30px,4vh,36px);
+  height:clamp(30px,4vh,36px);
+  color:var(--text);
 }
 
 #workspace{
-flex:1;
-display:flex;
-overflow:hidden;
-position:relative;
-padding:0 30px 0 0;
-background:rgba(255,255,255,.92);
-
-}
-
-#libraryPanel{
-width:360px;
-min-width:360px;
-background:var(--panel);
-overflow:hidden;
-display:flex;
-flex-direction:column;
-transition:transform var(--transition);
-z-index:20;
+  flex:1 1 auto;
+  min-height:0;
+  display:flex;
+  overflow:hidden;
+  position:relative;
+  padding:0 30px 0 0;
+  background:var(--panel);
 }
 
 #readerPanel{
-flex:1;
-display:flex;
-flex-direction:column;
-overflow:hidden;
-background:var(--panel2);
-position:relative;
+  flex:1 1 auto;
+  min-width:0;
+  min-height:0;
+  position:relative;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  background:var(--panel2);
+  color:var(--text);
 }
 
 #viewerBackground{
-flex:1;
-display:flex;
-align-items:center;
-justify-content:center;
-padding:28px;
-background-image:url("../assets/background.jpg");
-background-position:center;
-background-repeat:no-repeat;
-background-size:cover;
-overflow:hidden;
-border:1px solid var(--line);
-box-shadow: inset 0 0 10px 2px rgba(0, 0, 0, 0.2);
+  flex:1 1 auto;
+  min-height:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:clamp(8px,1.5vh,28px);
+  background-color:var(--panel2);
+  background-image:linear-gradient(var(--viewer-overlay),var(--viewer-overlay)),url("../assets/background.jpg");
+  background-position:center;
+  background-repeat:no-repeat;
+  background-size:cover;
+  border:1px solid var(--line);
+  box-shadow:inset 0 0 10px 2px rgba(0,0,0,.20);
+  overflow:hidden;
 }
 
-#viewerArea{
-width:100%;
-height:100%;
-display:flex;
-justify-content:center;
-align-items:center;
-overflow:hidden;
-
-}
-
-#pageContainer{
-position:relative;
-width:100%;
-height:100%;
-display:flex;
-justify-content:center;
-align-items:center;
-max-width:100%;
-max-height:100%;
-overflow:hidden;
-
-}
-
-.sky180FlipHost{
-position:relative;
-width:100%;
-height:100%;
-max-width:100%;
-max-height:100%;
-
-}
-
-.sky180Page{
-position:relative;
-overflow:hidden;
-background:#fff;
-}
-
-.sky180Page .pageCanvas{
-display:block;
-width:100%;
-height:100%;
-background:#fff;
-}
-
-
-
-
-#loadingBar{
-width:min(320px,90%);
-height:5px;
-border-radius:999px;
-overflow:hidden;
-background:#d7dce3;
-margin-top:14px;
-}
-
-#loadingProgress{
-width:0%;
-height:100%;
-background:#444;
-transition:width .25s linear;
-}
-
-#loadingText{
-margin-top:8px;
-font-size:13px;
-color:var(--muted);
-text-align:center;
-min-height:18px;
-}
-
-#toolbar{
-height:var(--toolbar-height);
-display:flex;
-align-items:center;
-justify-content:center;
-gap:20px;
-background:rgba(255,255,255,.88);
-backdrop-filter:blur(10px);
-border-top:1px solid var(--line);
-}
-
-#statusBar{
-height:var(--status-height);
-display:flex;
-align-items:center;
-justify-content:center;
-font-size:13px;
-color:var(--muted);
-background:white;
-}
+/* ---------- Shared controls / state helpers ---------- */
 
 .iconButton{
-width:var(--button-size);
-height:var(--button-size);
-display:flex;
-align-items:center;
-justify-content:center;
-border:none;
-background:transparent;
-border-radius:50%;
-cursor:pointer;
-transition:
-background var(--transition),
-transform var(--transition),
-box-shadow var(--transition);
+  width:var(--button-size);
+  height:var(--button-size);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border:none;
+  background:transparent;
+  border-radius:50%;
+  cursor:pointer;
+  transition:background var(--transition),transform var(--transition),box-shadow var(--transition);
 }
 
 .iconButton:hover{
-background:rgba(0,0,0,.06);
-transform:translateY(-2px);
-box-shadow:0 6px 18px rgba(0,0,0,.12);
+  background:rgba(0,0,0,.06);
+  transform:translateY(-2px);
+  box-shadow:0 6px 18px rgba(0,0,0,.12);
 }
 
-.iconButton:active{
-transform:scale(.96);
-}
+.iconButton:active{transform:scale(.96);}
 
 .icon{
-width:var(--icon-size);
-height:var(--icon-size);
-color:#333;
-pointer-events:none;
+  width:var(--icon-size);
+  height:var(--icon-size);
+  color:currentColor;
+  pointer-events:none;
 }
 
 .viewButton{
-width:42px;
-height:42px;
-display:flex;
-align-items:center;
-justify-content:center;
-background:transparent;
-border:none;
-border-radius:12px;
-cursor:pointer;
-transition:var(--transition);
-
+  width:42px;
+  height:42px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border:0;
+  border-radius:12px;
+  background:transparent;
+  color:var(--text);
+  cursor:pointer;
+  transition:var(--transition);
 }
 
-.viewButton:hover{
-background:rgba(0,0,0,.06);
-}
+.viewButton:hover{background:rgba(0,0,0,.06);}
+.viewButton.active{background:rgba(0,0,0,.08);}
 
-.viewButton.active{
-background:rgba(0,0,0,.08);
-}
+.hidden{display:none!important;}
+.visible{display:flex;}
 
-.hidden{
-display:none!important;
-}
-
-.visible{
-display:flex;
-}
-
-.fadeIn{
-animation:fadeIn .28s ease forwards;
-}
-
-.fadeOut{
-animation:fadeOut .28s ease forwards;
-}
-
-.pageLift{
-animation:pageLift .34s ease;
-}
-
-.rotatePage{
-animation:rotatePage .24s ease;
-}
+.fadeIn{animation:fadeIn .28s ease forwards;}
+.fadeOut{animation:fadeOut .28s ease forwards;}
+.pageLift{animation:pageLift .34s ease;}
+.rotatePage{animation:rotatePage .24s ease;}
 
 @keyframes fadeIn{
-from{
-opacity:0;
-}
-to{
-opacity:1;
-}
+  from{opacity:0;}
+  to{opacity:1;}
 }
 
 @keyframes fadeOut{
-from{
-opacity:1;
-}
-to{
-opacity:0;
-}
+  from{opacity:1;}
+  to{opacity:0;}
 }
 
 @keyframes pageLift{
-0%{
-transform:translateX(0) scale(1);
-}
-40%{
-transform:translateX(14px) translateY(-6px) scale(1.02);
-}
-100%{
-transform:translateX(0) scale(1);
-}
+  0%{transform:translateX(0) scale(1);}
+  40%{transform:translateX(14px) translateY(-6px) scale(1.02);}
+  100%{transform:translateX(0) scale(1);}
 }
 
 @keyframes rotatePage{
-from{
-transform:rotate(0deg);
-}
-to{
-transform:rotate(90deg);
-}
+  from{transform:rotate(0deg);}
+  to{transform:rotate(90deg);}
 }
 
-
-/* =====================================================
-   Responsive library landing / narrow workspace
-   ===================================================== */
+/* ---------- Viewer landing ---------- */
 
 #viewerLibrary{
-position:absolute;
-left:0;
-right:0;
-top:50%;
-bottom:auto;
-height:66.6667%;
-z-index:6;
-display:flex;
-flex-direction:column;
-justify-content:center;
-padding:clamp(20px,4vw,46px);
-min-height: 50vh;
-background:rgba(248,249,251,.4);
-border-radius: 20px;
-backdrop-filter:blur(7px);
-opacity:1;
-visibility:visible;
-transform:translateY(-50%) scale(1);
-transition:
-opacity .42s ease,
-transform .42s cubic-bezier(.22,.8,.25,1),
-visibility 0s linear 0s;
+  position:absolute;
+  left:0;
+  right:0;
+  top:50%;
+  bottom:auto;
+  height:60%;
+  min-height:50vh;
+  z-index:6;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  padding:clamp(20px,4vw,46px);
+  background:color-mix(in srgb,var(--panel) 55%,transparent);color:var(--text);backdrop-filter:blur(0);
+  border-radius:20px;
+  opacity:1;
+  visibility:visible;
+  transform:translateY(-50%) scale(1);
+  transition:opacity .42s ease,transform .42s cubic-bezier(.22,.8,.25,1),visibility 0s linear 0s;
 }
 
 #viewerLibrary.isOpening{
-opacity:0;
-visibility:hidden;
-transform:translateY(-50%) scale(1);
-transition:none!important;
-pointer-events:none;
+  opacity:0;
+  visibility:hidden;
+  transform:translateY(-50%) scale(1);
+  transition:none!important;
+  pointer-events:none;
 }
 
 #viewerLibrary.isLeaving{
-opacity:0;
-visibility:hidden;
-transform:translateY(calc(-50% + 12px)) scale(.985);
-transition:
-opacity .34s ease,
-transform .34s ease,
-visibility 0s linear .34s;
-pointer-events:none;
+  opacity:0;
+  visibility:hidden;
+  transform:translateY(calc(-50% + 12px)) scale(.985);
+  transition:opacity .34s ease,transform .34s ease,visibility 0s linear .34s;
+  pointer-events:none;
 }
 
 #viewerLibrary.isReturning{
-animation:viewerLibraryReturn .48s cubic-bezier(.22,.8,.25,1);
+  animation:viewerLibraryReturn .48s cubic-bezier(.22,.8,.25,1);
 }
 
 @keyframes viewerLibraryReturn{
-0%{opacity:0;transform:translateY(calc(-50% + 18px)) scale(.985)}
-100%{opacity:1;transform:translateY(-50%) scale(1)}
+  0%{opacity:0;transform:translateY(calc(-50% + 18px)) scale(.985)}
+  100%{opacity:1;transform:translateY(-50%) scale(1)}
 }
 
 .viewerLibraryHero{
-display:flex;
-align-items:center;
-justify-content:center;
-gap:16px;
-text-align:left;
-margin:0 auto 24px;
-max-width:760px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:16px;
+  text-align:left;
+  flex:1 1 25%;
+  min-height:0;
+  width:100%;
+  margin:0 auto;
 }
+
 
 .viewerLibraryVector{
-width:58px;
-height:58px;
-display:flex;
-align-items:center;
-justify-content:center;
-border-radius:18px;
-background:rgba(255,255,255,.82);
-box-shadow:0 10px 24px rgba(0,0,0,.10);
-color:#555;
-flex:0 0 auto;
-
+  width:58px;
+  height:58px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex:0 0 auto;
+  border-radius:18px;
+  background:var(--hero-surface);
+  color:var(--hero-icon);
+  box-shadow:var(--soft-shadow);
 }
 
-.viewerLibraryVector svg{
-width:36px;
-height:36px;
-
+.viewerLibraryLogo{
+  display:block;
+  width:72%;
+  height:72%;
+  object-fit:contain;
 }
 
 .viewerLibraryHero h2{
-font-size:clamp(24px,2vw,34px);
-font-weight:700;
-letter-spacing:-.02em;
+  font-size:clamp(30px,4vw,55px);
+  font-weight:700;
+  letter-spacing:-.02em;
+  color:var(--text);
 }
+
 
 .viewerLibraryHero p{
-margin-top:4px;
-font-size:14px;
-color:var(--muted);
+  margin-top:4px;
+  font-size:14px;
+  color:var(--muted);
 }
 
 #viewerLibraryScroll{
-width:min(980px,100%);
-max-height:calc(100% - 108px);
-margin:0 auto;
-overflow:auto;
-padding:4px 6px 18px;
-scroll-behavior:smooth;
+  flex:2 1 50%;
+  min-height:0;
+  width:100%;
+  margin:0 auto;
+  padding:4px 4px 10px;
+  overflow-x:auto;
+  overflow-y:hidden;
+  scroll-behavior:smooth;
+  scrollbar-width:thin;
 }
 
 #viewerShelfView{
-display:flex;
-
-grid-auto-flow: columns;
-opacity: 1;
-gap:18px;
+  display:flex;
+  flex-direction:row;
+  flex-wrap:nowrap;
+  align-items:stretch;
+  width:max-content;
+  min-width:max-content;
+  height:100%;
+  gap:clamp(10px,1.2vw,18px);
+  opacity:1;
+  padding:4px 0;
 
 }
+
 
 #viewerShelfView .bookCard{
-min-width:0;
-height: 20vh;
-overflow:hidden;
-text-overflow:ellipsis;
-white-space:nowrap;
-
+  flex:0 0 auto;
+  width:clamp(112px,11vw,170px);
+  min-width:clamp(112px,11vw,170px);
+  max-width:clamp(112px,11vw,170px);
+  height:auto;
+  min-height:0;
+  padding:7px;
+  white-space:normal;
 }
+
+#viewerShelfView .bookThumbnail{
+  width:100%;
+  height:auto;
+  aspect-ratio:auto;
+}
+
+#viewerShelfView .bookThumbnail img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+}
+
+
+#viewerShelfView .bookTitle{
+  margin:5px 1px 0;
+  font-size:clamp(10px,1.2vw,14px);
+  line-height:1.15;
+  display:-webkit-box;
+  -webkit-line-clamp:2;
+  -webkit-box-orient:vertical;
+  overflow:hidden;
+  overflow-wrap:anywhere;
+}
+
+#viewerShelfView .bookSubtitle{display:none;}
 
 .viewerContinue{
-width:min(520px,100%);
-margin:0 auto 16px;
+  flex:1 1 25%;
+  min-height:0;
+  width:min(560px,100%);
+  margin:0 auto;
+  padding:4px 0;
+  display:flex;
+  align-items:center;
 }
 
-.viewerContinue.hidden{
-display:none!important;
-}
+.viewerContinue.hidden{display:none!important;}
 
 .viewerContinueCard{
-display:flex;
-align-items:center;
-overflow: hidden;
-gap:14px;
-padding:12px 16px;
-border-radius:16px;
-background:rgba(255,255,255,.94);
-box-shadow:0 8px 22px rgba(0,0,0,.10);
-cursor:pointer;
-transition:transform .22s ease,box-shadow .22s ease;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:14px;
+  height:100%;
+  max-height:90%;
+  width:100%;
+  min-width:0;
+  padding:clamp(7px,1vh,12px) clamp(10px,1.5vw,16px);
+  overflow:hidden;
+  border-radius:16px;
+  background:var(--card);
+  box-shadow:var(--soft-shadow);
+  cursor:pointer;
+  transition:transform .22s ease,box-shadow .22s ease;
+
 }
 
-.viewerContinueCard:hover{
-transform:translateY(-2px);
-box-shadow:0 12px 28px rgba(0,0,0,.15);
-}
+
+.viewerContinueCard:hover{transform:translateY(-2px);box-shadow:var(--hover-shadow);}
 
 .viewerContinueCard img{
-width:44px;
-height:100%;
-object-fit:cover;
-border-radius:7px;
-box-shadow:0 4px 10px rgba(0,0,0,.12);
+  width:25%;
+  max-width:25%;
+  height:auto;
+  max-height:100%;
+  aspect-ratio:2/3;
+  object-fit:cover;
+  flex:0 0 25%;
+  border-radius:15px;
+  box-shadow:0 4px 10px rgba(0,0,0,.12);
+  padding: 5px;
+margin-top: 3px;
 }
+
 
 .viewerContinueText{
-display:flex;
-flex-direction:column;
-gap:3px;
-min-width:0;
+  display:flex;
+  flex:1 1 auto;
+  flex-direction:column;
+  gap:3px;
+  min-width:0;
+  overflow:hidden;
 }
 
-.viewerContinueText strong{
-font-size:clamp(15px,2vw,21px);
-overflow:hidden;
-text-overflow:ellipsis;
-white-space:nowrap;
-}
-
+.viewerContinueText strong,
 .viewerContinueText span{
-font-size:10px;
-color:var(--muted);
+  min-width:0;
+  max-width:100%;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  overflow-wrap:anywhere;
 }
 
-@media (max-width:999px){
+.viewerContinueText strong{font-size:clamp(13px,1.6vw,18px);line-height:1.2;}
+.viewerContinueText span{font-size:12px;color:var(--muted);}
 
-/* Narrow layouts always stack the viewer above the library.
-   There is no intermediate width where the library is hidden. */
-#workspace{
-padding:0;
-overflow:auto;
-display:flex;
-flex-direction:column;
-}
+#viewerLibrary:not(:has(.viewerContinue:not(.hidden))) .viewerLibraryHero{flex-basis:33.333%;}
+#viewerLibrary:not(:has(.viewerContinue:not(.hidden))) #viewerLibraryScroll{flex-basis:66.667%;}
 
-#readerPanel{
-order:1;
-width:100%;
-flex:1 1 auto;
-min-height:0;
-height:auto;
-}
+/* ---------- Main Library ---------- */
 
 #libraryPanel{
-order:2;
-position:relative;
-left:auto;
-top:auto;
-bottom:auto;
-transform:none!important;
-width:100%;
-min-width:0;
-height:320px;
-min-height:320px;
-max-height:320px;
-border-right:0;
-border-top:1px solid var(--line);
-box-shadow:0 -12px 28px rgba(0,0,0,.10);
+  box-sizing:border-box;
+  width:360px;
+  min-width:360px;
+  background:var(--panel);
+  color:var(--text);
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  position:relative;
+  z-index:1900;
+  transition:transform .28s cubic-bezier(.25,.8,.25,1);
 }
 
-#libraryPanel.open,
-#libraryPanel.visible,
-#libraryPanel.libraryCollapsed{
-transform:none!important;
-}
-
-#libraryPanel.libraryCollapsed{
-height:320px;
-min-height:320px;
-max-height:320px;
-overflow:hidden;
-border-top:1px solid var(--line);
-}
-
-#viewerLibrary{
-padding:clamp(16px,3vw,26px);
-}
-
-#viewerLibraryScroll{
-flex:1 1 auto;
-min-height:0;
-max-height:none;
-width:100%;
-overflow:auto;
-}
-
-#viewerShelfView{
-grid-template-columns:repeat(auto-fill,minmax(120px,1fr));
-gap:14px;
-}
-
-.viewerContinue{
-flex:0 0 auto;
-width:min(560px,100%);
-min-width:0;
-}
-
-.viewerContinueCard{
-min-width:0;
-overflow: hidden;
-}
-
-.viewerContinueText{
-min-width:0;
-flex:1 1 auto;
-}
-
-.viewerContinueText strong{
-font-size:clamp(15px,2vw,21px);
-white-space:normal;
-overflow:visible;
-text-overflow:clip;
-line-height:1.25;
-}
-
-}
-
-@media (max-width:760px){
-
-#readerPanel{
-min-height:460px;
-}
-
-#libraryPanel{
-height:300px;
-min-height:300px;
-max-height:300px;
+#continueReading,
+#recentSection{
+  box-sizing:border-box;
+  min-width:0;
+  min-height:0;
+  margin:0;
+  overflow:hidden;
+  background:var(--panel);
+  color:var(--text);
 }
 
 #continueReading{
-padding:12px 14px 10px;
-}
-
-#continueReading h2{
-font-size:clamp(15px,2vw,21px);
-margin-bottom:10px;
-}
-
-#continueCard{
-gap:12px;
-padding:10px 12px;
-border-radius:14px;
-overflow: hidden;
-}
-
-#continueCard .thumbnailPlaceholder,
-#continueCard .coverPlaceholder{
-width:50px;
-height:70px;
-flex:0 0 50px;
-}
-
-#continueCard .placeholderText{
-min-width:0;
-overflow: hidden;
-text-overflow: ellipsis;
-display: -webkit-box;
--webkit-line-clamp: 3;
--webkit-box-orient: vertical;
-}
-
-#continueCard .placeholderText h3{
-font-size:14px;
-line-height:1.25;
-overflow: hidden;
-text-overflow: ellipsis;
-display: -webkit-box;
--webkit-line-clamp: 3;
--webkit-box-orient: vertical;
-}
-
-#continueCard .placeholderText p{
-font-size:11px;
-overflow: hidden;
-text-overflow: ellipsis;
-display: -webkit-box;
--webkit-line-clamp: 3;
--webkit-box-orient: vertical;
+  flex:0 0 25%;
+  height:25%;
+  padding:10px 12px;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  border-bottom:1px solid var(--line);
 }
 
 #recentSection{
-padding:12px 14px;
+  flex:1 1 75%;
+  height:75%;
+  padding:10px 12px;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
 }
 
-.sectionHeader{
-margin-bottom:10px;
+#continueReading .sectionHeader,
+#recentSection .sectionHeader{
+  box-sizing:border-box;
+  flex:0 0 26px;
+  height:26px;
+  min-height:26px;
+  margin:0 0 6px;
+  padding:0;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
 }
 
-#searchWrapper{
-margin-bottom:10px;
+#continueReading .sectionHeader h2,
+#recentSection .sectionHeader h2{
+  margin:0;
+  padding:2px;
+  min-width:0;
+  line-height:1;
 }
 
-#viewerLibrary{
-padding:14px 10px;
+#continueReading .sectionHeader h2{
+  flex:1 1 auto;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
 }
 
-.viewerLibraryHero{
-margin-bottom:12px;
+.sectionToggleButton{
+  margin-left:auto;
+  flex:0 0 auto;
+  width:24px;
+  height:24px;
+  border:0;
+  border-radius:50%;
+  background:transparent;
+  color:var(--text);
+  font:600 20px/1 Inter,Arial,sans-serif;
+  cursor:pointer;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
 }
 
-.viewerLibraryHero h2{
-font-size:23px;
+.sectionToggleButton:hover{background:color-mix(in srgb,var(--text) 10%,transparent);}
+
+#continueCard{
+  display:flex;
+  align-items:left;
+  box-sizing:border-box;
+  flex:1 1 auto;
+  width:100%;
+  min-width:0;
+  min-height:0;
+  margin:0;
+  gap:10px;
+  padding:8px;
+  overflow:hidden;
+  border-radius:12px;
+  background:var(--card);
+  box-shadow:var(--soft-shadow);
 }
 
-#viewerShelfView{
-display:flex;
-gap:12px;
-width:max-content;
-grid-template-columns:none;
+#continueCard img{
+  object-fit: cover;
 }
 
-#viewerShelfView .bookCard{
-width:132px;
-flex:0 0 132px;
-overflow: hidden;
+
+#libraryContent{
+  box-sizing:border-box;
+  flex:1 1 auto;
+  width:100%;
+  min-width:0;
+  min-height:0;
+  margin:0;
+  overflow:auto;
+  padding:0 0 8px;
+  scroll-behavior:smooth;
 }
 
-#viewerShelfView .bookCard:nth-child(5n){
-grid-column:auto;
+#viewButtons{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  flex:0 0 auto;
 }
 
-#viewerShelfView .bookCard:nth-child(5n) .bookThumbnail{
-aspect-ratio:2/3;
+#viewButtons .viewButton{
+  width:30px;
+  height:30px;
 }
 
-#viewerShelfView .bookTitle{
-font-size:clamp(15px,2vw,21px);
-overflow: hidden;
-text-overflow: ellipsis;
-display: -webkit-box;
--webkit-line-clamp: 3;
--webkit-box-orient: vertical;
+#libraryDrawerClose{display:none;}
+
+/* Grid: exactly two columns with automatic/content-driven rows. */
+#shelfView{
+  display:block !important;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  grid-auto-rows:auto;
+  column-count:2;
+  column-gap: 10px;
+  padding:2px 2px 24px;
 }
 
-#viewerShelfView .bookSubtitle{
-font-size:clamp(10px,2vw,13px);
-overflow: hidden;
-text-overflow: ellipsis;
-display: -webkit-box;
--webkit-line-clamp: 3;
--webkit-box-orient: vertical;
+
+#shelfView .bookCard{
+  width:100%;
+  min-width:0;
+  height:fit-content;
+  width: fit-content;
+  margin-bottom:10px;
 }
 
+
+/* Shared card styling. */
+.bookCard,
+.bookTitle,
+.bookSubtitle,
+.placeholderText,
+.placeholderText h3,
+.placeholderText p,
+.listInfo,
+.listTitle,
+.listSubtitle,
+.listCategory{
+  min-width:0;
+  max-width:100%;
+  overflow-wrap:anywhere;
 }
 
-@media (max-width:430px){
-#readerPanel{
-min-height:430px;
+.bookCard{
+  position:relative;
+  display:flex;
+  flex-direction:column;
+  padding:10px;
+  border-radius:18px;
+  overflow:hidden;
+  cursor:pointer;
+  background-color:var(--card);
+  background-image:var(--card-background-image,none);
+  background-position:center;
+  background-size:cover;
+  background-repeat:no-repeat;
+  box-shadow:var(--soft-shadow);
+  border:1px solid color-mix(in srgb,var(--line) 80%,transparent);
+  transition:transform .25s ease,box-shadow .25s ease,background-color .25s ease;
 }
 
-#libraryPanel{
-height:285px;
-min-height:285px;
-max-height:285px;
+.bookCard::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:color-mix(in srgb,var(--card) 88%,transparent);
+  pointer-events:none;
+  transition:background .25s ease;
 }
 
-#viewerShelfView .bookCard{
-width:116px;
-flex-basis:116px;
-overflow: hidden;
-}
-}
+.bookCard:hover{transform:translateY(-3px);box-shadow:var(--hover-shadow);}
+.bookCard:hover::before{background:color-mix(in srgb,var(--card) 80%,transparent);}
 
-/* ---------- Desktop ---------- */
-
-@media (min-width:1000px){
-
-#libraryPanel{
-transform:translateX(0);
-position:relative;
-}
-
-#readerPanel{
-border-radius:0;
+.bookThumbnail{
+  position:relative;
+  z-index:1;
+  width:100%;
+  height:calc(100% - 50px) !important;
+  min-height:0;
+  aspect-ratio:auto;
+  border-radius:12px;
+  overflow:hidden;
+  background:#e4e7eb;
+  box-shadow:0 6px 16px rgba(0,0,0,.14);
 }
 
+
+.bookThumbnail img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block;
+  transition:transform .35s ease;
+  padding-top: 0; 
 }
 
-/* ---------- Narrow layout note ---------- */
-/* All sub-1000px layouts are handled above as a stacked viewer/library workspace. */
+.bookCard:hover .bookThumbnail img{transform:scale(1.025);}
 
-/* =====================================================
-   Test 27 — compact narrow library + floating reader controls
-   ===================================================== */
-
-/* The narrow workspace reserves at most one quarter of its active
-   height for the library. The viewer always remains above it. */
-@media (max-width:999px){
-
-  #workspace{
-    display:flex;
-    flex-direction:column;
-    overflow:auto;
-    min-height:0;
-
-  }
-
-  #readerPanel{
-    order:1;
-    flex:1 1 75%;
-    width:100%;
-    min-height:0;
-    height:auto;
-  }
-
-  #libraryPanel{
-    order:2;
-    display:flex;
-    flex-direction:row;
-    align-items:stretch;
-    width:100%;
-    min-width:0;
-    height:25%;
-    min-height:0;
-    max-height:25%;
-    flex:0 0 25%;
-    overflow:hidden;
-    border-right:0;
-    border-top:1px solid var(--line);
-    box-shadow:0 -10px 24px rgba(0,0,0,.08);
-  }
-
-  /* Continue Reading occupies a compact left-hand column. */
-  #continueReading{
-    width:clamp(185px,24vw,250px);
-    min-width:185px;
-    max-width:250px;
-    height:100%;
-    overflow:hidden;
-    padding:10px 12px;
-    border-bottom:0;
-    border-right:1px solid var(--line);
-    display:flex;
-    flex-direction:column;
-    justify-content:center;
-  }
-
-  #continueReading h2{
-font-size:clamp(15px,2vw,21px);
-    margin:0 0 7px;
-  }
-
-  #continueCard{
-    min-width:0;
-    width:100%;
-    min-height:0;
-    padding:8px 10px;
-    gap:9px;
-    border-radius:12px;
-    box-shadow:0 5px 14px rgba(0,0,0,.07);
-overflow: hidden;
-  }
-
-  #continueCard .coverPlaceholder,
-  #continueCard .thumbnailPlaceholder{
-    width:38px;
-    height:54px;
-    flex:0 0 38px;
-    border-radius:6px;
-  }
-
-  #continueCard .placeholderText,
-  #continueCard .placeholderText h3,
-  #continueCard .placeholderText p{
-    min-width:0;
-    max-width:100%;
-    overflow:hidden;
-text-overflow: ellipsis;
-display: -webkit-box;
--webkit-line-clamp: 3;
--webkit-box-orient: vertical;
-  }
-
-  #continueCard .placeholderText h3{
-font-size:clamp(15px,2vw,21px);
-    line-height:1.2;
-overflow: hidden;
-text-overflow: ellipsis;
-    display:-webkit-box;
-    -webkit-line-clamp:2;
-    -webkit-box-orient:vertical;
-  }
-
-  #continueCard .placeholderText p{
- font-size:clamp(10px,2vw,13px);
-    line-height:1.2;
-    white-space:nowrap;
-overflow: hidden;
-text-overflow: ellipsis;
-display: -webkit-box;
--webkit-line-clamp: 3;
--webkit-box-orient: vertical;
-    }
-
-  /* Library content occupies the remaining horizontal space. */
-  #recentSection{
-    flex:1 1 auto;
-    min-width:0;
-    min-height:0;
-    height:100%;
-    overflow:hidden;
-    padding:10px 12px;
-  }
-
-  .sectionHeader{
-    margin-bottom:5px;
-  }
-
-  .sectionHeader h2{
-    font-size:14px;
-  }
-
-  #viewButtons{
-    display:none;
-  }
-
-  #libraryContent{
-    min-height:0;
-    height:100%;
-    overflow-x:auto;
-    overflow-y:hidden;
-    padding:0 0 3px;
-  }
-
-  #shelfView{
-    display:flex;
-    flex-direction:row;
-    width:max-content;
-    min-width:100%;
-    height:100%;
-    gap:10px;
-    padding:1px 2px 5px;
-  }
-
-  #shelfView .bookCard,
-  #shelfView .bookCard:nth-child(5n){
-    width:74px;
-    min-width:74px;
-    max-width:74px;
-    flex:0 0 74px;
-    padding:5px;
-    border-radius:10px;
-  }
-
-  #shelfView .bookCard:nth-child(5n) .bookThumbnail{
-    aspect-ratio:2/3;
-  }
-
-  #shelfView .bookTitle{
-    margin-top:5px;
-    font-size:10px;
-    line-height:1.15;
-    display:-webkit-box;
-    -webkit-line-clamp:2;
-    -webkit-box-orient:vertical;
-    overflow:hidden;
-  }
-
-  #shelfView .bookSubtitle{
-    display:none;
-  }
-
-  /* Keep the viewer landing compact enough to coexist with the reduced
-     library height on narrow screens. */
-  #viewerLibrary{
-    padding:14px;
-  }
-
-  #viewerLibraryScroll{
-    min-height:0;
-    max-height:none;
-  }
+.bookTitle{
+  position:relative;
+  z-index:2;
+  margin:10px 2px 0;
+  font-size:14px;
+  font-weight:700;
+  line-height:1.3;
+  color:var(--text);
+  overflow:hidden;
+  display:-webkit-box;
+  -webkit-box-orient:vertical;
+  -webkit-line-clamp:2;
 }
 
-/* =====================================================
-   Floating reader controls
-   ===================================================== */
+.bookSubtitle{
+  position:relative;
+  z-index:2;
+  margin:4px 2px 2px;
+  font-size:12px;
+  line-height:1.35;
+  color:var(--muted);
+  overflow:hidden;
+  display:-webkit-box;
+  -webkit-box-orient:vertical;
+  -webkit-line-clamp:2;
+}
+
+/* List view. */
+#listView{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  width:100%;
+  min-width:0;
+  padding:0 0 24px;
+}
+
+#listView .listItem{
+  display:flex;
+  align-items:center;
+  gap:16px;
+  width:100%;
+  min-width:0;
+  padding:12px;
+  border-radius:16px;
+  cursor:pointer;
+  transition:background .2s ease,transform .2s ease;
+}
+
+#listView .listItem:hover{background:var(--card-soft);transform:translateX(4px);}
+
+#listView .listThumb{
+  width:54px;
+  height:76px;
+  flex:0 0 54px;
+  border-radius:8px;
+  overflow:hidden;
+  background:#dde2e8;
+  box-shadow:0 4px 12px rgba(0,0,0,.12);
+}
+
+#listView .listThumb img{width:100%;height:100%;object-fit:cover;display:block;}
+#listView .listInfo{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;}
+#listView .listTitle{font-size:15px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#listView .listSubtitle{margin-top:4px;font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+/* View state is authoritative; no responsive rule may resurrect a hidden view. */
+#libraryPanel #shelfView.hidden,
+#libraryPanel #listView.hidden{
+  display:none!important;
+  visibility:hidden!important;
+  pointer-events:none!important;
+}
+
+#libraryPanel #shelfView:not(.hidden){display:grid;}
+#libraryPanel #listView:not(.hidden){display:flex;}
+
+/* Read Again collapse: the Library consumes released vertical space. */
+#continueReading.continueCollapsed{
+  flex:0 0 42px!important;
+  height:42px!important;
+  min-height:42px!important;
+  max-height:42px!important;
+  padding:8px 12px!important;
+}
+
+#continueReading.continueCollapsed #continueCard{display:none!important;}
+
+#continueReading.continueCollapsed + #recentSection{
+  flex:1 1 auto!important;
+  height:auto!important;
+  min-height:0!important;
+}
+
+#app.viewerFocus #libraryPanel{display:none!important;}
+
+/* ---------- Top-bar search ---------- */
+
+#topSearchGroup{
+  grid-column:1;
+  justify-self:start;
+  display:flex;
+  align-items:center;
+  gap:7px;
+  width:calc(360px - 30px);
+  min-width:0;
+}
+
+#topSearchGroup #searchBox{
+  display:block!important;
+  flex:1 1 auto;
+  width:auto;
+  min-width:0;
+  height:34px;
+  padding:0 11px;
+  opacity:1;
+  pointer-events:auto;
+  border:1px solid color-mix(in srgb,var(--control-text) 18%,transparent);
+  border-radius:10px;
+  background:var(--control-bg);
+  color:var(--control-text);
+  font-size:14px;
+  outline:none;
+  box-sizing:border-box;
+  backdrop-filter:blur(10px);
+}
+
+#topSearchGroup #searchBox::placeholder{color:color-mix(in srgb,var(--control-text) 72%,transparent);}
+#topSearchGroup #searchBox:focus{box-shadow:0 0 0 2px color-mix(in srgb,var(--control-text) 18%,transparent);}
+#topSearchGroup .iconButton{flex:0 0 auto;}
+#searchWrapper,#searchToggleButton{display:none!important;}
+
+html[data-theme="dark"] #topBar .icon,
+html[data-theme="dark"] #topBar .iconButton{
+  color:#eef2f5!important;
+}
+
+/* ---------- Reader floating toolbar ---------- */
 
 #readerPanel #toolbar{
   position:absolute;
@@ -981,295 +868,63 @@ display: -webkit-box;
   height:42px;
   margin:0;
   pointer-events:auto;
-  border:1px solid rgba(255,255,255,.22);
-  background:rgba(255,255,255,.18);
-  color:#fff;
+  border:1px solid color-mix(in srgb,var(--control-text) 22%,transparent);
+  background:rgba(255,255,255,.30)!important;
+  color:var(--control-text);
   backdrop-filter:blur(7px);
   box-shadow:0 5px 18px rgba(0,0,0,.16);
-filter:drop-shadow(0px 1px 1px rgb(0 0 0 / 0.4));
-  transition:opacity .2s ease,transform .2s ease,background .2s ease;
+  display:block;
+  opacity:0;
+  visibility:hidden;
 }
 
-#readerPanel #toolbar .iconButton:hover{
-  background:rgba(255,255,255,.34);
-  transform:scale(1.04);
-}
+#readerPanel #toolbar:not(.hidden) .iconButton{opacity:1;visibility:visible;}
+#readerPanel #toolbar.hidden{display:none!important;}
 
-#readerPanel #toolbar #previousButton{
-  left:clamp(6px,2vw,22px);
-  top:50%;
-  transform:translateY(-50%);
-
-}
-
-#readerPanel #toolbar #nextButton{
-  right:clamp(6px,2vw,22px);
-  top:50%;
-  transform:translateY(-50%);
-}
-
-#readerPanel #toolbar #rotateButton,
-#readerPanel #toolbar #muteButton,
-#readerPanel #toolbar #viewerFullscreenButton{
-  top:14px;
-}
-
-
-/* The fullscreen/focus control is part of the toolbar, immediately to the
-   right of the mute control. It inherits the toolbar's visibility state. */
-#readerPanel #toolbar #viewerFullscreenButton{
-  right:14px;
-}
-
-#readerPanel #toolbar #muteButton{
-  right:64px;
-}
+#readerPanel #toolbar #viewerFullscreenButton{right:14px!important;left:auto!important;}
+#readerPanel #toolbar #muteButton{right:64px!important;left:auto!important;}
 
 #readerPanel #toolbar #rotateButton{
-  right:114px;
+  right:114px!important;
+  left:auto!important;
+  font-size:25px!important;
+  font-family:"Segoe UI Symbol","Noto Sans Symbols 2","Arial Unicode MS",sans-serif!important;
+  line-height:1;
+  display:flex!important;
+  align-items:center;
+  justify-content:center;
+  padding:0!important;
 }
 
-#readerPanel #toolbar #viewerFullscreenButton{
-  position:absolute;
+#readerPanel #toolbar #rotateButton svg,
+#readerPanel #toolbar #muteButton svg,
+#readerPanel #toolbar #viewerFullscreenButton svg{
+  color:var(--control-text)!important;
+  stroke:currentColor;
 }
 
-
-#readerPanel #toolbar.hidden{
-  display:block;
-  opacity:0;
-  visibility:hidden;
+#readerPanel #toolbar #previousButton.isFirstPage{
+  opacity:0!important;
+  visibility:hidden!important;
   pointer-events:none;
 }
 
-#readerPanel #toolbar.hidden .iconButton{
-  opacity:0;
-  visibility:hidden;
-  pointer-events:none;
+#readerPanel #toolbar #previousButton,
+#readerPanel #toolbar #nextButton{
+  transform-origin:center center;
 }
 
-/* Let the arrows sit beside the actual page host rather than over the
-   synthetic edge pages. Their transparent treatment keeps the visible
-   publication unobstructed. */
-@media (max-width:700px){
-  #readerPanel #toolbar .iconButton{
-    width:38px;
-    height:38px;
-  }
-  #readerPanel #toolbar #previousButton{left:5px;}
-  #readerPanel #toolbar #nextButton{right:5px;}
-  #readerPanel #toolbar #rotateButton{right:55px;}
-  #readerPanel #toolbar #muteButton{right:10px;}
+html[data-theme="dark"] #readerPanel #toolbar .iconButton,
+html[data-theme="dark"] #readerPanel #toolbar .icon{
+  color:#f2f5f7!important;
 }
 
-
-/* =====================================================
-   Test 28 — single-row narrow library + symmetric controls
-   ===================================================== */
-@media (max-width:999px){
-  /* Keep the narrow library compact and give the actual book cards
-     the majority of the panel height. */
-  #libraryPanel{
-    height:25% !important;
-    min-height:0 !important;
-    max-height:25% !important;
-    flex:0 0 25% !important;
-    overflow:hidden !important;
-  }
-
-  /* Continue Reading and Library headings each use no more than
-     one quarter of the active library-panel height. */
-  #continueReading,
-  #recentSection{
-    min-height:0 !important;
-    height:100% !important;
-  }
-
-  #continueReading{
-    width:clamp(170px,24vw,230px) !important;
-    min-width:170px !important;
-    max-width:230px !important;
-    padding:6px 9px !important;
-    justify-content:flex-start !important;
-    gap:2px !important;
-  }
-
-  #continueReading h2{
-    height:25% !important;
-    max-height:25% !important;
-    min-height:0 !important;
-    margin:0 !important;
-    display:flex !important;
-    align-items:center !important;
-font-size:clamp(15px,2vw,21px) !important;
-    line-height:1 !important;
-  }
-
-  #continueCard{
-    flex:1 1 75% !important;
-    min-height:0 !important;
-    max-height:75% !important;
-    width:100% !important;
-    overflow:hidden !important;
-  }
-
-  #recentSection{
-    padding:6px 9px !important;
-    overflow:hidden !important;
-  }
-
-  #recentSection .sectionHeader{
-    height:25% !important;
-    max-height:25% !important;
-    min-height:0 !important;
-    margin:0 !important;
-    display:flex !important;
-    align-items:center !important;
-    position:relative !important;
-  }
-
-  #recentSection .sectionHeader h2{
-    margin:0 !important;
-    font-size:12px !important;
-    line-height:1 !important;
-  }
-
-  #viewButtons,
-  #shelfViewButton,
-  #listViewButton{
-    display:none !important;
-  }
-
-  /* One continuous horizontal row — never a grid/list in the narrow
-     workspace. */
-  #libraryContent{
-    height:75% !important;
-    min-height:0 !important;
-    overflow-x:auto !important;
-    overflow-y:hidden !important;
-    scrollbar-width:thin;
-  }
-
-  #shelfView{
-    display:flex !important;
-    flex-direction:row !important;
-    flex-wrap:nowrap !important;
-    align-items:flex-start !important;
-    width:max-content !important;
-    min-width:max-content !important;
-    height:100% !important;
-    gap:10px !important;
-    padding:1px 2px 4px !important;
-  }
-
-  #shelfView .bookCard,
-  #shelfView .bookCard:nth-child(5n){
-    flex:0 0 74px !important;
-    width:74px !important;
-    min-width:74px !important;
-    max-width:74px !important;
-    height:auto !important;
-    max-height:100% !important;
-  }
+html[data-theme="dark"] #readerPanel #toolbar .iconButton{
+  background:rgba(12,15,20,.30)!important;
 }
 
-/* Reader controls remain completely absent until a book is selected. */
-#readerPanel #toolbar.hidden{
-  display:none !important;
-  opacity:0 !important;
-  pointer-events:none !important;
-}
+/* ---------- Settings ---------- */
 
-#readerPanel #toolbar:not(.hidden){
-  display:block;
-}
-
-/* =====================================================
-   SkyReader polish: mobile safe-area + centered landing
-===================================================== */
-
-html,body{height:100%;min-height:100%;}
-
-#app{
-  height:100dvh;
-  min-height:100svh;
-  padding-top:max(10px, env(safe-area-inset-top));
-  padding-bottom:max(16px, env(safe-area-inset-bottom));
-}
-
-#topBar{
-  flex:0 0 var(--header-height);
-  min-height:var(--header-height);
-  padding-top:max(0px, env(safe-area-inset-top));
-}
-
-#workspace{min-height:0;}
-
-#viewerLibrary{
-  top:50%;
-  height:min(66.6667%, 760px);
-  max-height:calc(100% - 24px);
-  min-height:0;
-  justify-content:center;
-  align-items:stretch;
-}
-
-#viewerLibrary:not(:has(.viewerContinue:not(.hidden))){
-  justify-content:center;
-}
-
-#viewerLibraryScroll{
-  flex:0 1 auto;
-}
-
-/* Mobile browser chrome can cover the visual edges even when CSS 100vh
-   reports the larger layout viewport. Keep meaningful breathing room. */
-@media (max-width:999px){
-  #app{
-    height:100dvh;
-    min-height:100svh;
-  }
-
-  #viewerBackground{
-    padding-top:max(28px, env(safe-area-inset-top) + 18px);
-    padding-bottom:max(34px, env(safe-area-inset-bottom) + 22px);
-  }
-
-  #viewerArea{
-    min-height:0;
-  }
-
-  /* Topbar library button is a real collapse/restore control on narrow
-     devices instead of remaining visually fixed. */
-  #libraryPanel.libraryCollapsed{
-    height:0 !important;
-    min-height:0 !important;
-    max-height:0 !important;
-    flex-basis:0 !important;
-    border-top:0 !important;
-    box-shadow:none !important;
-    overflow:hidden !important;
-  }
-
-  #viewButtons{display:flex !important;}
-
-  #libraryContent{
-    overflow:auto !important;
-  }
-
-  #shelfView{
-    width:auto !important;
-    min-width:0 !important;
-    height:auto !important;
-    min-height:100%;
-  }
-
-  #listView{
-    min-width:0;
-    width:100%;
-  }
-}
-
-/* Settings panel */
 .sr-settings-panel{
   position:fixed;
   inset:0;
@@ -1282,6 +937,7 @@ html,body{height:100%;min-height:100%;}
   visibility:hidden;
   transition:opacity .2s ease,visibility .2s ease;
 }
+
 .sr-settings-panel.visible{opacity:1;visibility:visible;}
 .sr-settings-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.38);backdrop-filter:blur(5px);}
 .sr-settings-dialog{position:relative;width:min(420px,100%);max-height:min(720px,90dvh);overflow:auto;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:22px;box-shadow:0 24px 70px rgba(0,0,0,.25);transform:translateY(10px) scale(.98);transition:transform .22s ease;}
@@ -1289,693 +945,306 @@ html,body{height:100%;min-height:100%;}
 .sr-settings-header{display:flex;align-items:center;justify-content:space-between;padding:18px 20px;border-bottom:1px solid var(--line);}
 .sr-settings-header h2{font-size:20px;}
 .sr-settings-close{width:34px;height:34px;border:0;border-radius:50%;background:transparent;font-size:26px;line-height:1;cursor:pointer;color:inherit;}
-.sr-settings-close:hover{background:rgba(0,0,0,.06);}
+.sr-settings-close:hover{background:color-mix(in srgb,var(--text) 8%,transparent);}
 .sr-settings-body{padding:10px 20px 20px;}
 .sr-setting-row{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:15px 0;border-bottom:1px solid var(--line);font-size:14px;}
-.sr-setting-row input[type="checkbox"]{width:20px;height:20px;accent-color:#444;}
+.sr-setting-row input[type="checkbox"]{width:20px;height:20px;accent-color:var(--text);}
 .sr-setting-range{flex-wrap:wrap;}
 .sr-setting-range input[type="range"]{width:100%;}
 .sr-settings-action{width:100%;margin-top:18px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--panel2);color:var(--text);cursor:pointer;font:inherit;}
 
-html[data-theme="dark"]{
-  --bg:#111315;--panel:#191c20;--panel2:#15181b;--text:#f2f3f5;--muted:#a6abb3;--line:#30343a;
-}
-html[data-theme="dark"] #topBar,
-html[data-theme="dark"] #workspace,
-html[data-theme="dark"] #statusBar{background:rgba(24,27,31,.94);}
-html[data-theme="dark"] .bookCard{background-color:rgba(30,33,38,.94);}
-html[data-theme="dark"] .bookCard::before{background:rgba(30,33,38,.88);}
+/* ---------- Welcome / focus ---------- */
 
-/* =====================================================
-   SkyReader viewer-first responsive layout
-   ===================================================== */
-:root{
-  --header-height:clamp(44px,5.5vh,68px);
-  --toolbar-height:clamp(42px,5.5vh,72px);
-  --status-height:clamp(24px,3vh,34px);
+.sr-welcome-banner{
+  background:var(--panel);
+  color:var(--muted);
+  border-top:1px solid var(--line);
+  padding:4px 8px;
+  font-size:12px;
 }
 
-#app{
-  height:100dvh;
-  min-height:100svh;
-  padding:clamp(4px,1vh,10px) 0;
+#app.viewerFocus{
+  position:fixed!important;
+  inset:0!important;
+  width:100vw!important;
+  height:100dvh!important;
+  min-height:100svh!important;
+  padding:0!important;
+  z-index:99999!important;
 }
 
-#topBar{
-  flex:0 0 var(--header-height);
-  min-height:var(--header-height);
-  height:var(--header-height);
-  padding-inline:clamp(8px,1.5vw,18px);
+#app.viewerFocus #workspace{
+  width:100%!important;
+  height:100%!important;
+  min-height:100%!important;
+  padding:0!important;
+  display:block!important;
+  overflow:hidden!important;
 }
 
-#topBar #appTitle{font-size:clamp(15px,2.2vh,22px);}
-#topBar .iconButton{width:clamp(28px,4vh,34px);height:clamp(28px,4vh,34px);}
+#app.viewerFocus #readerPanel{
+  display:flex!important;
+  width:100%!important;
+  height:100%!important;
+  min-height:100%!important;
+  max-height:none!important;
+  flex:none!important;
+}
 
-#workspace{min-height:0;}
+#app.viewerFocus #viewerBackground{
+  width:100%;
+  height:100%;
+  flex:1 1 auto!important;
+  padding:max(6px,env(safe-area-inset-top)) max(6px,env(safe-area-inset-right)) max(6px,env(safe-area-inset-bottom)) max(6px,env(safe-area-inset-left))!important;
+}
 
-#readerPanel{min-height:0;}
+/* ---------- Responsive system ---------- */
 
-#viewerBackground{min-height:0;padding:clamp(8px,1.5vh,28px);}
-
-/* Viewer receives at least two thirds of the usable vertical viewport on
-   narrow screens; surrounding chrome scales down before the viewer does. */
 @media (max-width:999px){
-  #workspace{display:flex;flex-direction:column;overflow:hidden;}
-  #readerPanel{order:1;flex:2 1 66.6667%;height:auto;min-height:66.6667%;}
-  #libraryPanel{order:2;flex:1 1 33.3333%;height:auto;min-height:0;max-height:33.3333%;}
-  #toolbar{height:var(--toolbar-height);min-height:var(--toolbar-height);}
-  #statusBar{height:var(--status-height);min-height:var(--status-height);}
-  #viewerBackground{padding-top:max(8px,env(safe-area-inset-top));padding-bottom:max(8px,env(safe-area-inset-bottom));}
+  #app{
+    height:100dvh;
+    min-height:100svh;
+  }
+
+  #topBar{
+    padding-top:max(0px,env(safe-area-inset-top));
+  }
+
+  #workspace{
+    display:flex;
+    flex-direction:row;
+    overflow:hidden;
+    min-height:0;
+    padding:0;
+  }
+
+  #readerPanel{
+    order:1;
+    flex:1 1 auto;
+    width:100%;
+    min-width:0;
+    height:100%;
+    min-height:0;
+    max-height:none;
+  }
+
+  #viewerBackground{
+    padding-top:max(8px,env(safe-area-inset-top));
+    padding-bottom:max(8px,env(safe-area-inset-bottom));
+  }
+
+  #viewerLibrary{padding:10px;}
+  #viewerShelfView .bookCard{width:clamp(96px,16vw,145px);min-width:clamp(96px,16vw,145px);max-width:clamp(96px,16vw,145px);}
+
+  #topSearchGroup{
+    width:min(calc(100vw - 36px),330px);
+  }
+
+  #topSearchGroup #searchBox{
+    height:30px;
+    font-size:12px;
+  }
+
+  #readerPanel #toolbar .iconButton{width:38px;height:38px;}
+  #readerPanel #toolbar #rotateButton{right:101px!important;}
+  #readerPanel #toolbar #muteButton{right:53px!important;}
+  #readerPanel #toolbar #viewerFullscreenButton{right:5px!important;}
 }
 
 @media (max-width:600px){
   #topBar{--header-height:clamp(38px,6vh,52px);}
-  #libraryPanel{font-size:clamp(11px,1.8vw,14px);}
-  #continueReading,#recentSection{padding:clamp(5px,1vh,10px) clamp(8px,1.5vw,14px)!important;}
-  #continueReading h2,.sectionHeader h2{font-size:clamp(11px,2.2vw,16px)!important;margin-bottom:clamp(4px,0.8vh,8px)!important;}
-  #searchWrapper{margin-bottom:clamp(4px,0.8vh,8px)!important;}
-  #searchBox{height:clamp(30px,4vh,40px);font-size:clamp(11px,2vw,14px);}
-  #viewButtons{gap:4px!important;}
-  #viewButtons .viewButton{width:clamp(26px,4vh,32px);height:clamp(26px,4vh,32px);}
+  .viewerLibraryHero{gap:9px;}
+  .viewerLibraryHero h2{font-size:clamp(25px,5vw,35px);}
+  .viewerLibraryHero p{font-size:11px;}
+  .viewerLibraryVector{width:44px;height:44px;border-radius:14px;}
+  #listView .listThumb{width:48px;height:68px;flex-basis:48px;}
+  #listView .listTitle{font-size:14px;}
+  #listView .listSubtitle{font-size:12px;}
 }
 
-/* Viewer landing uses up to two thirds of the viewer itself. The content
-   is partitioned 1:1:2 when Continue Reading exists, and 1:2 otherwise. */
-#viewerLibrary{
-  height:min(66.6667%,760px);
-  max-height:66.6667%;
-  min-height:0;
-  padding:clamp(10px,2vh,28px) clamp(10px,2vw,28px);
-  justify-content:stretch;
-  overflow:hidden;
-}
-.viewerLibraryHero{flex:1 1 25%;min-height:0;margin:0 auto;padding:4px 0;width:100%;}
-.viewerContinue{flex:1 1 25%;min-height:0;width:min(560px,100%);margin:0 auto;padding:4px 0;display:flex;align-items:center;}
-.viewerContinueCard{width:100%;max-height:100%;padding:clamp(7px,1vh,12px) clamp(10px,1.5vw,16px);overflow: hidden;}
-#viewerLibraryScroll{flex:2 1 50%;min-height:0;max-height:none;overflow:hidden;width:100%;padding:4px 4px 8px;}
-#viewerShelfView{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));grid-auto-rows:minmax(0,1fr);gap:clamp(8px,1vw,14px);height:100%;overflow:hidden;}
-#viewerShelfView .bookCard{height:100%;min-height:0;padding:clamp(5px,0.8vw,10px);overflow: hidden;}
-#viewerShelfView .bookThumbnail{aspect-ratio:2/3;min-height:0;max-height:calc(100% - 28px);}
-#viewerShelfView .bookTitle{font-size:clamp(10px,1.3vw,14px);margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display: -webkit-box;
--webkit-line-clamp: 3;
--webkit-box-orient: vertical;}
-#viewerShelfView .bookSubtitle{display:none;}
-#viewerLibrary:not(:has(.viewerContinue:not(.hidden))) .viewerLibraryHero{flex-basis:33.333%;}
-#viewerLibrary:not(:has(.viewerContinue:not(.hidden))) #viewerLibraryScroll{flex-basis:66.666%;}
-
-/* Lower library panel: cards fit the available height instead of creating a
-   vertical scroll just to reveal the covers. */
 @media (max-width:999px){
-  #libraryPanel{overflow:hidden!important;}
-  #libraryContent{overflow:hidden!important;min-height:0;}
-  #shelfView,#listView{height:100%;min-height:0;overflow:hidden;}
-  #shelfView{grid-template-columns:repeat(auto-fit,minmax(62px,1fr));grid-auto-rows:1fr;gap:clamp(5px,1vw,10px);padding:2px;}
-  #shelfView .bookCard,#shelfView .bookCard:nth-child(5n){grid-column:auto;min-height:0;height:100%;padding:4px;}
-  #shelfView .bookThumbnail{aspect-ratio:2/3;min-height:0;max-height:calc(100% - 20px);}
-  #shelfView .bookTitle{font-size:clamp(9px,1.7vw,12px);margin:4px 1px 0;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display: -webkit-box;
--webkit-line-clamp: 3;
--webkit-box-orient: vertical;}
-  #shelfView .bookSubtitle{display:none;}
-  #listView{overflow:hidden;}
-  #listView .listItem{min-height:0;height:100%;}
-}
-
-/* Viewer-only focus mode: everything outside the actual viewer disappears. */
-#app.viewerFocus #topBar,
-#app.viewerFocus #libraryPanel,
-#app.viewerFocus #statusBar,
-#app.viewerFocus > div:last-child{display:none!important;}
-#app.viewerFocus #workspace{padding:0!important;}
-#app.viewerFocus #readerPanel{width:100%!important;flex:1 1 100%!important;min-height:100%!important;height:100%!important;}
-#app.viewerFocus #viewerBackground{height:100%;padding:max(8px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left));}
-
-
-/* =====================================================
-   SkyReader vNext — viewer-dominant horizontal libraries
-   ===================================================== */
-
-/* The reader gets the dominant share of the narrow viewport.  The browser
-   chrome is not counted as application content; dvh gives us the current
-   dynamic viewport while the surrounding UI is allowed to compress. */
-@media (max-width:999px){
-  #workspace{
-    display:flex !important;
-    flex-direction:column !important;
-    height:75dvh !important;
-    min-height:75dvh !important;
-    max-height:75dvh !important;
-    overflow:hidden !important;
-  }
-
-  #readerPanel{
-    order:1 !important;
-    flex:0 0 75% !important;
-    width:100% !important;
-    height:75% !important;
-    min-height:0 !important;
-    max-height:none !important;
-  }
-
+  /* One Library DOM becomes a left pull-out drawer. */
   #libraryPanel{
-    order:2 !important;
-    flex:0 0 25% !important;
-    width:100% !important;
-    height:25% !important;
-    min-height:0 !important;
-    max-height:25% !important;
-    overflow:hidden !important;
+    position:fixed!important;
+    left:0!important;
+    top:0!important;
+    bottom:0!important;
+    width:min(88vw,380px)!important;
+    min-width:min(88vw,380px)!important;
+    height:100dvh!important;
+    min-height:100dvh!important;
+    max-height:none!important;
+    padding:0!important;
+    flex-direction:column!important;
+    overflow:hidden!important;
+    transform:translateX(-102%)!important;
+    transition:transform .28s cubic-bezier(.25,.8,.25,1)!important;
+    z-index:1900!important;
+    box-shadow:12px 0 30px rgba(0,0,0,.22)!important;
+    border-right:1px solid var(--line)!important;
+    border-top:0!important;
   }
 
-  /* Do not spend vertical space on browser-bar compensation.  Keep only
-     the safe-area inset that the device actually reports. */
-  #viewerBackground{
-    padding-top:max(6px,env(safe-area-inset-top)) !important;
-    padding-bottom:max(6px,env(safe-area-inset-bottom)) !important;
+  #libraryPanel.visible{transform:translateX(0)!important;}
+  #libraryPanel.libraryCollapsed{transform:translateX(-102%)!important;}
+
+  #continueReading{
+    flex:0 0 25%!important;
+    width:100%!important;
+    height:25%!important;
+    min-height:0!important;
+    max-height:25%!important;
+    padding:10px 12px!important;
   }
 
-  /* ---------- Viewer landing: 1 : 1 : 2 ---------- */
-  #viewerLibrary{
-    top:50% !important;
-    height:88% !important;
-    max-height:88% !important;
-    min-height:0 !important;
-    width:96% !important;
-    left:2% !important;
-    right:auto !important;
-    padding:8px 10px !important;
-    justify-content:stretch !important;
-    overflow:hidden !important;
-  }
-
-  .viewerLibraryHero{
-    flex:1 1 25% !important;
-    height:25% !important;
-    min-height:0 !important;
-    margin:0 !important;
-    width:100% !important;
-    overflow:hidden !important;
-    gap:9px !important;
-  }
-
-  .viewerLibraryHero h2{
-    font-size:clamp(17px,2vw,26px) !important;
-  }
-
-  .viewerLibraryHero p{
-    font-size:clamp(10px,1.8vw,13px) !important;
-  }
-
-  .viewerLibraryVector{
-    width:clamp(36px,7vw,52px) !important;
-    height:clamp(36px,7vw,52px) !important;
-  }
-
-  .viewerContinue{
-    flex:1 1 25% !important;
-    height:25% !important;
-    min-height:0 !important;
-    max-height:none !important;
-    width:100% !important;
-    margin:0 !important;
-    padding:4px 0 !important;
-    overflow:hidden !important;
-  }
-
-  .viewerContinueCard{
-    height:100% !important;
-    max-height:100% !important;
-    min-height:0 !important;
-    padding:6px 10px !important;
-overflow: hidden;
-  }
-
-  .viewerContinueCard img{
-    width:auto !important;
-    height:100% !important;
-    max-height:100% !important;
-    aspect-ratio:2/3 !important;
-  }
-
-  #viewerLibraryScroll{
-    flex:2 1 50% !important;
-    height:50% !important;
-    min-height:0 !important;
-    max-height:none !important;
-    width:100% !important;
-    overflow-x:auto !important;
-    overflow-y:hidden !important;
-    padding:4px 2px 6px !important;
-    scrollbar-width:thin;
-  }
-
-  /* A single horizontal rail.  Cards may overflow the container width and
-     are intentionally reached by horizontal scrolling. */
-  #viewerShelfView{
-    display:flex !important;
-    flex-direction:row !important;
-    flex-wrap:nowrap !important;
-    align-items:stretch !important;
-    width:max-content !important;
-    min-width:max-content !important;
-    height:100% !important;
-    gap:clamp(8px,1.2vw,14px) !important;
-    overflow:visible !important;
-  }
-
-  #viewerShelfView .bookCard,
-  #viewerShelfView .bookCard:nth-child(5n){
-    flex:0 0 auto !important;
-    width:clamp(92px,16vw,145px) !important;
-    min-width:clamp(92px,16vw,145px) !important;
-    max-width:clamp(92px,16vw,145px) !important;
-    height:100% !important;
-    min-height:0 !important;
-    max-height:100% !important;
-    padding:5px !important;
-    grid-column:auto !important;
-  }
-
-  #viewerShelfView .bookThumbnail{
-    width:100% !important;
-    height:calc(100% - 32px) !important;
-    max-height:none !important;
-    min-height:0 !important;
-    aspect-ratio:auto !important;
-  }
-
-  #viewerShelfView .bookTitle{
-    margin:5px 1px 0 !important;
-    font-size:clamp(10px,1.5vw,14px) !important;
-    line-height:1.15 !important;
-    white-space:nowrap !important;
-    overflow:hidden !important;
-    text-overflow:ellipsis !important;
-  }
-
-  #viewerShelfView .bookSubtitle{
-    display:none !important;
-  }
-
-  /* If there is no Continue Reading, the two remaining regions become
-     1/3 hero and 2/3 library while preserving the horizontal rail. */
-  #viewerLibrary:not(:has(.viewerContinue:not(.hidden))) .viewerLibraryHero{
-    flex-basis:33.333% !important;
-    height:33.333% !important;
-  }
-
-  #viewerLibrary:not(:has(.viewerContinue:not(.hidden))) #viewerLibraryScroll{
-    flex-basis:66.667% !important;
-    height:66.667% !important;
-  }
-
-  /* ---------- Lower library panel: horizontal cards + titles ---------- */
   #recentSection{
-    min-width:0 !important;
-    min-height:0 !important;
-    height:100% !important;
-    overflow:hidden !important;
-    padding:4px 8px !important;
-  }
-
-  #recentSection .sectionHeader{
-    height:22% !important;
-    max-height:22% !important;
-    min-height:0 !important;
-    margin:0 !important;
-  }
-
-  #recentSection .sectionHeader h2{
-    font-size:clamp(11px,1.8vw,15px) !important;
+    flex:1 1 75%!important;
+    width:100%!important;
+    height:75%!important;
+    min-height:0!important;
+    max-height:none!important;
+    padding:10px 12px!important;
   }
 
   #libraryContent{
-    height:78% !important;
-    min-height:0 !important;
-    overflow-x:auto !important;
-    overflow-y:hidden !important;
-    padding:0 0 3px !important;
+    flex:1 1 auto!important;
+    width:100%!important;
+    min-height:0!important;
+    overflow:auto!important;
   }
 
   #shelfView{
-    display:flex !important;
-    flex-direction:row !important;
-    flex-wrap:nowrap !important;
-    align-items:stretch !important;
-    width:max-content !important;
-    min-width:max-content !important;
-    height:100% !important;
-    min-height:0 !important;
-    gap:clamp(6px,1vw,10px) !important;
-    padding:1px 2px 4px !important;
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    grid-auto-rows:auto;
+    gap:var(--library-gap);
+    width:100%;
+    min-width:0;
+    height:auto;
+    padding:2px 2px 24px;
   }
 
-  #shelfView .bookCard,
-  #shelfView .bookCard:nth-child(5n){
-    flex:0 0 auto !important;
-    width:clamp(62px,10vw,100px) !important;
-    min-width:clamp(62px,10vw,100px) !important;
-    max-width:clamp(62px,10vw,100px) !important;
-    height:100% !important;
-    min-height:0 !important;
-    max-height:100% !important;
-    padding:4px !important;
-    grid-column:auto !important;
+  #shelfView .bookCard{
+    width:100%;
+    min-width:0;
+    height:fit-content;
+    max-height:none;
+    padding:8px;
   }
 
-  #shelfView .bookThumbnail{
-    width:100% !important;
-    height:calc(100% - 27px) !important;
-    max-height:none !important;
-    min-height:0 !important;
-    aspect-ratio:auto !important;
-  }
-
-  #shelfView .bookTitle{
-    display:block !important;
-    margin:4px 1px 0 !important;
-    font-size:clamp(8px,1.35vw,12px) !important;
-    line-height:1.1 !important;
-    white-space:nowrap !important;
-    overflow:hidden !important;
-    text-overflow:ellipsis !important;
-  }
-
-  #shelfView .bookSubtitle{display:none !important;}
-
-  /* Keep list mode available when explicitly selected, but make its rows
-     fit the same compressed panel rather than introducing vertical scroll. */
   #listView{
-    height:100% !important;
-    overflow:hidden !important;
-  }
-}
-
-/* ---------- Viewer focus mode ---------- */
-#app.viewerFocus{
-  position:fixed !important;
-  inset:0 !important;
-  width:100vw !important;
-  height:100dvh !important;
-  min-height:100svh !important;
-  padding:0 !important;
-  z-index:99999 !important;
-}
-
-#app.viewerFocus #topBar,
-#app.viewerFocus #libraryPanel,
-#app.viewerFocus #statusBar,
-#app.viewerFocus > div:last-child{
-  display:none !important;
-}
-
-#app.viewerFocus #workspace{
-  width:100% !important;
-  height:100% !important;
-  min-height:100% !important;
-  max-height:none !important;
-  padding:0 !important;
-  display:block !important;
-  overflow:hidden !important;
-}
-
-#app.viewerFocus #readerPanel{
-  display:flex !important;
-  width:100% !important;
-  height:100% !important;
-  min-height:100% !important;
-  max-height:none !important;
-  flex:none !important;
-}
-
-#app.viewerFocus #viewerBackground{
-  width:100% !important;
-  height:100% !important;
-  flex:1 1 auto !important;
-  padding:max(6px,env(safe-area-inset-top)) max(6px,env(safe-area-inset-right)) max(6px,env(safe-area-inset-bottom)) max(6px,env(safe-area-inset-left)) !important;
-}
-
-#app.viewerFocus #viewerArea{
-  width:100% !important;
-  height:100% !important;
-}
-
-/* Final viewport accounting: reserve a compact top bar, then give the
-   reader panel a true 75dvh share of the visible screen. The lower library
-   uses whatever vertical space remains instead of stealing height from the
-   reader. */
-@media (max-width:999px){
-  #workspace{
-    height:calc(100dvh - var(--header-height)) !important;
-    min-height:0 !important;
-    max-height:none !important;
-    flex:1 1 auto !important;
+    display:flex;
+    flex-direction:column;
+    width:100%;
+    gap:10px;
   }
 
-  #readerPanel{
-    flex:0 0 75dvh !important;
-    height:75dvh !important;
-    min-height:0 !important;
-    max-height:75dvh !important;
+  #libraryDrawerClose{
+    display:flex!important;
+    flex:0 0 30px!important;
+    width:30px!important;
+    height:30px!important;
+    align-items:center;
+    justify-content:center;
+    padding:0;
+    border:1px solid color-mix(in srgb,var(--control-text) 22%,transparent);
+    border-radius:8px;
+    background:rgba(255,255,255,.30);
+    color:var(--control-text);
+    cursor:pointer;
   }
 
-  #libraryPanel{
-    flex:1 1 auto !important;
-    height:auto !important;
-    min-height:0 !important;
-    max-height:none !important;
+  #libraryDrawerClose .icon{width:18px;height:18px;}
+
+  #narrowLibraryToggle{
+    display:flex!important;
+    position:fixed!important;
+    left:8px!important;
+    top:50px!important;
+    width:38px!important;
+    height:38px!important;
+    min-width:38px!important;
+    min-height:38px!important;
+    align-items:center!important;
+    justify-content:center!important;
+    padding:0!important;
+    border:1px solid color-mix(in srgb,var(--control-text) 22%,transparent)!important;
+    border-radius:8px!important;
+    background:rgba(255,255,255,.30)!important;
+    color:var(--control-text)!important;
+    backdrop-filter:blur(7px)!important;
+    box-shadow:0 5px 18px rgba(0,0,0,.16)!important;
+    z-index:2001!important;
+    cursor:pointer;
   }
+
+  #narrowLibraryToggle .icon{width:22px!important;height:22px!important;}
+  #narrowLibraryToggle.isOpen{opacity:0!important;visibility:hidden!important;pointer-events:none!important;}
+
+  html[data-theme="dark"] #narrowLibraryToggle,
+  html[data-theme="dark"] #libraryDrawerClose{
+    background:rgba(12,15,20,.30)!important;
+    color:#f2f5f7!important;
+  }
+
+  /* Read Again retains the desktop vertical hierarchy inside the drawer. */
+  #continueReading.continueCollapsed{
+    flex:0 0 42px!important;
+    width:100%!important;
+    height:42px!important;
+    min-height:42px!important;
+    max-height:42px!important;
+    padding:8px 12px!important;
+  }
+
+  #continueReading.continueCollapsed .sectionHeader h2{display:block!important;}
+  #continueReading.continueCollapsed #continueCard{display:none!important;}
 }
 
-
-/* =====================================================
-   SkyReader requested polish — Test 31
-   ===================================================== */
-
-/* First page: the previous control is completely invisible, not merely disabled. */
-#readerPanel #toolbar #previousButton.isFirstPage{
-  opacity:0 !important;
-  visibility:hidden !important;
-  pointer-events:none !important;
+@media (min-width:1000px){
+  #narrowLibraryToggle{display:none!important;}
+  #libraryPanel{transform:translateX(0)!important;position:relative!important;}
+  #libraryDrawerClose{display:none!important;}
 }
 
-/* Keep the top-right controls in a deterministic left-to-right order:
-   rotate | mute | fullscreen. */
-#readerPanel #toolbar #viewerFullscreenButton{
-  right:14px !important;
-  left:auto !important;
-}
-#readerPanel #toolbar #muteButton{
-  right:64px !important;
-  left:auto !important;
-}
-#readerPanel #toolbar #rotateButton{
-  right:114px !important;
-  left:auto !important;
+@media (max-width:600px){
+  #topSearchGroup{width:min(calc(100vw - 36px),330px);}
 }
 
-/* Narrow screens: fullscreen remains to the right of mute. */
-@media (max-width:700px){
-  #readerPanel #toolbar #viewerFullscreenButton{right:10px !important;}
-  #readerPanel #toolbar #muteButton{right:56px !important;}
-  #readerPanel #toolbar #rotateButton{right:102px !important;}
-}
-
-/* Viewer-library landing: cap it at roughly two thirds of the actual
-   viewer background on narrow devices. Remove the old 50vh floor that could
-   make short phone screens disproportionately tall. */
-#viewerLibrary{
+/* ---------- Production error feedback ---------- */
+.productionError{
+  position:fixed;
+  left:50%;
+  top:18px;
+  transform:translateX(-50%);
+  z-index:10000;
+  width:min(560px,calc(100vw - 32px));
   box-sizing:border-box;
-  height:66.6667% !important;
-  max-height:66.6667% !important;
-  min-height:0 !important;
-  padding:clamp(14px,3vw,28px) !important;
+  border:1px solid color-mix(in srgb,var(--control-text,#20242a) 18%,transparent);
+  border-radius:12px;
+  background:color-mix(in srgb,var(--control-bg,#fff) 94%,transparent);
+  color:var(--text,#20242a);
+  box-shadow:0 10px 30px rgba(0,0,0,.18);
+  backdrop-filter:blur(12px);
 }
-
-/* Main Library desktop: Continue/Read Again uses only one quarter of the
-   panel so the bento/library area gets the remaining three quarters. */
-@media (min-width:1000px){
-  #continueReading{
-    flex:0 0 25% !important;
-    height:25% !important;
-    min-height:0 !important;
-    overflow:hidden !important;
-  }
-  #recentSection{
-    flex:1 1 75% !important;
-    min-height:0 !important;
-  }
+.productionError[hidden]{display:none!important;}
+.productionErrorInner{
+  position:relative;
+  display:flex;
+  align-items:flex-start;
+  gap:10px;
+  padding:12px 42px 12px 14px;
+  flex-direction:column;
 }
-
-/* =====================================================
-   Library publication search — single responsive implementation
-===================================================== */
-#searchWrapper{display:flex;align-items:center;justify-content:flex-end;gap:8px;width:100%;min-height:46px;margin-bottom:18px;}
-#searchBox{order:1;flex:0 1 0;width:0;min-width:0;height:46px;padding:0;opacity:0;pointer-events:none;border:none;border-radius:14px;background:#f2f4f7;font-size:15px;outline:none;transition:width .22s ease,opacity .18s ease,padding .22s ease,box-shadow .2s ease;}
-#searchToggleButton{order:2;flex:0 0 46px;width:46px;height:46px;display:flex;align-items:center;justify-content:center;border:0;border-radius:14px;background:#f2f4f7;color:var(--text);cursor:pointer;position:relative;z-index:5;touch-action:manipulation;}
-#searchWrapper.searchExpanded #searchBox{flex:1 1 280px;width:min(360px,100%);padding:0 16px;opacity:1;pointer-events:auto;}
-#searchBox:focus{background:white;box-shadow:0 0 0 2px rgba(0,0,0,.08);}
-@media (max-width:999px){#searchWrapper{position:absolute;right:10px;top:9px;width:46px;min-height:46px;margin:0;z-index:40;}#searchWrapper.searchExpanded{width:min(300px,calc(100vw - 20px));}#searchWrapper.searchExpanded #searchBox{flex:1 1 auto;width:auto;}#searchToggleButton{flex:0 0 46px;}}
-
-/* =====================================================
-   Test 31.1 — final UI polish
-   ===================================================== */
-
-/* Keep the three top-right reader controls in a fixed order on narrow
-   screens: Rotate → Mute → Fullscreen. */
-#readerPanel #toolbar #viewerFullscreenButton{
-  right:14px !important;
-  position:absolute !important;
+.productionErrorInner strong{font-size:14px;}
+.productionErrorInner span{font-size:13px;line-height:1.4;word-break:break-word;}
+#productionErrorClose{
+  position:absolute;right:8px;top:8px;width:30px;height:30px;border:0;
+  border-radius:8px;background:transparent;color:inherit;font-size:22px;
+  cursor:pointer;
 }
-#readerPanel #toolbar #muteButton{
-  right:64px !important;
+.thumbnailFallback{
+  display:flex!important;align-items:center;justify-content:center;
+  background:var(--card-soft,#eef1f4);
 }
-#readerPanel #toolbar #rotateButton{
-  right:114px !important;
-}
-
-@media (max-width:700px){
-  #readerPanel #toolbar #viewerFullscreenButton{
-    right:5px !important;
-  }
-  #readerPanel #toolbar #muteButton{
-    right:53px !important;
-  }
-  #readerPanel #toolbar #rotateButton{
-    right:101px !important;
-  }
-}
-
-/* The desktop Continue / Read Again area is exactly one quarter of the
-   Library panel. Its heading and card share that constrained box so the
-   card cannot be cropped at the bottom. */
-@media (min-width:1000px){
-  #continueReading{
-    box-sizing:border-box !important;
-    flex:0 0 25% !important;
-    height:25% !important;
-    min-height:0 !important;
-    max-height:25% !important;
-    overflow:hidden !important;
-    padding:8px 12px !important;
-    display:flex !important;
-    flex-direction:column !important;
-    justify-content:flex-start !important;
-    gap:4px !important;
-  }
-  #continueReading h2{
-    flex:0 0 25% !important;
-    height:25% !important;
-    min-height:0 !important;
-    max-height:25% !important;
-    margin:0 !important;
-    display:flex !important;
-    align-items:center !important;
-    font-size:clamp(14px,1.1vw,18px) !important;
-    line-height:1 !important;
-  }
-  #continueCard{
-    box-sizing:border-box !important;
-    flex:1 1 75% !important;
-    width:100% !important;
-    min-height:0 !important;
-    max-height:75% !important;
-    overflow:hidden !important;
-    padding:6px 9px !important;
-    gap:10px !important;
-    border-radius:12px !important;
-text-overflow: ellipsis;
-display: -webkit-box;
--webkit-line-clamp: 3;
--webkit-box-orient: vertical;
-  }
-  #continueCard .coverPlaceholder,
-  #continueCard .thumbnailPlaceholder{
-    width:40px !important;
-    height:100% !important;
-    max-height:64px !important;
-    flex:0 0 40px !important;
-    border-radius:6px !important;
-  }
-  #continueCard .placeholderText h3{
-    font-size:12px !important;
-    line-height:1.15 !important;
-overflow: hidden;
-text-overflow: ellipsis;
-display: -webkit-box;
--webkit-line-clamp: 3;
--webkit-box-orient: vertical;
-  }
-  #continueCard .placeholderText p{
-    font-size:10px !important;
-    line-height:1.15 !important;
-overflow: hidden;
-text-overflow: ellipsis;
-display: -webkit-box;
--webkit-line-clamp: 3;
--webkit-box-orient: vertical;
-  }
-}
-
-/* Test 31.2 — uniform white reader controls. */
-#readerPanel #toolbar #rotateButton,
-#readerPanel #toolbar #muteButton,
-#readerPanel #toolbar #viewerFullscreenButton{
-  color:#fff !important; 
-}
-#readerPanel #toolbar #rotateButton svg,
-#readerPanel #toolbar #muteButton svg,
-#readerPanel #toolbar #viewerFullscreenButton svg{
-  color:#fff !important;
-  stroke:currentColor;
-}
-
-/* Test 31.3 — use the native clockwise rotate glyph requested for the reader control. */
-#readerPanel #toolbar #rotateButton{
-  color:#fff !important;
-  font-size:25px !important;
-  font-family:"Segoe UI Symbol","Noto Sans Symbols 2","Arial Unicode MS",sans-serif !important;
-  line-height:1 !important;
-  display:flex !important;
-  align-items:center !important;
-  justify-content:center !important;
-  padding:0 !important;
-}
-
-/* Test 31.4 — Main Library Continue/Read Again conditional height.
-   When there is no resumable book, remove the empty section entirely and
-   give the Library books area the full panel height. When a resumable book
-   exists, desktop keeps Continue/Read Again at exactly 25%. */
-#libraryPanel.noContinue #continueReading{
-  display:none !important;
-}
-
-#libraryPanel.noContinue #recentSection{
-  flex:1 1 100% !important;
-  height:100% !important;
-  min-height:0 !important;
-}
-
-@media (min-width:1000px){
-  #libraryPanel:not(.noContinue) #continueReading{
-    flex:0 0 25% !important;
-    height:25% !important;
-    min-height:0 !important;
-  }
-  #libraryPanel:not(.noContinue) #recentSection{
-    flex:1 1 75% !important;
-    height:75% !important;
-    min-height:0 !important;
-  }
-}
-
-/* =====================================================
-   Test 31.12 — Viewer Library landing vertical breathing room
-   Keep the successful 2/3-height landing while restoring
-   approximately 60px of space above and below its contents.
-   This is intentionally the final #viewerLibrary rule so
-   earlier responsive overrides cannot reduce the vertical padding.
-   ===================================================== */
-#viewerLibrary{
-  padding-top:60px !important;
-  padding-bottom:60px !important;
-}
+.thumbnailFallback::after{content:"Book";font-size:12px;color:var(--muted,#68717b);}

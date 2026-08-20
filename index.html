@@ -9,6 +9,7 @@
 
 <meta name="theme-color" content="#ffffff">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="SkyReader">
 
@@ -25,6 +26,7 @@
 <link rel="icon" href="/favicon.ico" type="image/x-icon">
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>if(window.pdfjsLib){pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";}</script>
 <script src="page-flip.browser.js"></script>
 
 </head>
@@ -35,11 +37,16 @@
 
 <header id="topBar">
 
-<button id="libraryButton" class="iconButton" title="Library">
-<svg class="icon"><use href="#icon-library"></use></svg>
+<button id="narrowLibraryToggle" class="narrowLibraryToggle" type="button" title="Open Library" aria-label="Open Library" aria-expanded="false">
+<svg class="icon"><use href="#icon-open-book"></use></svg>
 </button>
 
-
+<div id="topSearchGroup">
+<button id="topSearchButton" class="iconButton" type="button" title="Search publications" aria-label="Search publications">
+<svg class="icon"><use href="#icon-search"></use></svg>
+</button>
+<input id="searchBox" type="search" placeholder="Search publications..." aria-label="Search publications">
+</div>
 
 <h1 id="appTitle"></h1>
 
@@ -56,7 +63,10 @@
 
 <section id="continueReading">
 
-<h2>Reading...</h2>
+<div class="sectionHeader">
+<h2>Read Again</h2>
+<button id="continueToggleButton" class="sectionToggleButton" type="button" aria-label="Hide Read Again" title="Hide Read Again">−</button>
+</div>
 
 <div id="continueCard" class="placeholderCard">
 
@@ -82,6 +92,10 @@
 
 <div id="viewButtons">
 
+<button id="libraryDrawerClose" class="libraryDrawerClose" type="button" title="Close Library" aria-label="Close Library">
+<svg class="icon"><use href="#icon-close"></use></svg>
+</button>
+
 <button id="shelfViewButton" class="viewButton active" title="Grid view" aria-label="Grid view">
 <svg class="icon"><use href="#icon-grid"></use></svg>
 </button>
@@ -91,20 +105,6 @@
 </button>
 
 </div>
-
-</div>
-
-<div id="searchWrapper">
-
-<input
-id="searchBox"
-type="search"
-placeholder="Search publications..."
-aria-label="Search publications">
-
-<button id="searchToggleButton" class="libraryFloatingButton" type="button" title="Search publications" aria-label="Search publications" aria-expanded="false">
-<svg class="icon"><use href="#icon-search"></use></svg>
-</button>
 
 </div>
 
@@ -137,14 +137,7 @@ aria-label="Search publications">
 <div class="viewerLibraryHero">
 
 <div class="viewerLibraryVector" aria-hidden="true">
-<svg viewBox="0 0 120 120" role="img">
-<path d="M26 31c0-5 4-9 9-9h45c8 0 14 6 14 14v48c0-6-5-11-11-11H35c-5 0-9 4-9 9V31Z"
-fill="none" stroke="currentColor" stroke-width="5" stroke-linejoin="round"/>
-<path d="M26 82c0-5 4-9 9-9h48c6 0 11 5 11 11"
-fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round"/>
-<path d="M48 39h28M48 51h20"
-fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round"/>
-</svg>
+<img src="assets/logo.svg" alt="" class="viewerLibraryLogo" onerror="this.style.visibility='hidden'">
 </div>
 
 <div>
@@ -160,6 +153,14 @@ fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round"/>
 <div id="viewerShelfView" class="viewerShelfView"></div>
 </div>
 
+</div>
+
+<div id="productionError" class="productionError" role="alert" aria-live="assertive" hidden>
+<div class="productionErrorInner">
+<strong id="productionErrorTitle">Unable to open SkyReader</strong>
+<span id="productionErrorText"></span>
+<button id="productionErrorClose" type="button" aria-label="Dismiss error">×</button>
+</div>
 </div>
 
 <div id="loading" aria-live="polite" aria-busy="true">
@@ -212,7 +213,7 @@ fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round"/>
 </div>
 </center>
 </div>
-<div style="background:rgba(255,255,255,.92)";><center>Welcome to SkyReader</center></div>
+<div class="sr-welcome-banner"><center>Welcome to SkyReader</center></div>
 
 
 </section>
@@ -225,11 +226,14 @@ fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round"/>
 
 <svg xmlns="http://www.w3.org/2000/svg" style="display:none">
 
-<symbol id="icon-library" viewBox="0 0 24 24">
-<path d="M4 6h16M4 12h16M4 18h16"
-stroke="currentColor"
-stroke-width="2"
-stroke-linecap="round"/>
+
+<symbol id="icon-open-book" viewBox="0 0 24 24">
+<path d="M12 6.5c-2.1-2-4.5-2.7-8-2.2v14.1c3.5-.5 5.9.2 8 2.1 2.1-1.9 4.5-2.6 8-2.1V4.3c-3.5-.5-5.9.2-8 2.2Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+<path d="M12 6.5v14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+</symbol>
+
+<symbol id="icon-close" viewBox="0 0 24 24">
+<path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
 </symbol>
 
 <symbol id="icon-search" viewBox="0 0 24 24">
@@ -278,7 +282,6 @@ stroke-linecap="round"
 stroke-linejoin="round"/>
 </symbol>
 
-<symbol id="icon-rotate" viewBox="0 0 24 24"></symbol>
 
 <symbol id="icon-volume" viewBox="0 0 24 24">
 <path d="M5 10H9L14 6V18L9 14H5Z"
@@ -321,8 +324,6 @@ stroke-linecap="round"/>
 <script src="js/renderer.js"></script>
 <script src="js/reader.js"></script>
 <script src="js/navigation.js"></script>
-<script src="js/viewer.js"></script>
-<script src="js/gestures.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/settingsPanel.js"></script>
 <script src="js/app.js"></script>

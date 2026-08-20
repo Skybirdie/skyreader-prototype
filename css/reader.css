@@ -357,27 +357,6 @@ color:#fff;
 
 #pageJumpButton{padding:5px 10px;cursor:pointer;}
 
-.libraryHidden{
-
-transform:translateX(-105%);
-
-opacity:0;
-
-pointer-events:none;
-
-transition:.25s ease;
-
-}
-
-#library{
-
-transition:
-
-transform .25s ease,
-
-opacity .25s ease;
-
-}
 
 #loading{
 position:absolute;
@@ -424,81 +403,6 @@ opacity:.8;
 }
 
 
-/* ---------- PAGE ANIMATIONS ---------- */
-
-.pageTurning{
-
-animation:pageTurn .34s ease;
-
-}
-
-@keyframes pageTurn{
-
-0%{
-transform:
-translateX(0)
-translateY(0)
-scale(1)
-rotate(0deg);
-}
-
-40%{
-transform:
-translateX(16px)
-translateY(-5px)
-scale(1.015)
-rotate(.35deg);
-}
-
-100%{
-transform:
-translateX(0)
-translateY(0)
-scale(1)
-rotate(0deg);
-}
-
-}
-
-/* ---------- ROTATION ---------- */
-
-.rotating{
-
-animation:rotateViewer .24s ease;
-
-}
-
-@keyframes rotateViewer{
-
-from{
-transform:rotate(0deg);
-}
-
-to{
-transform:rotate(90deg);
-}
-
-}
-
-/* ---------- ZOOM ---------- */
-
-.zoomed{
-
-cursor:grab;
-
-}
-
-.zoomed:active{
-
-cursor:grabbing;
-
-}
-
-#pageCanvas.zooming{
-
-transition:none;
-
-}
 
 /* ---------- LOADING ---------- */
 
@@ -587,21 +491,6 @@ letter-spacing:.02em;
 
 }
 
-/* ---------- CANVAS STATES ---------- */
-
-.canvasHidden{
-
-opacity:0;
-
-}
-
-.canvasVisible{
-
-opacity:1;
-
-transition:opacity .25s ease;
-
-}
 
 /*-------------------------------------------------------
  Reader Status
