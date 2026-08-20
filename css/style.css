@@ -591,6 +591,7 @@ margin-top: 3px;
 
 #continueCard img{
   object-fit: cover;
+border:1px grey solid;
 }
 
 
