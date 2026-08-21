@@ -1582,6 +1582,10 @@ dom.loading.classList.remove("visible");
 
 function beginBookOpen(text="Loading..."){
 
+    // Prevent stale reader controls from remaining visible while the
+    // previous book is cleared and the new book is still loading.
+    ui.hideToolbar();
+
     clearProductionError();
     showLoading(text);
 
