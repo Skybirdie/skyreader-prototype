@@ -267,19 +267,22 @@ sorter.filter=function(books,filter="all",category=""){
 
 sorter.dateKey=function(book){
     const raw=book && (book.date ?? book.releaseDate ?? book.release_date ?? "");
-    const normalized=String(raw??"").trim();
-    const digits=normalized.replace(/[^0-9]/g,"");
-    // YYYYMMDDHHmm is intentionally compared as a full integer key.
-    // Every component participates: year, month, day, hour, minute.
-    if(/^\d{12}$/.test(digits)) return Number(digits);
+    const digits=String(raw??"").trim().replace(/[^0-9]/g,"");
+    // Canonical prototype/Glide contract key: YYYYMMDDHHmm.
+    // Preserve all 12 digits so month, day, hour and minute participate.
+    if(/^\d{12}$/.test(digits)) return digits;
+    // Compatible numeric timestamps: pad only for deterministic comparison.
+    if(/^\d{8,14}$/.test(digits)) return digits.padStart(14,"0");
     const parsed=parseBookDate(raw);
-    return Number.isFinite(parsed)?parsed:0;
+    return Number.isFinite(parsed) && parsed>0
+        ? String(Math.trunc(parsed)).padStart(14,"0")
+        : "00000000000000";
 };
 
 sorter.organize=function(options={}){
     const source=copyBooks(options.books);
     const filtered=sorter.filter(source,options.filter||"all",options.category||"");
-    const mode=options.sort||sorter.modes.ALPHABETICAL;
+    const mode=String(options.sort||sorter.modes.ALPHABETICAL).trim().toLowerCase();
     if(mode===sorter.modes.RANDOM)return random(filtered);
     const byId=new Map(filtered.map(book=>[book.id,book]));
     if(mode===sorter.modes.FAVORITES)return favorites().filter(book=>byId.has(book.id));
@@ -289,13 +292,13 @@ sorter.organize=function(options={}){
     // Decorate so equal/invalid dates remain deterministic.
     return filtered.map((book,index)=>({book,index,date:date(book)})).sort((a,b)=>{
         if(mode===sorter.modes.NEWEST){
-            const diff=b.date-a.date;
+            const diff=b.date.localeCompare(a.date);
             if(diff)return diff;
             const byTitle=title(a.book).localeCompare(title(b.book));
             return byTitle||a.index-b.index;
         }
         if(mode===sorter.modes.OLDEST){
-            const diff=a.date-b.date;
+            const diff=a.date.localeCompare(b.date);
             if(diff)return diff;
             const byTitle=title(a.book).localeCompare(title(b.book));
             return byTitle||a.index-b.index;

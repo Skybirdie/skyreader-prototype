@@ -144,7 +144,7 @@ updateViewerContinue(){
 
     wrap.innerHTML=`
     <div class="viewerContinueCard" title="Read again: ${book.title}">
-        <img src="${book.thumbnail}" alt="">
+        <img src="${book.thumbnail||"assets/default-thumbnail.png"}" alt="" onerror="if(this.dataset.fallbackApplied==='true'){this.style.display='none';return;}this.dataset.fallbackApplied='true';this.src='assets/default-thumbnail.png';">
         <div class="viewerContinueText">
             <strong>Read Again: ${book.title}</strong>
             <span>Last viewed: page ${lastPage}</span>
@@ -236,10 +236,15 @@ image.loading="lazy";
 
 image.src=book.thumbnail;
 image.alt=book.title||"";
+const fallbackThumbnail="assets/default-thumbnail.png";
 image.addEventListener("error",()=>{
-    image.style.display="none";
-    thumbnail.classList.add("thumbnailFallback");
-},{once:true});
+    if(image.dataset.fallbackApplied==="true"){
+        thumbnail.classList.add("thumbnailFallback");
+        return;
+    }
+    image.dataset.fallbackApplied="true";
+    image.src=fallbackThumbnail;
+});
 
 thumbnail.appendChild(image);
 
@@ -293,7 +298,7 @@ item.innerHTML=
 
 <img loading="lazy"
 
-src="${book.thumbnail}">
+src="${book.thumbnail||"assets/default-thumbnail.png"}" onerror="if(this.dataset.fallbackApplied==='true'){this.style.display='none';return;}this.dataset.fallbackApplied='true';this.src='assets/default-thumbnail.png';">
 
 </div>
 
@@ -367,7 +372,7 @@ updateReadAgain(){
     card.style.display=visible?"flex":"none";
     card.innerHTML=`
         <div class="thumbnailPlaceholder">
-            <img src="${book.thumbnail}" alt="${book.title}" style="width:100%;height:100%;object-fit:cover;border-radius:10px;">
+            <img src="${book.thumbnail||"assets/default-thumbnail.png"}" alt="${book.title}" style="width:100%;height:100%;object-fit:cover;border-radius:10px;" onerror="if(this.dataset.fallbackApplied==='true'){this.style.display='none';return;}this.dataset.fallbackApplied='true';this.src='assets/default-thumbnail.png';">
         </div>
         <div class="placeholderText">
             <h3>${book.title}</h3>

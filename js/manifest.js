@@ -28,11 +28,11 @@ window.Manifest={
 
 source:{
 
-    url:"library.json",
+    url:"library.json?v=1.1.6",
 
     async load(){
 
-        const response=await fetch(this.url);
+        const response=await fetch(this.url,{cache:"no-store"});
 
         if(!response.ok){
 
@@ -165,7 +165,7 @@ normalize(rawManifest){
 
             pageCount:book.pageCount||"unknown",
 
-            date:book.date??book.releaseDate??book.release_date??""
+            date:String(book.date??book.releaseDate??book.release_date??"").trim()
 
         };
 
