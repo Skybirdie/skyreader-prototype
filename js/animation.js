@@ -821,17 +821,9 @@ settled:false
 
 function playTurnAudio(){
 
-if(
-
-window.AudioController &&
-
-typeof AudioController.playPageTurn==="function"
-
-){
-
-AudioController.playPageTurn();
-
-}
+/* Page-turn audio is owned by Sky180FlipEngine so it can begin at the
+   first real user_fold/flipping state. Legacy animation timelines do not
+   trigger a second, delayed copy. */
 
 }
 

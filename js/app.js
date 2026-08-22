@@ -195,6 +195,9 @@ async function buildLibrary(){
     SkyReader.filteredLibrary = [...SkyReader.library];
 
     Library.initialize();
+    // Explicit post-load handoff: render from the final normalized collection.
+    if(typeof Library.applyOrganization==="function") Library.applyOrganization();
+    if(typeof Library.build==="function") Library.build();
 
     log(
 

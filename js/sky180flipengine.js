@@ -37,6 +37,8 @@ let initialized=false;
 let engineReady=false;
 let pendingReadyReject=null;
 let normalFlippingTime=650;
+let pageTurnAudioPlayed=false;
+let pageCurlAudioPlayed=false;
 let handlers={
     init:null,
     page:null,
@@ -510,6 +512,22 @@ engine.open=async function(options={}){
             syncCurrentPage(true);
         }
 
+        // Curl and turn are deliberately separate sounds. Hover/edge curl
+        // gets pagecurl.mp3; the committed movement gets pageturn.mp3.
+        if(state==="fold_corner"){
+            if(!pageCurlAudioPlayed && window.AudioController && typeof AudioController.playPageCurl==="function"){
+                pageCurlAudioPlayed=true;
+                AudioController.playPageCurl();
+            }
+        }
+
+        if(state==="user_fold" || state==="flipping"){
+            if(!pageTurnAudioPlayed && window.AudioController && typeof AudioController.playPageTurn==="function"){
+                pageTurnAudioPlayed=true;
+                AudioController.playPageTurn();
+            }
+        }
+
         if(state==="flipping"){
             if(flipbook &&
                typeof flipbook.getPageCollection==="function" &&
@@ -527,12 +545,12 @@ engine.open=async function(options={}){
                 }
             }
 
-            if(window.AudioController &&
-               typeof AudioController.playPageTurn==="function"){
-                AudioController.playPageTurn();
-            }
         }
 
+        if(state==="read" || state==="idle"){
+            pageTurnAudioPlayed=false;
+            pageCurlAudioPlayed=false;
+        }
         emit("state",state);
     });
 

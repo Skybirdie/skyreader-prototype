@@ -165,7 +165,7 @@ normalize(rawManifest){
 
             pageCount:book.pageCount||"unknown",
 
-            date:book.date||""
+            date:book.date??book.releaseDate??book.release_date??""
 
         };
 

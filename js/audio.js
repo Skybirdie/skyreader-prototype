@@ -88,18 +88,19 @@ window.AudioController=(function(){
     audio.emit=emit;
 
     // Strict production mapping: one action, one sound, no fallback substitution.
-    const SELECT_VOLUME_SCALE=10.0;
-    const CLOSE_VOLUME_SCALE=0.5;
+    const SELECT_VOLUME_SCALE=0.5;
     audio.register("bookSelect","assets/audio/select.mp3",3,SELECT_VOLUME_SCALE);
+    audio.register("pageCurl","assets/audio/pagecurl.mp3",3,1);
     audio.register("pageTurn","assets/audio/pageturn.mp3",5,1);
-    audio.register("bookClose","assets/audio/close.mp3",2,CLOSE_VOLUME_SCALE);
+    audio.register("bookClose","assets/audio/close.mp3",2,1);
     audio.register("libraryOpen","assets/audio/open.mp3",2,1);
 
     audio.playSelect=function(){return audio.play("bookSelect");};
-    audio.playPageTurn=function(){return audio.play("pageTurn");};
+    audio.playPageCurl=function(){ return audio.play("pageCurl"); };
+    audio.playPageTurn=function(){ return audio.play("pageTurn"); };
     audio.playBookClose=function(){return audio.play("bookClose");};
     audio.playOpen=function(){return audio.play("libraryOpen");};
-    audio.pageTurn=function(direction){audio.playPageTurn();emit("pageTurn",{direction,time:performance.now()});};
+    audio.pageTurn=function(direction,mode="desktop"){audio.playPageTurn(mode);emit("pageTurn",{direction,mode,time:performance.now()});};
     audio.readerOpened=function(book){emit("readerOpened",book);};
     audio.readerClosed=function(){emit("readerClosed");};
     audio.pageChanged=function(page){emit("pageChanged",page);};

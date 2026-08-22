@@ -90,6 +90,19 @@
 
 <h2>Library</h2>
 
+<div id="libraryOrganizationControls" aria-label="Library organization">
+<button id="librarySortButton" class="libraryOrgButton" type="button" title="Sort Library" aria-label="Sort Library">⇅</button>
+<button id="libraryFilterButton" class="libraryOrgButton" type="button" title="Filter Library" aria-label="Filter Library"><svg class="icon"><use href="#icon-filter"></use></svg><span class="libraryFilterActive" aria-hidden="true"></span></button>
+<div id="librarySortMenu" class="libraryOrgMenu hidden" role="menu">
+<select id="librarySort" aria-label="Sort library">
+<option value="alphabetical">Alphabetical</option><option value="newest">Newest</option><option value="oldest">Oldest</option><option value="category">Category</option><option value="random">Random</option><option value="recent">Recently Read</option><option value="favorites">Favorites</option>
+</select>
+</div>
+<div id="libraryFilterMenu" class="libraryOrgMenu hidden" role="menu">
+<select id="libraryCategory" aria-label="Filter by category"><option value="all">All categories</option></select>
+</div>
+</div>
+
 <div id="viewButtons">
 
 <button id="libraryDrawerClose" class="libraryDrawerClose" type="button" title="Close Library" aria-label="Close Library">
@@ -241,6 +254,8 @@
 <path d="M16 16l5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
 </symbol>
 
+<symbol id="icon-filter" viewBox="0 0 24 24"><path d="M4 5h16l-6.5 7.5v5.5l-3 1v-6.5L4 5Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></symbol>
+
 <symbol id="icon-settings" viewBox="0 0 24 24">
 <path d="M12 8a4 4 0 100 8a4 4 0 000-8zm9 4l-2.2.8l.2 2.3l-2 1.2l-1.7-1.5l-2.1.9l-.5 2.2h-2.4l-.5-2.2l-2.1-.9l-1.7 1.5l-2-1.2l.2-2.3L3 12l.8-2.2l-1.5-1.7l1.2-2l2.3.2L7 4l2.2-.5V1.1h2.4V3.5l2.2.5l.9 2.1l2.3-.2l1.2 2l-1.5 1.7z"
 fill="none"
@@ -316,6 +331,7 @@ stroke-linecap="round"/>
 <script src="js/storage.js"></script>
 <script src="js/glideContract.js"></script>
 <script src="js/manifest.js"></script>
+<script src="js/librarySorter.js"></script>
 <script src="js/library.js"></script>
 <script src="js/animation.js"></script>
 <script src="js/audio.js"></script>

@@ -31,6 +31,70 @@ select(book,page=null){
 
 },
 
+getOrganization(panel="main"){
+    const defaults={sort:"alphabetical",filter:"all",category:""};
+    const org=SkyReader.ui.organization||(SkyReader.ui.organization={});
+    return Object.assign(defaults,org[panel]||{});
+},
+
+setOrganization(panel="main",changes={}){
+    const org=SkyReader.ui.organization||(SkyReader.ui.organization={});
+    org[panel]=Object.assign({sort:"alphabetical",filter:"all",category:"all"},org[panel]||{},changes);
+    if(panel==="main"){
+        this.applyOrganization();
+        // State changes must always rebuild the visible library immediately.
+        this.build();
+    }
+},
+
+applyOrganization(){
+    const org=this.getOrganization("main");
+    const organized=window.LibrarySorter
+        ? LibrarySorter.organize({books:SkyReader.library,sort:org.sort,filter:org.filter,category:org.category})
+        : [...SkyReader.library];
+    const query=(this.searchText||"").trim().toLowerCase();
+    SkyReader.filteredLibrary=!query ? organized : organized.filter(book=>{
+        const haystack=[book.title,book.subtitle,book.author,book.category].map(v=>String(v||"").toLowerCase());
+        return haystack.some(value=>value.includes(query));
+    });
+    this.syncOrganizationControls();
+},
+
+populateCategories(){
+    const select=document.getElementById("libraryCategory");
+    if(!select)return;
+    const current=this.getOrganization("main").category||"all";
+    select.innerHTML='<option value="all">All categories</option>';
+    const categories=window.LibrarySorter&&LibrarySorter.categories ? LibrarySorter.categories(SkyReader.library) : [];
+    categories.forEach(category=>{
+        const option=document.createElement("option");
+        option.value=category;
+        option.textContent=category;
+        select.appendChild(option);
+    });
+    select.value=current;
+},
+
+syncOrganizationControls(){
+    const org=this.getOrganization("main");
+    const sort=document.getElementById("librarySort");
+    const category=document.getElementById("libraryCategory");
+    if(sort)sort.value=org.sort;
+    if(category)category.value=org.category||"all";
+    const filterButton=document.getElementById("libraryFilterButton");
+    if(filterButton){
+        const active=(org.category||"all")!=="all";
+        filterButton.classList.toggle("isFiltered",active);
+        filterButton.setAttribute("aria-pressed",active?"true":"false");
+    }
+},
+
+organizedBooks(panel="viewer"){
+    const org=this.getOrganization(panel);
+    if(window.LibrarySorter)return LibrarySorter.organize({books:SkyReader.library,sort:org.sort,filter:org.filter,category:org.category});
+    return [...SkyReader.library];
+},
+
 build(){
 
 this.buildShelf();
@@ -52,7 +116,7 @@ if(!shelf)return;
 
 shelf.innerHTML="";
 
-SkyReader.filteredLibrary.forEach(book=>{
+this.organizedBooks("viewer").forEach(book=>{
 
 const card=this.createShelfCard(book);
 card.classList.add("viewerBookCard");
@@ -103,6 +167,11 @@ document.getElementById("shelfView");
 
 shelf.innerHTML="";
 
+if(!SkyReader.filteredLibrary.length){
+    shelf.innerHTML='<div class="libraryEmptyState">No books match the current sort, filter, or search.</div>';
+    return;
+}
+
 SkyReader.filteredLibrary.forEach(book=>{
 
 shelf.appendChild(
@@ -122,6 +191,11 @@ const list=
 document.getElementById("listView");
 
 list.innerHTML="";
+
+if(!SkyReader.filteredLibrary.length){
+    list.innerHTML='<div class="libraryEmptyState">No books match the current sort, filter, or search.</div>';
+    return;
+}
 
 SkyReader.filteredLibrary.forEach(book=>{
 
@@ -253,35 +327,11 @@ return item;
 
 filter(text){
 
-this.searchText=text.toLowerCase();
-
-SkyReader.filteredLibrary=
-
-SkyReader.library.filter(book=>{
-
-return(
-
-book.title
-
-.toLowerCase()
-
-.includes(this.searchText)
-
-||
-
-(book.subtitle||"")
-
-.toLowerCase()
-
-.includes(this.searchText)
-
-);
-
-});
-
-this.build();
+this.searchText=String(text||"").toLowerCase();
+this.applyOrganization();
 
 },
+
 
 getReadAgainBook(){
     const id=SkyReader.resume && SkyReader.resume.magazineId;
@@ -299,7 +349,10 @@ updateReadAgain(){
     const panel=document.getElementById("libraryPanel");
 
     if(!book){
-        section.style.display="none";
+        // Keep the compact Read Again header visible, but never leave an
+        // expanded empty placeholder occupying panel space.
+        section.style.display="";
+        section.classList.add("continueCollapsed");
         card.style.display="none";
         if(panel) panel.classList.add("noContinue");
         this.updateViewerContinue();
@@ -397,6 +450,21 @@ if(listButton){
         this.showList();
     });
 }
+
+const librarySort=document.getElementById("librarySort");
+const libraryCategory=document.getElementById("libraryCategory");
+const librarySortButton=document.getElementById("librarySortButton");
+const libraryFilterButton=document.getElementById("libraryFilterButton");
+const librarySortMenu=document.getElementById("librarySortMenu");
+const libraryFilterMenu=document.getElementById("libraryFilterMenu");
+const closeOrgMenus=()=>{ librarySortMenu?.classList.add("hidden"); libraryFilterMenu?.classList.add("hidden"); };
+if(librarySortButton)librarySortButton.addEventListener("click",event=>{ event.stopPropagation(); libraryFilterMenu?.classList.add("hidden"); librarySortMenu?.classList.toggle("hidden"); });
+if(libraryFilterButton)libraryFilterButton.addEventListener("click",event=>{ event.stopPropagation(); librarySortMenu?.classList.add("hidden"); libraryFilterMenu?.classList.toggle("hidden"); });
+document.addEventListener("click",event=>{ if(!event.target.closest("#libraryOrganizationControls"))closeOrgMenus(); });
+const applySort=()=>{ if(librarySort){ this.setOrganization("main",{sort:String(librarySort.value||"alphabetical")}); closeOrgMenus(); } };
+const applyCategory=()=>{ if(libraryCategory){ this.setOrganization("main",{category:String(libraryCategory.value||"all")}); closeOrgMenus(); } };
+if(librarySort){ librarySort.addEventListener("change",applySort); librarySort.addEventListener("input",applySort); }
+if(libraryCategory){ libraryCategory.addEventListener("change",applyCategory); libraryCategory.addEventListener("input",applyCategory); }
 
 const continueToggle=document.getElementById("continueToggleButton");
 if(continueToggle){
@@ -555,59 +623,16 @@ break;
 
 },
 
-sortByTitle(){
+sortByTitle(){ this.setOrganization("main",{sort:"alphabetical"}); },
 
-SkyReader.filteredLibrary.sort((a,b)=>{
+sortNewest(){ this.setOrganization("main",{sort:"newest"}); },
 
-return a.title.localeCompare(b.title);
+sortOldest(){ this.setOrganization("main",{sort:"oldest"}); },
 
-});
+sortRecent(){ this.setOrganization("main",{sort:"recent"}); },
 
-this.build();
+sortRandom(){ this.setOrganization("main",{sort:"random"}); },
 
-},
-
-sortNewest(){
-
-SkyReader.filteredLibrary.sort((a,b)=>{
-
-const da=new Date(a.date||0);
-
-const db=new Date(b.date||0);
-
-return db-da;
-
-});
-
-this.build();
-
-},
-
-sortRecent(){
-
-const last=StorageManager.load();
-
-if(!last.lastMagazine){
-
-this.sortByTitle();
-
-return;
-
-}
-
-SkyReader.filteredLibrary.sort((a,b)=>{
-
-if(a.id===last.lastMagazine)return -1;
-
-if(b.id===last.lastMagazine)return 1;
-
-return a.title.localeCompare(b.title);
-
-});
-
-this.build();
-
-},
 
 openFirstBook(){
 
@@ -639,6 +664,9 @@ this.showList();
 
 initialize(){
 
+this.populateCategories();
+this.applyOrganization();
+// Manifest data is now authoritative; render immediately on first load.
 this.build();
 
 this.initializeEvents();

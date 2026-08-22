@@ -82,6 +82,10 @@ volume:.5
 ui:{
 libraryOpen:true,
 shelfView:true,
+organization:{
+main:{sort:"alphabetical",filter:"all",category:""},
+viewer:{sort:"alphabetical",filter:"all",category:""}
+},
 loading:false,
 loadingProgress:0,
 loadingMessage:"Ready"
