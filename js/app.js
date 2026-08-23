@@ -491,6 +491,14 @@ showDefaultView();
 
     started=true;
 
+    // Remove the branded startup layer only after the normalized library
+    // has rendered and the application is actually ready.
+    const reloadScreen=document.getElementById("reloadScreen");
+    if(reloadScreen){
+        reloadScreen.classList.add("isReady");
+        window.setTimeout(()=>reloadScreen.remove(),500);
+    }
+
     log("SkyReader started.");
 
 };

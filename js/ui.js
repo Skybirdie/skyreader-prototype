@@ -867,21 +867,21 @@ case " ":
 
 case "Home":
 
-event.preventDefault();
-
-Reader.goTo(1);
+if(Reader.isOpen() && typeof SRNavigation!=="undefined" &&
+   typeof SRNavigation.goToPage==="function"){
+    event.preventDefault();
+    SRNavigation.goToPage(1);
+}
 
 break;
 
 case "End":
 
-event.preventDefault();
-
-Reader.goTo(
-
-Reader.pages()
-
-);
+if(Reader.isOpen() && typeof SRNavigation!=="undefined" &&
+   typeof SRNavigation.goToPage==="function"){
+    event.preventDefault();
+    SRNavigation.goToPage(Reader.pages());
+}
 
 break;
 

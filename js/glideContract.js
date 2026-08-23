@@ -15,6 +15,47 @@ window.GlideContract=(function(){
 
 const adapter={};
 
+/*-------------------------------------------------------
+ Shared SkyReader Book Adapter
+
+ Every source -- Glide contract or prototype library.json --
+ passes through these same normalization functions before the
+ rest of SkyReader sees the books. This is the single data
+ boundary for Book objects.
+-------------------------------------------------------*/
+function normalizeBook(raw={},index=0){
+    const source=(raw && typeof raw==="object") ? raw : {};
+    return {
+        id:String(source.id ?? ("book_"+index)).trim() || ("book_"+index),
+        title:String(source.title ?? "").trim(),
+        subtitle:String(source.subtitle ?? "").trim(),
+        thumbnail:String(source.thumbnail ?? source.cover ?? "assets/default-thumbnail.png").trim() || "assets/default-thumbnail.png",
+        pdf:String(source.pdf ?? "").trim(),
+        author:String(source.author ?? "").trim(),
+        category:String(source.category ?? "").trim(),
+        pageCount:source.pageCount ?? source.page_count ?? "unknown",
+        date:String(source.date ?? source.releaseDate ?? source.release_date ?? "").trim()
+    };
+}
+
+function normalizeManifest(rawManifest){
+    if(!rawManifest || typeof rawManifest!=="object") throw new Error("Invalid manifest.");
+    const rawBooks=Array.isArray(rawManifest) ? rawManifest : rawManifest.books;
+    if(!Array.isArray(rawBooks)) throw new Error("Manifest missing books.");
+
+    const books=rawBooks.map((book,index)=>{
+        const normalized=normalizeBook(book,index);
+        if(!normalized.title) throw new Error("Book title missing.");
+        if(!normalized.pdf) throw new Error(normalized.title+" has no PDF.");
+        return normalized;
+    });
+
+    return {books,background:Array.isArray(rawManifest) ? null : (rawManifest.background ?? null)};
+}
+
+adapter.normalizeBook=normalizeBook;
+adapter.normalizeManifest=normalizeManifest;
+
 function readGlobal(){
     const candidates=[
         window.SkyReaderGlideContract,

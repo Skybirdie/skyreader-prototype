@@ -28,7 +28,7 @@ window.Manifest={
 
 source:{
 
-    url:"library.json?v=1.1.6",
+    url:"library.json?v=1.1.7",
 
     async load(){
 
@@ -137,63 +137,10 @@ books(){
 
 normalize(rawManifest){
 
-    if(!rawManifest || typeof rawManifest!=="object")
-
-        throw new Error("Invalid manifest.");
-
-    if(!Array.isArray(rawManifest.books))
-
-        throw new Error("Manifest missing books.");
-
-    const books=rawManifest.books.map((book,index)=>{
-
-        const normalized={
-
-            id:book.id||("book_"+index),
-
-            title:book.title,
-
-            subtitle:book.subtitle||"",
-
-            thumbnail:book.thumbnail||"assets/default-thumbnail.png",
-
-            pdf:book.pdf,
-
-            author:book.author||"",
-
-            category:book.category||"",
-
-            pageCount:book.pageCount||"unknown",
-
-            date:String(book.date??book.releaseDate??book.release_date??"").trim()
-
-        };
-
-        if(!normalized.title)
-
-            throw new Error("Book title missing.");
-
-        if(!normalized.pdf)
-
-            throw new Error(
-
-                normalized.title+
-
-                " has no PDF."
-
-            );
-
-        return normalized;
-
-    });
-
-    return{
-
-        books,
-
-        background:rawManifest.background||null
-
-    };
+    // Both GlideContract and library.json deliberately converge here.
+    // GlideContract owns the one shared Book adapter so neither source
+    // can construct a subtly different object shape.
+    return GlideContract.normalizeManifest(rawManifest);
 
 },
 
