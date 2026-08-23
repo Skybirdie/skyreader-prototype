@@ -91,7 +91,7 @@
     {
       "id": "sample8",
       "title": "Khurasan",
-      "subtitle": "Sample Magazine7",
+      "subtitle": "Sample Magazine8",
       "thumbnail": "assets/thumbnails/khurasan.jpg",
       "pdf": "pdf/Khurasan Read Me New.pdf",
       "author": "Andrew L.",
@@ -99,7 +99,19 @@
       "pageCount": "2",
       "date": "202507200811"
     }
+,
 
+    {
+      "id": "sample9",
+      "title": "Clothed",
+      "subtitle": "Sample Magazine9",
+      "thumbnail": "assets/thumbnails/clothed.jpg",
+      "pdf": "pdf/Clothed.pdf",
+      "author": "Sky",
+      "category": "General",
+      "pageCount": "2",
+      "date": "202507200912"
+    }
   ]
 }
 
