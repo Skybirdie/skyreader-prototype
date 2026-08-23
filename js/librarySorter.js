@@ -266,9 +266,9 @@ sorter.filter=function(books,filter="all",category=""){
 };
 
 sorter.dateKey=function(book){
-    const raw=book && (book.date ?? book.releaseDate ?? book.release_date ?? "");
+    const raw=book && book.date != null ? book.date : "";
     const digits=String(raw??"").trim().replace(/[^0-9]/g,"");
-    // Canonical prototype/Glide contract key: YYYYMMDDHHmm.
+    // Canonical Book contract key: YYYYMMDDHHmm.
     // Preserve all 12 digits so month, day, hour and minute participate.
     if(/^\d{12}$/.test(digits)) return digits;
     // Compatible numeric timestamps: pad only for deterministic comparison.

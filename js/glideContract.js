@@ -34,7 +34,7 @@ function normalizeBook(raw={},index=0){
         author:String(source.author ?? "").trim(),
         category:String(source.category ?? "").trim(),
         pageCount:source.pageCount ?? source.page_count ?? "unknown",
-        date:String(source.date ?? source.releaseDate ?? source.release_date ?? "").trim()
+        date:String(source.date ?? "").trim()
     };
 }
 

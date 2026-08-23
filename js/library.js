@@ -142,20 +142,38 @@ updateViewerContinue(){
 
     const lastPage=Math.max(1,Number(SkyReader.resume.page)||1);
 
-    wrap.innerHTML=`
-    <div class="viewerContinueCard" title="Read again: ${book.title}">
-        <img src="${book.thumbnail||"assets/default-thumbnail.png"}" alt="" onerror="if(this.dataset.fallbackApplied==='true'){this.style.display='none';return;}this.dataset.fallbackApplied='true';this.src='assets/default-thumbnail.png';">
-        <div class="viewerContinueText">
-            <strong>Read Again: ${book.title}</strong>
-            <span>Last viewed: page ${lastPage}</span>
-        </div>
-    </div>`;
+    wrap.innerHTML="";
 
+    const card=document.createElement("div");
+    card.className="viewerContinueCard";
+    card.title=`Read again: ${book.title}`;
+
+    const image=document.createElement("img");
+    image.src=book.thumbnail||"assets/default-thumbnail.png";
+    image.alt="";
+    image.addEventListener("error",()=>{
+        if(image.dataset.fallbackApplied==="true"){
+            image.style.display="none";
+            return;
+        }
+        image.dataset.fallbackApplied="true";
+        image.src="assets/default-thumbnail.png";
+    });
+
+    const text=document.createElement("div");
+    text.className="viewerContinueText";
+
+    const title=document.createElement("strong");
+    title.textContent=`Read Again: ${book.title}`;
+
+    const page=document.createElement("span");
+    page.textContent=`Last viewed: page ${lastPage}`;
+
+    text.append(title,page);
+    card.append(image,text);
+    card.onclick=()=>this.select(book,1);
+    wrap.appendChild(card);
     wrap.classList.remove("hidden");
-    const card=wrap.querySelector(".viewerContinueCard");
-    if(card){
-        card.onclick=()=>this.select(book,1);
-    }
 },
 
 
@@ -290,35 +308,36 @@ item.className="listItem";
 
 item.dataset.id=book.id;
 
-item.innerHTML=
+const thumbWrap=document.createElement("div");
+thumbWrap.className="listThumb";
 
-`
+const image=document.createElement("img");
+image.loading="lazy";
+image.src=book.thumbnail||"assets/default-thumbnail.png";
+image.alt=book.title||"";
+image.addEventListener("error",()=>{
+    if(image.dataset.fallbackApplied==="true"){
+        image.style.display="none";
+        return;
+    }
+    image.dataset.fallbackApplied="true";
+    image.src="assets/default-thumbnail.png";
+});
+thumbWrap.appendChild(image);
 
-<div class="listThumb">
+const info=document.createElement("div");
+info.className="listInfo";
 
-<img loading="lazy"
+const title=document.createElement("div");
+title.className="listTitle";
+title.textContent=book.title;
 
-src="${book.thumbnail||"assets/default-thumbnail.png"}" onerror="if(this.dataset.fallbackApplied==='true'){this.style.display='none';return;}this.dataset.fallbackApplied='true';this.src='assets/default-thumbnail.png';">
+const subtitle=document.createElement("div");
+subtitle.className="listSubtitle";
+subtitle.textContent=book.subtitle||"";
 
-</div>
-
-<div class="listInfo">
-
-<div class="listTitle">
-
-${book.title}
-
-</div>
-
-<div class="listSubtitle">
-
-${book.subtitle||""}
-
-</div>
-
-</div>
-
-`;
+info.append(title,subtitle);
+item.append(thumbWrap,info);
 
 item.onclick=()=>{
 
@@ -370,14 +389,39 @@ updateReadAgain(){
     section.style.display="";
     section.classList.toggle("continueCollapsed",!visible);
     card.style.display=visible?"flex":"none";
-    card.innerHTML=`
-        <div class="thumbnailPlaceholder">
-            <img src="${book.thumbnail||"assets/default-thumbnail.png"}" alt="${book.title}" style="width:100%;height:100%;object-fit:cover;border-radius:10px;" onerror="if(this.dataset.fallbackApplied==='true'){this.style.display='none';return;}this.dataset.fallbackApplied='true';this.src='assets/default-thumbnail.png';">
-        </div>
-        <div class="placeholderText">
-            <h3>${book.title}</h3>
-            <p>Last viewed: page ${lastPage}</p>
-        </div>`;
+    card.innerHTML="";
+
+    const thumbnailPlaceholder=document.createElement("div");
+    thumbnailPlaceholder.className="thumbnailPlaceholder";
+
+    const image=document.createElement("img");
+    image.src=book.thumbnail||"assets/default-thumbnail.png";
+    image.alt=book.title||"";
+    image.style.width="100%";
+    image.style.height="100%";
+    image.style.objectFit="cover";
+    image.style.borderRadius="10px";
+    image.addEventListener("error",()=>{
+        if(image.dataset.fallbackApplied==="true"){
+            image.style.display="none";
+            return;
+        }
+        image.dataset.fallbackApplied="true";
+        image.src="assets/default-thumbnail.png";
+    });
+    thumbnailPlaceholder.appendChild(image);
+
+    const placeholderText=document.createElement("div");
+    placeholderText.className="placeholderText";
+
+    const title=document.createElement("h3");
+    title.textContent=book.title;
+
+    const page=document.createElement("p");
+    page.textContent=`Last viewed: page ${lastPage}`;
+
+    placeholderText.append(title,page);
+    card.append(thumbnailPlaceholder,placeholderText);
     card.onclick=()=>this.select(book,1);
 
     this.updateViewerContinue();
