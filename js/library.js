@@ -101,8 +101,6 @@ this.buildShelf();
 
 this.buildList();
 
-this.updateReadAgain();
-
 this.buildViewerLibrary();
 
 },
@@ -351,11 +349,17 @@ return item;
 
 filter(text){
 
-this.searchText=String(text||"").toLowerCase();
-this.applyOrganization();
+    this.searchText=String(text||"").toLowerCase();
+
+    this.applyOrganization();
+
+    /* Search changes the authoritative filtered collection.
+       Rebuild both visible library representations so the UI immediately
+       reflects the new filtered result. */
+    this.buildShelf();
+    this.buildList();
 
 },
-
 
 getReadAgainBook(){
     const id=SkyReader.resume && SkyReader.resume.magazineId;
@@ -363,75 +367,6 @@ getReadAgainBook(){
     return SkyReader.library.find(book=>book.id===id)||null;
 },
 
-updateReadAgain(){
-    const section=document.getElementById("continueReading");
-    const card=document.getElementById("continueCard");
-    const book=this.getReadAgainBook();
-
-    if(!section || !card)return;
-
-    const panel=document.getElementById("libraryPanel");
-
-    if(!book){
-        // Keep the compact Read Again header visible, but never leave an
-        // expanded empty placeholder occupying panel space.
-        section.style.display="";
-        section.classList.add("continueCollapsed");
-        card.style.display="none";
-        if(panel) panel.classList.add("noContinue");
-        this.updateViewerContinue();
-        return;
-    }
-
-    const lastPage=Math.max(1,Number(SkyReader.resume.page)||1);
-    const visible=SkyReader.settings.readAgainVisible!==false;
-    if(panel) panel.classList.remove("noContinue");
-    section.style.display="";
-    section.classList.toggle("continueCollapsed",!visible);
-    card.style.display=visible?"flex":"none";
-    card.innerHTML="";
-
-    const thumbnailPlaceholder=document.createElement("div");
-    thumbnailPlaceholder.className="thumbnailPlaceholder";
-
-    const image=document.createElement("img");
-    image.src=book.thumbnail||"assets/default-thumbnail.png";
-    image.alt=book.title||"";
-    image.style.width="100%";
-    image.style.height="100%";
-    image.style.objectFit="cover";
-    image.style.borderRadius="10px";
-    image.addEventListener("error",()=>{
-        if(image.dataset.fallbackApplied==="true"){
-            image.style.display="none";
-            return;
-        }
-        image.dataset.fallbackApplied="true";
-        image.src="assets/default-thumbnail.png";
-    });
-    thumbnailPlaceholder.appendChild(image);
-
-    const placeholderText=document.createElement("div");
-    placeholderText.className="placeholderText";
-
-    const title=document.createElement("h3");
-    title.textContent=book.title;
-
-    const page=document.createElement("p");
-    page.textContent=`Last viewed: page ${lastPage}`;
-
-    placeholderText.append(title,page);
-    card.append(thumbnailPlaceholder,placeholderText);
-    card.onclick=()=>this.select(book,1);
-
-    this.updateViewerContinue();
-    if(typeof RecentShelf!=="undefined" && typeof RecentShelf.refresh==="function") RecentShelf.refresh();
-},
-
-/* Backward-compatible alias for modules that still call the old name. */
-updateContinueReading(){
-    this.updateReadAgain();
-},
 
 open(id,page=null){
 
@@ -476,11 +411,23 @@ if(search){
 }
 
 if(searchToggle && search){
-    searchToggle.addEventListener("click",()=>{
+    const searchGroup=document.getElementById("topSearchGroup");
+
+    const openSearch=()=>{
+        if(searchGroup)searchGroup.classList.add("searchOpen");
         requestAnimationFrame(()=>{
-            search.focus();
+            search.focus({preventScroll:true});
             search.select();
         });
+    };
+
+    searchToggle.addEventListener("click",openSearch);
+
+    /* Keep the visual state synchronized with the actual focused control.
+       This is presentation only; the existing input/filter event remains
+       authoritative for search behavior. */
+    search.addEventListener("focus",()=>{
+        if(searchGroup)searchGroup.classList.add("searchOpen");
     });
 }
 
@@ -515,22 +462,6 @@ const applyCategory=()=>{ if(libraryCategory){ this.setOrganization("main",{cate
 if(librarySort){ librarySort.addEventListener("change",applySort); librarySort.addEventListener("input",applySort); }
 if(libraryCategory){ libraryCategory.addEventListener("change",applyCategory); libraryCategory.addEventListener("input",applyCategory); }
 
-const continueToggle=document.getElementById("continueToggleButton");
-if(continueToggle){
-    const syncContinueToggle=()=>{
-        const visible=SkyReader.settings.readAgainVisible!==false;
-        continueToggle.textContent=visible?"−":"+";
-        continueToggle.setAttribute("aria-label",visible?"Hide Read Again":"Show Read Again");
-        continueToggle.title=visible?"Hide Read Again":"Show Read Again";
-    };
-    syncContinueToggle();
-    continueToggle.addEventListener("click",()=>{
-        SkyReader.settings.readAgainVisible=SkyReader.settings.readAgainVisible===false;
-        StorageManager.saveSettings();
-        syncContinueToggle();
-        this.updateReadAgain();
-    });
-}
 
 const libraryDrawerClose=document.getElementById("libraryDrawerClose");
 if(libraryDrawerClose){
@@ -554,7 +485,7 @@ if(narrowLibraryToggle){
         if(opening){
             if(typeof Library.buildShelf==="function") Library.buildShelf();
             if(typeof Library.buildList==="function") Library.buildList();
-            if(typeof Library.updateReadAgain==="function") Library.updateReadAgain();
+
         }
         SkyReader.toggleLibrary(opening);
         syncNarrowLibraryToggle();

@@ -5,13 +5,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 
-<title>SkyReader</title>
+<title>MMicj</title>
 
 <meta name="theme-color" content="#ffffff">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="SkyReader">
+<meta name="apple-mobile-web-app-title" content="MMicj">
 
 <link rel="preconnect" href="https://cdnjs.cloudflare.com">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -40,8 +40,8 @@
 <body>
 
 <div id="reloadScreen" role="status" aria-live="polite">
-<img src="assets/reload.gif" alt="Loading SkyReader" onerror="this.style.display='none';this.nextElementSibling.hidden=false;">
-<div class="reloadFallback" hidden>Loading SkyReader…</div>
+<img src="assets/reload.gif" alt="Loading Meditation Mornings" onerror="this.style.display='none';this.nextElementSibling.hidden=false;">
+<div class="reloadFallback" hidden>Loading MMicj…</div>
 </div>
 
 <div id="app">
@@ -62,7 +62,7 @@
 <h1 id="appTitle"></h1>
 
 
-<button id="settingsButton" class="iconButton" title="Settings">
+<button id="settingsButton" class="iconButton" type="button" title="Settings" aria-label="Settings">
 <svg class="icon"><use href="#icon-settings"></use></svg>
 </button>
 
@@ -72,28 +72,6 @@
 
 <aside id="libraryPanel" class="visible">
 
-<section id="continueReading">
-
-<div class="sectionHeader">
-<h2>Read Again</h2>
-<button id="continueToggleButton" class="sectionToggleButton" type="button" aria-label="Hide Read Again" title="Hide Read Again">−</button>
-</div>
-
-<div id="continueCard" class="placeholderCard">
-
-<div class="coverPlaceholder"></div>
-
-<div class="placeholderText">
-
-<h3>No recent magazine</h3>
-
-<p>Select a publication below.</p>
-
-</div>
-
-</div>
-
-</section>
 
 <section id="recentSection">
 
@@ -124,7 +102,7 @@
 <svg class="icon"><use href="#icon-grid"></use></svg>
 </button>
 
-<button id="listViewButton" class="viewButton">
+<button id="listViewButton" class="viewButton" type="button" title="List view" aria-label="List view">
 <svg class="icon"><use href="#icon-list"></use></svg>
 </button>
 
@@ -156,12 +134,12 @@
      selected book. The same library data is used so this never
      becomes a second source of truth.
 -->
-<div id="viewerLibrary" class="viewerLibrary" aria-label="SkyReader library">
+<div id="viewerLibrary" class="viewerLibrary" aria-label="MMicj library">
 
 <div class="viewerLibraryHero">
 
 <div class="viewerLibraryVector" aria-hidden="true">
-<img src="assets/logo.svg" alt="" class="viewerLibraryLogo" onerror="this.style.visibility='hidden'">
+<img src="assets/logo.png" alt="" class="viewerLibraryLogo" onerror="this.style.visibility='hidden'">
 </div>
 
 <div>
@@ -181,7 +159,7 @@
 
 <div id="productionError" class="productionError" role="alert" aria-live="assertive" hidden>
 <div class="productionErrorInner">
-<strong id="productionErrorTitle">Unable to open SkyReader</strong>
+<strong id="productionErrorTitle">Unable to open MMicj</strong>
 <span id="productionErrorText"></span>
 <button id="productionErrorClose" type="button" aria-label="Dismiss error">×</button>
 </div>
@@ -202,13 +180,13 @@
 
 <nav id="toolbar">
 
-<button id="previousButton" class="iconButton">
+<button id="previousButton" class="iconButton" type="button" title="Previous page" aria-label="Previous page">
 <svg class="icon"><use href="#icon-previous"></use></svg>
 </button>
 
-<button id="rotateButton" class="iconButton" aria-label="Rotate">↻</button>
+<button id="rotateButton" class="iconButton" type="button" title="Rotate reader" aria-label="Rotate reader">↻</button>
 
-<button id="muteButton" class="iconButton">
+<button id="muteButton" class="iconButton" type="button" title="Mute" aria-label="Mute">
 <svg class="icon"><use href="#icon-volume"></use></svg>
 </button>
 
@@ -216,7 +194,7 @@
 <svg class="icon"><use href="#icon-fullscreen"></use></svg>
 </button>
 
-<button id="nextButton" class="iconButton">
+<button id="nextButton" class="iconButton" type="button" title="Next page" aria-label="Next page">
 <svg class="icon"><use href="#icon-next"></use></svg>
 </button>
 
@@ -232,12 +210,12 @@
 <label for="pageJumpInput">Go to page</label>
 <div class="pageJumpRow">
 <input id="pageJumpInput" type="number" inputmode="numeric" min="1" step="1" autocomplete="off" aria-label="Page number">
-<button id="pageJumpButton" type="button">Go</button>
+<button id="pageJumpButton" type="button" title="Go to page" aria-label="Go to page">Go</button>
 </div>
 </div>
 </center>
 </div>
-<div class="sr-welcome-banner"><center>Welcome to SkyReader</center></div>
+<div class="sr-welcome-banner"><center>Welcome to Meditation Mornings</center></div>
 
 
 </section>

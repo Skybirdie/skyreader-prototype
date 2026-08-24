@@ -151,6 +151,7 @@ body{
   overflow:hidden;
   background:var(--panel2);
   color:var(--text);
+
 }
 
 #viewerBackground{
@@ -245,7 +246,6 @@ body{
   from{transform:rotate(0deg);}
   to{transform:rotate(90deg);}
 }
-
 /* ---------- Viewer landing ---------- */
 
 #viewerLibrary{
@@ -254,19 +254,38 @@ body{
   right:0;
   top:50%;
   bottom:auto;
+
+  /* Strictly 60% of the viewer background height. */
   height:60%;
-  min-height:50vh;
+  min-height:0;
+
   z-index:6;
+
   display:flex;
   flex-direction:column;
-  justify-content:center;
+
+  /* The children themselves control the vertical distribution. */
+  justify-content:stretch;
+
+  box-sizing:border-box;
+
   padding:clamp(20px,4vw,46px);
-  background:color-mix(in srgb,var(--panel) 55%,transparent);color:var(--text);backdrop-filter:blur(0);
+
+  background:color-mix(in srgb,var(--panel) 55%,transparent);
+  color:var(--text);
+  backdrop-filter:blur(0);
+
   border-radius:20px;
+
   opacity:1;
   visibility:visible;
+
   transform:translateY(-50%) scale(1);
-  transition:opacity .42s ease,transform .42s cubic-bezier(.22,.8,.25,1),visibility 0s linear 0s;
+
+  transition:
+    opacity .42s ease,
+    transform .42s cubic-bezier(.22,.8,.25,1),
+    visibility 0s linear 0s;
 }
 
 #viewerLibrary.isOpening{
@@ -281,7 +300,10 @@ body{
   opacity:0;
   visibility:hidden;
   transform:translateY(calc(-50% + 12px)) scale(.985);
-  transition:opacity .34s ease,transform .34s ease,visibility 0s linear .34s;
+  transition:
+    opacity .34s ease,
+    transform .34s ease,
+    visibility 0s linear .34s;
   pointer-events:none;
 }
 
@@ -290,33 +312,52 @@ body{
 }
 
 @keyframes viewerLibraryReturn{
-  0%{opacity:0;transform:translateY(calc(-50% + 18px)) scale(.985)}
-  100%{opacity:1;transform:translateY(-50%) scale(1)}
+  0%{
+    opacity:0;
+    transform:translateY(calc(-50% + 18px)) scale(.985)
+  }
+  100%{
+    opacity:1;
+    transform:translateY(-50%) scale(1)
+  }
 }
+
+
+/* ---------- Hero ---------- */
 
 .viewerLibraryHero{
   display:flex;
   align-items:center;
   justify-content:center;
+
   gap:16px;
   text-align:left;
+
   flex:1 1 25%;
   min-height:0;
+
   width:100%;
   margin:0 auto;
+
+  box-sizing:border-box;
 }
 
 
 .viewerLibraryVector{
   width:58px;
   height:58px;
+
   display:flex;
   align-items:center;
   justify-content:center;
+
   flex:0 0 auto;
+
   border-radius:18px;
+
   background:var(--hero-surface);
   color:var(--hero-icon);
+
   box-shadow:var(--soft-shadow);
 }
 
@@ -334,21 +375,30 @@ body{
   color:var(--text);
 }
 
-
 .viewerLibraryHero p{
   margin-top:4px;
   font-size:14px;
   color:var(--muted);
 }
 
+
+/* ---------- Viewer library shelf ---------- */
+
 #viewerLibraryScroll{
   flex:2 1 50%;
+
   min-height:0;
+
   width:100%;
   margin:0 auto;
+
   padding:4px 4px 10px;
+
+  box-sizing:border-box;
+
   overflow-x:auto;
   overflow-y:hidden;
+
   scroll-behavior:smooth;
   scrollbar-width:thin;
 }
@@ -358,24 +408,32 @@ body{
   flex-direction:row;
   flex-wrap:nowrap;
   align-items:stretch;
+
   width:max-content;
   min-width:max-content;
-  height:100%;
-  gap:clamp(10px,1.2vw,18px);
-  opacity:1;
-  padding:4px 0;
 
+  height:100%;
+
+  gap:clamp(10px,1.2vw,18px);
+
+  opacity:1;
+
+  padding:4px 0;
 }
 
 
 #viewerShelfView .bookCard{
   flex:0 0 auto;
+
   width:clamp(112px,11vw,170px);
   min-width:clamp(112px,11vw,170px);
   max-width:clamp(112px,11vw,170px);
+
   height:auto;
   min-height:0;
+
   padding:7px;
+
   white-space:normal;
 }
 
@@ -391,74 +449,111 @@ body{
   object-fit:cover;
 }
 
-
 #viewerShelfView .bookTitle{
   margin:5px 1px 0;
+
   font-size:clamp(10px,1.2vw,14px);
   line-height:1.15;
+
   display:-webkit-box;
   -webkit-line-clamp:2;
   -webkit-box-orient:vertical;
+
   overflow:hidden;
   overflow-wrap:anywhere;
 }
 
-#viewerShelfView .bookSubtitle{display:none;}
+#viewerShelfView .bookSubtitle{
+  display:none;
+}
+
+
+/* ---------- Read Again ---------- */
 
 .viewerContinue{
   flex:1 1 25%;
+
   min-height:0;
+
   width:min(560px,100%);
   margin:0 auto;
+
   padding:4px 0;
+
   display:flex;
   align-items:center;
+
+  box-sizing:border-box;
 }
 
-.viewerContinue.hidden{display:none!important;}
+.viewerContinue.hidden{
+  display:none!important;
+}
 
 .viewerContinueCard{
   display:flex;
   align-items:center;
   justify-content:center;
+
   gap:14px;
+
   height:100%;
   max-height:90%;
+
   width:100%;
   min-width:0;
-  padding:clamp(7px,1vh,12px) clamp(10px,1.5vw,16px);
+
+  padding:
+    clamp(7px,1vh,12px)
+    clamp(10px,1.5vw,16px);
+
   overflow:hidden;
+
   border-radius:16px;
+
   background:var(--card);
   box-shadow:var(--soft-shadow);
-  cursor:pointer;
-  transition:transform .22s ease,box-shadow .22s ease;
 
+  cursor:pointer;
+
+  transition:
+    transform .22s ease,
+    box-shadow .22s ease;
 }
 
-
-.viewerContinueCard:hover{transform:translateY(-2px);box-shadow:var(--hover-shadow);}
+.viewerContinueCard:hover{
+  transform:translateY(-2px);
+  box-shadow:var(--hover-shadow);
+}
 
 .viewerContinueCard img{
   width:25%;
   max-width:25%;
+
   height:auto;
   max-height:100%;
+
   aspect-ratio:2/3;
   object-fit:cover;
-  flex:0 0 25%;
-  border-radius:15px;
-  box-shadow:0 4px 10px rgba(0,0,0,.12);
-  padding: 5px;
-margin-top: 3px;
-}
 
+  flex:0 0 25%;
+
+  border-radius:15px;
+
+  box-shadow:0 4px 10px rgba(0,0,0,.12);
+
+  padding:5px;
+  margin-top:3px;
+}
 
 .viewerContinueText{
   display:flex;
+
   flex:1 1 auto;
+
   flex-direction:column;
   gap:3px;
+
   min-width:0;
   overflow:hidden;
 }
@@ -467,18 +562,68 @@ margin-top: 3px;
 .viewerContinueText span{
   min-width:0;
   max-width:100%;
+
   overflow:hidden;
   text-overflow:ellipsis;
   white-space:nowrap;
   overflow-wrap:anywhere;
 }
 
-.viewerContinueText strong{font-size:clamp(13px,1.6vw,18px);line-height:1.2;}
-.viewerContinueText span{font-size:12px;color:var(--muted);}
+.viewerContinueText strong{
+  font-size:clamp(13px,1.6vw,18px);
+  line-height:1.2;
+}
 
-#viewerLibrary:not(:has(.viewerContinue:not(.hidden))) .viewerLibraryHero{flex-basis:33.333%;}
-#viewerLibrary:not(:has(.viewerContinue:not(.hidden))) #viewerLibraryScroll{flex-basis:66.667%;}
+.viewerContinueText span{
+  font-size:12px;
+  color:var(--muted);
+}
 
+
+/* =========================================================
+   LANDING DISTRIBUTION
+   ========================================================= */
+
+/*
+ * With Read Again:
+ *
+ *   Hero       = 25%
+ *   Read Again = 25%
+ *   Library    = 50%
+ *
+ * Without Read Again:
+ *
+ *   Hero       = 33.333%
+ *   Library    = 66.667%
+ *
+ * Because #viewerLibrary itself has a strict 60% height,
+ * these percentages always refer to that fixed landing area.
+ */
+
+#viewerLibrary:not(:has(.viewerContinue:not(.hidden)))
+  .viewerLibraryHero{
+  flex:0 0 33.333%;
+}
+
+#viewerLibrary:not(:has(.viewerContinue:not(.hidden)))
+  #viewerLibraryScroll{
+  flex:0 0 66.667%;
+}
+
+#viewerLibrary:has(.viewerContinue:not(.hidden))
+  .viewerLibraryHero{
+  flex:0 0 25%;
+}
+
+#viewerLibrary:has(.viewerContinue:not(.hidden))
+  .viewerContinue{
+  flex:0 0 25%;
+}
+
+#viewerLibrary:has(.viewerContinue:not(.hidden))
+  #viewerLibraryScroll{
+  flex:0 0 50%;
+}
 /* ---------- Main Library ---------- */
 
 #libraryPanel{
@@ -506,15 +651,6 @@ margin-top: 3px;
   color:var(--text);
 }
 
-#continueReading{
-  flex:0 0 25%;
-  height:25%;
-  padding:10px 12px;
-  display:flex;
-  flex-direction:column;
-  gap:10px;
-  border-bottom:1px solid var(--line);
-}
 
 #recentSection{
   flex:1 1 75%;
@@ -547,52 +683,9 @@ margin-top: 3px;
   line-height:1;
 }
 
-#continueReading .sectionHeader h2{
-  flex:1 1 auto;
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis;
-}
 
-.sectionToggleButton{
-  margin-left:auto;
-  flex:0 0 auto;
-  width:24px;
-  height:24px;
-  border:0;
-  border-radius:50%;
-  background:transparent;
-  color:var(--text);
-  font:600 20px/1 Inter,Arial,sans-serif;
-  cursor:pointer;
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-}
 
-.sectionToggleButton:hover{background:color-mix(in srgb,var(--text) 10%,transparent);}
 
-#continueCard{
-  display:flex;
-  align-items:left;
-  box-sizing:border-box;
-  flex:1 1 auto;
-  width:100%;
-  min-width:0;
-  min-height:0;
-  margin:0;
-  gap:10px;
-  padding:8px;
-  overflow:hidden;
-  border-radius:12px;
-  background:var(--card);
-  box-shadow:var(--soft-shadow);
-}
-
-#continueCard img{
-  object-fit: cover;
-  border:1px solid color-mix(in srgb,var(--line) 80%,transparent);
-}
 
 
 #libraryContent{
@@ -620,6 +713,40 @@ margin-top: 3px;
 }
 
 #libraryDrawerClose{display:none;}
+
+
+/* ---------------------------------------------------------
+   Narrow drawer
+   Grid + List on the left, X on the right
+   --------------------------------------------------------- */
+
+@media (max-width: 999px) {
+
+    #viewButtons {
+        display: flex;
+        align-items: center;
+    }
+
+    #shelfViewButton {
+        order: 1;
+    }
+
+    #listViewButton {
+        order: 2;
+    }
+
+    .libraryDrawerClose {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        order: 3;
+        margin-left: 8px;
+    }
+
+}
+
+
+
 
 /* Grid: exactly two columns with automatic/content-driven rows. */
 #shelfView{
@@ -789,16 +916,6 @@ margin-top: 3px;
 #libraryPanel #shelfView:not(.hidden){display:grid;}
 #libraryPanel #listView:not(.hidden){display:flex;}
 
-/* Read Again collapse: the Library consumes released vertical space. */
-#continueReading.continueCollapsed{
-  flex:0 0 42px!important;
-  height:42px!important;
-  min-height:42px!important;
-  max-height:42px!important;
-  padding:8px 12px!important;
-}
-
-#continueReading.continueCollapsed #continueCard{display:none!important;}
 
 #continueReading.continueCollapsed + #recentSection{
   flex:1 1 auto!important;
@@ -821,7 +938,7 @@ margin-top: 3px;
 }
 
 #topSearchGroup #searchBox{
-  display:block!important;
+  display:none!important;
   flex:1 1 auto;
   width:auto;
   min-width:0;
@@ -841,6 +958,7 @@ margin-top: 3px;
 
 #topSearchGroup #searchBox::placeholder{color:color-mix(in srgb,var(--control-text) 72%,transparent);}
 #topSearchGroup #searchBox:focus{box-shadow:0 0 0 2px color-mix(in srgb,var(--control-text) 18%,transparent);}
+#topSearchGroup.searchOpen #searchBox{display:block!important;}
 #topSearchGroup .iconButton{flex:0 0 auto;}
 #searchWrapper,#searchToggleButton{display:none!important;}
 
@@ -959,10 +1077,11 @@ html[data-theme="dark"] #readerPanel #toolbar .iconButton{
 .sr-welcome-banner{
   background:var(--panel);
   color:var(--muted);
-  border-top:1px solid var(--line);
-  padding:4px 8px;
+  border-top:none;
+  padding:2px 8px;
   font-size:12px;
 }
+
 
 #app.viewerFocus{
   position:fixed!important;
@@ -998,6 +1117,9 @@ html[data-theme="dark"] #readerPanel #toolbar .iconButton{
   flex:1 1 auto!important;
   padding:max(6px,env(safe-area-inset-top)) max(6px,env(safe-area-inset-right)) max(6px,env(safe-area-inset-bottom)) max(6px,env(safe-area-inset-left))!important;
 }
+
+
+
 
 /* ---------- Responsive system ---------- */
 
@@ -1052,6 +1174,12 @@ html[data-theme="dark"] #readerPanel #toolbar .iconButton{
   #readerPanel #toolbar #viewerFullscreenButton{right:5px!important;}
 }
 
+ #statusBar {
+ background:var(--panel);
+    border-bottom: none;
+}
+
+
 @media (max-width:600px){
   #topBar{--header-height:clamp(38px,6vh,52px);}
   .viewerLibraryHero{gap:9px;}
@@ -1086,17 +1214,48 @@ html[data-theme="dark"] #readerPanel #toolbar .iconButton{
     border-top:0!important;
   }
 
+/* =====================================================
+   Polish 3 — Drawer controls
+   ===================================================== */
+
+/* Wide desktop:
+   The drawer-close X is only a narrow-drawer control. */
+@media (min-width:1000px){
+
+    #libraryDrawerClose{
+        display:none !important;
+    }
+
+    #continueToggleButton{
+        display:flex !important;
+    }
+
+}
+
+
+/* Narrow drawer:
+   Keep the X beside the Read Again toggle in the Library header. */
+@media (max-width:999px){
+
+    #libraryDrawerClose{
+         display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    #recentSection .sectionHeader{
+        position:relative;
+    }
+
+    #recentSection #libraryDrawerClose{
+        margin-left:auto;
+    }
+
+}
+
   #libraryPanel.visible{transform:translateX(0)!important;}
   #libraryPanel.libraryCollapsed{transform:translateX(-102%)!important;}
 
-  #continueReading{
-    flex:0 0 25%!important;
-    width:100%!important;
-    height:25%!important;
-    min-height:0!important;
-    max-height:25%!important;
-    padding:10px 12px!important;
-  }
 
   #recentSection{
     flex:1 1 75%!important;
@@ -1141,7 +1300,7 @@ html[data-theme="dark"] #readerPanel #toolbar .iconButton{
   }
 
   #libraryDrawerClose{
-    display:flex!important;
+    display:inline-flex;
     flex:0 0 30px!important;
     width:30px!important;
     height:30px!important;

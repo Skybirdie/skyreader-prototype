@@ -400,10 +400,10 @@ function clearProductionError(){
     if(dom.productionErrorText)dom.productionErrorText.textContent="";
 }
 
-function showProductionError(error,title="SkyReader could not complete that action."){
+function showProductionError(error,title="MMicj could not complete that action."){
     if(!dom.productionError)return;
     const message=error instanceof Error ? error.message : String(error||"Unknown error.");
-    if(dom.productionErrorTitle)dom.productionErrorTitle.textContent=title||"SkyReader could not complete that action.";
+    if(dom.productionErrorTitle)dom.productionErrorTitle.textContent=title||"MMicj could not complete that action.";
     if(dom.productionErrorText)dom.productionErrorText.textContent=message;
     dom.productionError.hidden=false;
 }
@@ -838,6 +838,17 @@ document.addEventListener(
 
 event=>{
 
+/* Editable controls own their keyboard input.  In particular, Search must
+ * not allow reader shortcuts such as R/Rotate to consume typed characters. */
+if(
+    event.target instanceof HTMLInputElement ||
+    event.target instanceof HTMLTextAreaElement ||
+    event.target instanceof HTMLSelectElement ||
+    event.target?.isContentEditable
+){
+    return;
+}
+
 switch(event.key){
 
 /*
@@ -886,12 +897,14 @@ if(Reader.isOpen() && typeof SRNavigation!=="undefined" &&
 break;
 
 case "r":
-
 case "R":
 
-rotateReader();
+    if(Reader.isOpen()){
+        event.preventDefault();
+        rotateReader();
+    }
 
-break;
+    return;
 
 case "+":
 
@@ -1407,7 +1420,7 @@ book.title
 
 :
 
-"SkyReader";
+"MMicj";
 
 }
 
@@ -1417,8 +1430,15 @@ if(!dom.pageIndicator)return;
 
 if(!Reader.isOpen()){
     dom.pageIndicator.textContent="";
+    dom.pageIndicator.classList.remove("pageIndicatorActive");
+    dom.pageIndicator.setAttribute("aria-hidden","true");
+    dom.pageIndicator.tabIndex=-1;
     return;
 }
+
+dom.pageIndicator.classList.add("pageIndicatorActive");
+dom.pageIndicator.removeAttribute("aria-hidden");
+dom.pageIndicator.tabIndex=0;
 
 const spread=typeof Reader.spread==="function"
     ? Reader.spread()
