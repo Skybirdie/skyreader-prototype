@@ -1048,7 +1048,7 @@ html[data-theme="dark"] #readerPanel #toolbar .iconButton{
 
 @media (max-width: 759px) {
 
-  #toolbar {
+ #readerPanel #toolbar {
     top:calc(var(--header-height) + 2px);
   }
 
