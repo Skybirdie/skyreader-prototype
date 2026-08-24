@@ -1042,14 +1042,18 @@ html[data-theme="dark"] #readerPanel #toolbar .iconButton{
   background:rgba(12,15,20,.30)!important;
 }
 
+
 /* =========================================================
-   MOBILE — KEEP READER CONTROLS BELOW TOP BAR
+   MOBILE — READER CONTROL TOP CLEARANCE
    ========================================================= */
 
-@media (max-width: 759px) {
+@media (max-width:759px){
 
- #readerPanel #toolbar {
-    top:calc(var(--header-height) + 2px);
+  #readerPanel #toolbar{
+    top:2px;
+    right:0;
+    bottom:0;
+    left:0;
   }
 
 }
