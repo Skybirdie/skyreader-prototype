@@ -1042,6 +1042,18 @@ html[data-theme="dark"] #readerPanel #toolbar .iconButton{
   background:rgba(12,15,20,.30)!important;
 }
 
+/* =========================================================
+   MOBILE — KEEP READER CONTROLS BELOW TOP BAR
+   ========================================================= */
+
+@media (max-width: 759px) {
+
+  #toolbar {
+    top: var(--header-height);
+  }
+
+}
+
 /* ---------- Settings ---------- */
 
 .sr-settings-panel{
