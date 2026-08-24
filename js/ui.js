@@ -59,105 +59,6 @@ let touchStartY=0;
 let pinchDistance=0;
 let pinching=false;
 
-/*-------------------------------------------------------
-  Icons
--------------------------------------------------------*/
-
-const icons={
-
-library:`
-<svg viewBox="0 0 24 24" fill="none"
-stroke="currentColor"
-stroke-width="2"
-stroke-linecap="round"
-stroke-linejoin="round">
-
-<path d="M4 5h16"/>
-
-<path d="M4 12h16"/>
-
-<path d="M4 19h16"/>
-
-</svg>
-`,
-
-previous:`
-<svg viewBox="0 0 24 24"
-fill="none"
-stroke="currentColor"
-stroke-width="2"
-stroke-linecap="round"
-stroke-linejoin="round">
-
-<polyline points="15 18 9 12 15 6"/>
-
-</svg>
-`,
-
-next:`
-<svg viewBox="0 0 24 24"
-fill="none"
-stroke="currentColor"
-stroke-width="2"
-stroke-linecap="round"
-stroke-linejoin="round">
-
-<polyline points="9 18 15 12 9 6"/>
-
-</svg>
-`,
-
-rotate:`↻`,
-
-
-zoomIn:`
-<svg viewBox="0 0 24 24"
-fill="none"
-stroke="currentColor"
-stroke-width="2">
-
-<circle cx="11" cy="11" r="7"/>
-
-<line x1="11" y1="8" x2="11" y2="14"/>
-
-<line x1="8" y1="11" x2="14" y2="11"/>
-
-<line x1="20" y1="20" x2="16.5" y2="16.5"/>
-
-</svg>
-`,
-
-zoomOut:`
-<svg viewBox="0 0 24 24"
-fill="none"
-stroke="currentColor"
-stroke-width="2">
-
-<circle cx="11" cy="11" r="7"/>
-
-<line x1="8" y1="11" x2="14" y2="11"/>
-
-<line x1="20" y1="20" x2="16.5" y2="16.5"/>
-
-</svg>
-`,
-
-mute:`
-<svg viewBox="0 0 24 24"
-fill="none"
-stroke="currentColor"
-stroke-width="2">
-
-<polygon points="11 5 6 9 2 9 2 15 6 15 11 19"/>
-
-<path d="M19 5a9 9 0 010 14"/>
-
-<path d="M15.5 8.5a5 5 0 010 7"/>
-
-</svg>
-`
-
-};
 
 /*-------------------------------------------------------
   Initialization
@@ -178,7 +79,7 @@ if(dom.productionErrorClose){
     dom.productionErrorClose.addEventListener("click",clearProductionError);
 }
 
-installIcons();
+
 
 connectReader();
 
@@ -323,59 +224,6 @@ dom.pageJumpButton=document.getElementById("pageJumpButton");
 /*-------------------------------------------------------
   SVG Icons
 -------------------------------------------------------*/
-
-function installIcons(){
-
-
-if(dom.previousButton){
-
-dom.previousButton.innerHTML=
-
-icons.previous;
-
-}
-
-if(dom.nextButton){
-
-dom.nextButton.innerHTML=
-
-icons.next;
-
-}
-
-if(dom.rotateButton){
-
-dom.rotateButton.innerHTML=
-
-icons.rotate;
-
-}
-
-if(dom.zoomInButton){
-
-dom.zoomInButton.innerHTML=
-
-icons.zoomIn;
-
-}
-
-if(dom.zoomOutButton){
-
-dom.zoomOutButton.innerHTML=
-
-icons.zoomOut;
-
-}
-
-if(dom.muteButton){
-
-dom.muteButton.innerHTML=
-
-icons.mute;
-
-}
-
-}
 
 function updateMuteIcon(){
 
