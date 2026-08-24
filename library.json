@@ -66,14 +66,14 @@
 
     {
       "id": "sample7",
-      "title": "Water, living waters never run dry; you will never thirst",
+      "title": "Square",
       "subtitle": "Sample Magazine7",
-      "thumbnail": "assets/thumbnails/water.jpg",
-      "pdf": "pdf/Water, living waters never run dry; you will never thirst.pdf",
-      "author": "Andrew L.",
+      "thumbnail": "assets/thumbnails/square.jpg",
+      "pdf": "pdf/Square.pdf",
+      "author": "unknown",
       "category": "General",
       "pageCount": "2",
-      "date": "202607200810"
+      "date": "202608240812"
     },
 
     {
