@@ -1042,6 +1042,22 @@ html[data-theme="dark"] #readerPanel #toolbar .iconButton{
   background:rgba(12,15,20,.30)!important;
 }
 
+/* =========================================================
+   MOBILE — READER CONTROL TOP CLEARANCE
+   ========================================================= */
+
+@media (max-width:759px){
+
+  #readerPanel #toolbar{
+    inset:0;
+  }
+
+  #readerPanel #toolbar .iconButton{
+    margin-top:1px;
+  }
+
+}
+
 /* ---------- Settings ---------- */
 
 .sr-settings-panel{
