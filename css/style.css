@@ -1006,8 +1006,8 @@ html[data-theme="dark"] #topBar .iconButton{
 #readerPanel #toolbar #rotateButton{
   right:114px!important;
   left:auto!important;
-  font-size:25px!important;
-  font-family:"Segoe UI Symbol","Noto Sans Symbols 2","Arial Unicode MS",sans-serif!important;
+/*  font-size:25px!important;
+  font-family:"Segoe UI Symbol","Noto Sans Symbols 2","Arial Unicode MS",sans-serif!important;  */
   line-height:1;
   display:flex!important;
   align-items:center;
@@ -1041,6 +1041,7 @@ html[data-theme="dark"] #readerPanel #toolbar .icon{
 html[data-theme="dark"] #readerPanel #toolbar .iconButton{
   background:rgba(12,15,20,.30)!important;
 }
+
 
 /* =========================================================
    MOBILE — READER CONTROL TOP CLEARANCE
