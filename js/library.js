@@ -128,50 +128,51 @@ this.updateViewerContinue();
 },
 
 updateViewerContinue(){
+
     const wrap=document.getElementById("viewerContinue");
+
     if(!wrap)return;
 
     const book=this.getReadAgainBook();
+
+
+    /* Preserve the existing Viewer Landing
+       visibility and layout behavior. */
+
     if(!book){
+
         wrap.classList.add("hidden");
-        wrap.innerHTML="";
+
+        if(
+            typeof RecentShelf!=="undefined" &&
+            typeof RecentShelf.hide==="function"
+        ){
+
+            RecentShelf.hide();
+
+        }
+
         return;
+
     }
 
-    const lastPage=Math.max(1,Number(SkyReader.resume.page)||1);
 
-    wrap.innerHTML="";
-
-    const card=document.createElement("div");
-    card.className="viewerContinueCard";
-    card.title=`Read again: ${book.title}`;
-
-    const image=document.createElement("img");
-    image.src=book.thumbnail||"assets/default-thumbnail.png";
-    image.alt="";
-    image.addEventListener("error",()=>{
-        if(image.dataset.fallbackApplied==="true"){
-            image.style.display="none";
-            return;
-        }
-        image.dataset.fallbackApplied="true";
-        image.src="assets/default-thumbnail.png";
-    });
-
-    const text=document.createElement("div");
-    text.className="viewerContinueText";
-
-    const title=document.createElement("strong");
-    title.textContent=`Read Again: ${book.title}`;
-
-    const page=document.createElement("span");
-    page.textContent=`Last viewed: page ${lastPage}`;
-
-    text.append(title,page);
-    card.append(image,text);
-    card.onclick=()=>this.select(book,1);
-    wrap.appendChild(card);
     wrap.classList.remove("hidden");
+
+
+    /* RecentShelf now provides the visual card,
+       while the existing viewerContinue wrapper
+       continues to control the landing layout. */
+
+    if(
+        typeof RecentShelf!=="undefined" &&
+        typeof RecentShelf.refresh==="function"
+    ){
+
+        RecentShelf.refresh();
+
+    }
+
 },
 
 
@@ -222,6 +223,66 @@ this.createListItem(book)
 );
 
 });
+
+},
+
+createFavoriteButton(book){
+
+const button=document.createElement("button");
+
+button.type="button";
+
+button.className="favoriteButton";
+
+const isActive=Boolean(
+    window.Favorites &&
+    typeof Favorites.has==="function" &&
+    Favorites.has(book.id)
+);
+
+button.classList.toggle("active",isActive);
+
+button.setAttribute("aria-pressed",isActive?"true":"false");
+
+const setLabel=active=>{
+    const label=active?"Remove from favorites":"Add to favorites";
+    button.setAttribute("aria-label",label);
+    button.title=label;
+};
+
+setLabel(isActive);
+
+button.innerHTML=
+    '<svg class="icon favoriteIconOutline"><use href="#icon-favorite-outline"></use></svg>'+
+    '<svg class="icon favoriteIconFilled"><use href="#icon-favorite-filled"></use></svg>';
+
+button.addEventListener("click",event=>{
+
+    /* The button lives inside a card whose own onclick opens the book --
+       stopPropagation keeps a favorite tap from also opening the reader. */
+    event.stopPropagation();
+    event.preventDefault();
+
+    if(!window.Favorites || typeof Favorites.toggle!=="function")return;
+
+    const nowActive=Favorites.toggle(book.id);
+
+    button.classList.toggle("active",nowActive);
+    button.setAttribute("aria-pressed",nowActive?"true":"false");
+    setLabel(nowActive);
+
+    /* "Favorites" in the library dropdown is a sort mode, not a filter --
+       LibrarySorter.organize() checks options.sort for it. Unfavoriting a
+       book while viewing that mode should remove its card immediately
+       rather than leaving a stale card that no longer belongs there. */
+    if(this.getOrganization("main").sort==="favorites"){
+    this.applyOrganization();
+    this.build();
+}
+
+});
+
+return button;
 
 },
 
@@ -278,9 +339,13 @@ subtitle.textContent=
 
 book.subtitle||"";
 
+const favoriteButton=this.createFavoriteButton(book);
+
 card.append(
 
 thumbnail,
+
+favoriteButton,
 
 title,
 
@@ -334,8 +399,10 @@ const subtitle=document.createElement("div");
 subtitle.className="listSubtitle";
 subtitle.textContent=book.subtitle||"";
 
+const favoriteButton=this.createFavoriteButton(book);
+
 info.append(title,subtitle);
-item.append(thumbWrap,info);
+item.append(thumbWrap,info,favoriteButton);
 
 item.onclick=()=>{
 

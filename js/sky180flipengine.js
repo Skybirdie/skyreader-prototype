@@ -658,6 +658,7 @@ engine.previous=function(){
     const targetSpreadIndex=
         spread.getCurrentSpreadIndex()-1;
 
+
     prepareHostForTransition(targetSpreadIndex);
     flipHost.classList.toggle("sky180-cover-reverse",targetSpreadIndex===0);
     flipHost.classList.remove("sky180-final-forward");
@@ -666,6 +667,7 @@ engine.previous=function(){
     flipbook.flipPrev();
     return true;
 };
+
 
 engine.goTo=function(page){
     if(!flipbook) return false;

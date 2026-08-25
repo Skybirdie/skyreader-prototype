@@ -201,14 +201,6 @@ body{
   pointer-events:none;
 }
 
-.iconButton .customIcon{
-  width: 20px;
-  height: 20px;
-  object-fit: contain;
-  display: block;
-}
-
-
 .viewButton{
   width:42px;
   height:42px;
@@ -588,6 +580,363 @@ body{
 }
 
 
+
+/* =========================================================
+   VIEWER LANDING — RECENT SHELF
+   RecentShelf visually replaces viewerContinueCard
+   ========================================================= */
+
+#viewerContinue{
+  overflow:hidden;
+}
+
+
+/* RecentShelf now lives inside viewerContinue */
+
+#viewerContinue #srRecentShelf{
+  display:flex;
+  align-items:center;
+
+  width:100%;
+  height:100%;
+
+  min-width:0;
+  min-height:0;
+
+  margin:0;
+  padding:
+    clamp(7px,1vh,12px)
+    clamp(10px,1.5vw,16px);
+
+  box-sizing:border-box;
+
+  overflow:hidden;
+
+  border-radius:16px;
+
+  background:var(--card);
+
+  box-shadow:var(--soft-shadow);
+}
+
+
+/* Hide the old shelf heading because the Viewer Landing
+   card itself represents the Read Again section */
+
+#viewerContinue #srRecentShelf .sr-recent-title{
+  display:none;
+}
+
+
+/* The list becomes the full card area */
+
+#viewerContinue #srRecentShelf .sr-recent-list{
+  display:flex;
+
+  align-items:center;
+
+  width:100%;
+  height:100%;
+
+  min-width:0;
+  min-height:0;
+}
+
+
+/* The RecentShelf card now visually replaces
+   .viewerContinueCard */
+
+#viewerContinue #srRecentShelf .sr-recent-card{
+  display:flex;
+
+  align-items:center;
+  justify-content:center;
+
+  gap:14px;
+
+  width:100%;
+  height:100%;
+
+  min-width:0;
+  min-height:0;
+
+  margin:0;
+  padding:0;
+
+  overflow:hidden;
+
+  border:0;
+  border-radius:0;
+
+  background:transparent;
+
+  color:inherit;
+
+  font:inherit;
+
+  text-align:left;
+
+  cursor:pointer;
+
+  transition:
+    transform .22s ease;
+}
+
+
+/* Preserve the existing hover behavior */
+
+#viewerContinue #srRecentShelf:hover{
+  transform:translateY(-2px);
+
+  box-shadow:var(--hover-shadow);
+}
+
+
+/* Read Again cover */
+
+#viewerContinue #srRecentShelf .sr-recent-thumbnail{
+  display:block;
+
+  flex:0 0 auto;
+
+  width:auto;
+  height:auto;
+
+  max-width:25%;
+  max-height:100%;
+
+  object-fit:contain;
+
+  padding:5px;
+  margin-top:3px;
+
+  box-sizing:border-box;
+
+  border-radius:15px;
+
+}
+
+/* Book information */
+
+#viewerContinue #srRecentShelf .sr-recent-info{
+  display:flex;
+
+  flex:1 1 auto;
+  flex-direction:column;
+  justify-content:center;
+
+  gap:3px;
+
+  min-width:0;
+
+  overflow:hidden;
+}
+
+
+#viewerContinue #srRecentShelf .sr-recent-book,
+#viewerContinue #srRecentShelf .sr-recent-page{
+  min-width:0;
+  max-width:100%;
+
+  overflow:hidden;
+
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+
+#viewerContinue #srRecentShelf .sr-recent-book{
+  font-size:clamp(13px,1.6vw,18px);
+  font-weight:700;
+  line-height:1.2;
+}
+
+
+#viewerContinue #srRecentShelf .sr-recent-book::before{
+  content:"Read Again: ";
+}
+
+
+#viewerContinue #srRecentShelf .sr-recent-page{
+  font-size:12px;
+
+  color:var(--muted);
+}
+
+
+
+
+/* =========================================================
+   RecentShelf — Read Again - NEW ADD STARTS HERE
+   ========================================================= */
+
+#srRecentShelf{
+  box-sizing:border-box;
+  width:100%;
+  min-width:0;
+  margin:0;
+  padding:10px 12px;
+
+  background:var(--panel);
+  color:var(--text);
+
+  overflow:hidden;
+}
+
+
+/* Hide completely when RecentShelf has no book */
+
+#srRecentShelf[hidden]{
+  display:none!important;
+}
+
+
+/* ---------------------------------------------------------
+   Heading
+   --------------------------------------------------------- */
+
+#srRecentShelf .sr-recent-title{
+  margin:0 0 8px;
+  padding:0;
+
+  font:inherit;
+  font-size:1rem;
+  font-weight:600;
+  line-height:1.2;
+
+  color:var(--text);
+}
+
+
+/* ---------------------------------------------------------
+   Shelf container
+   --------------------------------------------------------- */
+
+#srRecentShelf .sr-recent-list{
+  display:flex;
+  flex-direction:column;
+
+  width:100%;
+  min-width:0;
+
+  margin:0;
+  padding:0;
+}
+
+
+/* ---------------------------------------------------------
+   Read Again card
+   --------------------------------------------------------- */
+
+#srRecentShelf .sr-recent-card{
+  box-sizing:border-box;
+
+  display:flex;
+  align-items:center;
+
+  width:100%;
+  min-width:0;
+
+  margin:0;
+  padding:8px;
+
+  border:0;
+  border-radius:8px;
+
+  background:transparent;
+  color:var(--text);
+
+  text-align:left;
+  cursor:pointer;
+
+  overflow:hidden;
+}
+
+
+#srRecentShelf .sr-recent-card:hover{
+  background:color-mix(
+    in srgb,
+    var(--control-text) 8%,
+    transparent
+  );
+}
+
+
+
+
+/* ---------------------------------------------------------
+   Thumbnail
+   Critical: prevents the full-size image problem
+   --------------------------------------------------------- */
+
+#srRecentShelf .sr-recent-thumbnail{
+  display:block;
+
+  flex:0 0 auto;
+
+  width:46px;
+  height:64px;
+
+  max-width:46px;
+  max-height:64px;
+
+  object-fit:cover;
+
+  margin:0 10px 0 0;
+
+  border-radius:4px;
+
+  overflow:hidden;
+}
+
+
+/* ---------------------------------------------------------
+   Book information
+   --------------------------------------------------------- */
+
+#srRecentShelf .sr-recent-info{
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+
+  flex:1 1 auto;
+
+  min-width:0;
+
+  overflow:hidden;
+}
+
+
+#srRecentShelf .sr-recent-book{
+  min-width:0;
+
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+
+  font-weight:600;
+
+  color:var(--text);
+}
+
+
+#srRecentShelf .sr-recent-page{
+  margin-top:4px;
+
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+
+  font-size:.8rem;
+
+  opacity:.7;
+}
+
+
+
+
+
+
 /* =========================================================
    LANDING DISTRIBUTION
    ========================================================= */
@@ -847,6 +1196,44 @@ body{
 
 .bookCard:hover .bookThumbnail img{transform:scale(1.025);}
 
+.favoriteButton{
+  position:absolute;
+  top:18px;
+  right:18px;
+  z-index:3;
+  width:32px;
+  height:32px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border:none;
+  border-radius:50%;
+  background:color-mix(in srgb,var(--card) 70%,transparent);
+  backdrop-filter:blur(4px);
+  color:var(--text);
+  cursor:pointer;
+  transition:transform .2s ease,color .2s ease,background .2s ease;
+}
+
+.favoriteButton:hover{transform:scale(1.08);}
+
+.favoriteButton .icon{width:18px;height:18px;}
+
+.favoriteButton .favoriteIconFilled{display:none;}
+
+.favoriteButton.active .favoriteIconOutline{display:none;}
+.favoriteButton.active .favoriteIconFilled{display:block;}
+
+.favoriteButton.active{color:#e0435c;}
+
+#listView .listItem .favoriteButton{
+  position:static;
+  flex:0 0 auto;
+  margin-left:auto;
+  background:transparent;
+  backdrop-filter:none;
+}
+
 .bookTitle{
   position:relative;
   z-index:2;
@@ -1014,8 +1401,8 @@ html[data-theme="dark"] #topBar .iconButton{
 #readerPanel #toolbar #rotateButton{
   right:114px!important;
   left:auto!important;
-/*  font-size:25px!important;
-  font-family:"Segoe UI Symbol","Noto Sans Symbols 2","Arial Unicode MS",sans-serif!important;  */
+  font-size:25px!important;
+  font-family:"Segoe UI Symbol","Noto Sans Symbols 2","Arial Unicode MS",sans-serif!important;
   line-height:1;
   display:flex!important;
   align-items:center;
@@ -1346,6 +1733,7 @@ html[data-theme="dark"] #readerPanel #toolbar .iconButton{
   position: absolute;
   top: var(--header-height);
     left:8px!important;
+
     width:38px!important;
     height:38px!important;
     min-width:38px!important;
@@ -1361,10 +1749,11 @@ html[data-theme="dark"] #readerPanel #toolbar .iconButton{
     box-shadow:0 5px 18px rgba(0,0,0,.16)!important;
     z-index:2001!important;
     cursor:pointer;
+
   }
 
   #narrowLibraryToggle .icon{width:22px!important;height:22px!important;}
-
+  #narrowLibraryToggle.isOpen{opacity:0!important;visibility:hidden!important;pointer-events:none!important;}
 
   html[data-theme="dark"] #narrowLibraryToggle,
   html[data-theme="dark"] #libraryDrawerClose{

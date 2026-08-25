@@ -241,56 +241,51 @@ function showDefaultView(){
 
 function initializeFeatureModules(){
 
-    if(
-    typeof BookmarkPanel!=="undefined" &&
-    typeof BookmarkPanel.build==="function"
-){
+    /*
+     * Each of these is an optional, independently-loaded feature module.
+     * A missing script is expected and silently skipped via the typeof
+     * guard below. A *broken* module (one that IS loaded but throws
+     * while building its UI) must not be allowed to take the rest of
+     * startup down with it -- initializeFeatureModules() runs before
+     * connectModules(), which is what wires up book selection, so an
+     * uncaught error here previously meant the whole library silently
+     * stopped responding to clicks. Each block is isolated so that
+     * can't happen again.
+     */
 
-        BookmarkPanel.build(document.body);
+    const featureModules=[
+        ["BookmarkPanel", ()=>BookmarkPanel.build(document.body)],
+        ["RecentShelf", ()=>RecentShelf.build(
+    document.getElementById("viewerContinue")
+)],
+        ["TableOfContents", ()=>TableOfContents.build(document.body)],
+        ["ReaderStatus", ()=>ReaderStatus.build(document.body)],
+        ["ReadingStats", ()=>ReadingStats.build(document.body)]
+    ];
 
-    }
+    featureModules.forEach(([name,run])=>{
 
-    if(
-    typeof RecentShelf!=="undefined" &&
-    typeof RecentShelf.build==="function"
-){
-    RecentShelf.build(document.body);
-}
+        const module=window[name];
 
-    if(
+        if(typeof module==="undefined" || typeof module.build!=="function"){
 
-typeof TableOfContents!=="undefined" &&
-typeof TableOfContents.build==="function"){
+            return;
 
-        TableOfContents.build(document.body);
+        }
 
-    }
-    if(
-typeof ReaderStatus!=="undefined" &&
-typeof ReaderStatus.build==="function"){
+        try{
 
-        ReaderStatus.build(document.body);
+            run();
 
-    }
+        }catch(error){
 
-    if(
-typeof ReadingStats!=="undefined" &&
-typeof ReadingStats.build==="function"){
+            console.error(`[SkyReader] ${name}.build() failed -- continuing without it.`,error);
 
-        ReadingStats.build(document.body);
+        }
 
-    }
-
-    if(
-typeof RecentReading!=="undefined" &&
-typeof RecentReading.build==="function"){
-
-        RecentReading.build(document.body);
-
-    }
+    });
 
 }
-
 /*-------------------------------------------------------
   Wire Modules
 -------------------------------------------------------*/
@@ -348,12 +343,9 @@ function connectModules(){
                 UI.showToolbar();
             }
 
-            if(
-                typeof RecentReading!=="undefined" &&
-                typeof RecentReading.add==="function"
-            ){
-                RecentReading.add(book.id);
-            }
+            if(typeof RecentReading!=="undefined" && typeof RecentReading.record==="function"){
+    RecentReading.record(book.id, startPage || 1);
+}
 
             if(
                 typeof ReadingStats!=="undefined" &&

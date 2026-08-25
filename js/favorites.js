@@ -24,20 +24,19 @@ const STORAGE_KEY="skyreader-favorites";
 /*-------------------------------------------------------
  Load
 -------------------------------------------------------*/
-
+// Change "Storage" to "SRStore":
 function load(){
 
-    return Storage.get(STORAGE_KEY,[]);
+    return SRStore.get(STORAGE_KEY,[]);
 
 }
-
 /*-------------------------------------------------------
  Save
 -------------------------------------------------------*/
-
+// Change "Storage" to "SRStore":
 function save(data){
 
-    Storage.set(STORAGE_KEY,data);
+    SRStore.set(STORAGE_KEY,data);
 
 }
 
