@@ -1343,9 +1343,9 @@ html[data-theme="dark"] #readerPanel #toolbar .iconButton{
 
   #narrowLibraryToggle{
     display:flex!important;
-    position:fixed!important;
+  position: absolute;
+  top: var(--header-height);
     left:8px!important;
-    top:50px!important;
     width:38px!important;
     height:38px!important;
     min-width:38px!important;
