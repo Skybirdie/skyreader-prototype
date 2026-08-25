@@ -272,11 +272,10 @@ const panel=this.selectors.libraryPanel;
 if(!panel)return;
 
 if(window.innerWidth<=999){
-
-panel.classList.toggle("libraryCollapsed",!this.ui.libraryOpen);
-window.dispatchEvent(new Event("sr:library-toggle"));
-return;
-
+  panel.classList.toggle("visible",this.ui.libraryOpen);
+  panel.classList.toggle("libraryCollapsed",!this.ui.libraryOpen);
+  window.dispatchEvent(new Event("sr:library-toggle"));
+  return;
 }
 
 if(window.innerWidth>=1000){
