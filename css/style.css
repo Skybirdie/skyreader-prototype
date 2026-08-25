@@ -1208,7 +1208,7 @@ body{
   justify-content:center;
   border:none;
   border-radius:50%;
-  background:color-mix(in srgb,var(--card) 70%,transparent);
+  background:color-mix(in srgb,var(--card) 30%,transparent);
   backdrop-filter:blur(4px);
   color:var(--text);
   cursor:pointer;
