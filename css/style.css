@@ -201,6 +201,14 @@ body{
   pointer-events:none;
 }
 
+.iconButton .customIcon{
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  display: block;
+}
+
+
 .viewButton{
   width:42px;
   height:42px;
@@ -1271,6 +1279,7 @@ html[data-theme="dark"] #readerPanel #toolbar .iconButton{
 }
 
   #libraryPanel.visible{transform:translateX(0)!important;}
+  #libraryPanel.libraryCollapsed{transform:translateX(-102%)!important;}
 
 
   #recentSection{
@@ -1355,7 +1364,7 @@ html[data-theme="dark"] #readerPanel #toolbar .iconButton{
   }
 
   #narrowLibraryToggle .icon{width:22px!important;height:22px!important;}
-  #narrowLibraryToggle.isOpen{opacity:0!important;visibility:hidden!important;pointer-events:none!important;}
+
 
   html[data-theme="dark"] #narrowLibraryToggle,
   html[data-theme="dark"] #libraryDrawerClose{
