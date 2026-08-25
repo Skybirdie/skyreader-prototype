@@ -1198,11 +1198,11 @@ body{
 
 .favoriteButton{
   position:absolute;
-  top:18px;
-  right:18px;
+  top:10px;
+  right:10px;
   z-index:3;
-  width:32px;
-  height:32px;
+  width:25px;
+  height:25px;
   display:flex;
   align-items:center;
   justify-content:center;
