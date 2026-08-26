@@ -32,7 +32,7 @@
 <style>
 #reloadScreen{position:fixed;inset:0;z-index:999999;display:flex;align-items:center;justify-content:center;background:#eef1f5;opacity:1;transition:opacity .35s ease;pointer-events:auto;}
 #reloadScreen.isReady{opacity:0;pointer-events:none;}
-#reloadScreen img{width:auto;height:100%;object-fit:cover;}
+#reloadScreen img{width:auto;height:100px;object-fit:cover;}
 #reloadScreen .reloadFallback{font:600 16px/1.4 Inter,Arial,sans-serif;color:#66707a;text-align:center;padding:24px;}
 </style>
 </head>
@@ -40,7 +40,7 @@
 <body>
 
 <div id="reloadScreen" role="status" aria-live="polite">
-<img src="assets/reload.png" alt="Loading Meditation Mornings" onerror="this.style.display='none';this.nextElementSibling.hidden=false;">
+<img src="assets/reload.gif" alt="Loading Meditation Mornings" style="opacity:0.4;" onerror="this.style.display='none';this.nextElementSibling.hidden=false;">
 <div class="reloadFallback" hidden>Loading MMicj…</div>
 </div>
 
