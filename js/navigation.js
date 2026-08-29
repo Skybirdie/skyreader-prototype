@@ -233,6 +233,46 @@ options
 
 };
 
+
+
+/*-------------------------------------------------------
+  Reader Close Cleanup
+-------------------------------------------------------*/
+
+function clearReaderBookmarkOverlay(){
+
+    if(typeof hideBookmarkFlag==="function"){
+
+        hideBookmarkFlag();
+
+        return;
+
+    }
+
+    /* Fallback in case UI internals are not directly exposed. */
+    document
+        .querySelectorAll(".bookmarkFlag")
+        .forEach(flag=>{
+
+            flag.classList.remove(
+                "visible",
+                "active",
+                "turning"
+            );
+
+            flag.dataset.bookmarkBook="";
+            flag.dataset.bookmarkPage="";
+            flag.dataset.bookmarkId="";
+
+        });
+
+    document
+        .querySelectorAll(".bookmarkFlag.bookmarkFlagExtra")
+        .forEach(flag=>flag.remove());
+
+}
+
+
 /*-------------------------------------------------------
   Go To Page
 -------------------------------------------------------*/
@@ -295,11 +335,37 @@ navigation.next = async function(){
         Sky180FlipEngine.isTwoPageDocument();
 
     if(twoPageDocument){
-        Reader.close({playSound:true});
-        AudioController.readerClosed();
-        currentBook=null;
-        return true;
-    }
+
+    clearReaderBookmarkOverlay();
+
+    Reader.close({playSound:true});
+
+    AudioController.readerClosed();
+
+    currentBook=null;
+
+    /*
+ * On narrow screens the library is a user-controlled drawer.
+ * Closing a book must not automatically open it.
+ */
+if(
+    window.innerWidth<=999 &&
+    typeof SkyReader!=="undefined" &&
+    typeof SkyReader.toggleLibrary==="function"
+){
+
+    SkyReader.toggleLibrary(false);
+
+    window.dispatchEvent(
+        new Event("sr:library-toggle")
+    );
+
+}
+
+
+    return true;
+
+}
 
     // Current page represents the first page of the visible spread.
     // 11 pages -> final spread starts at 10.
@@ -315,12 +381,36 @@ navigation.next = async function(){
 
     if(page >= finalSpreadStart){
 
-        Reader.close({playSound:true});
-        AudioController.readerClosed();
-        currentBook=null;
+    clearReaderBookmarkOverlay();
 
-        return true;
-    }
+    Reader.close({playSound:true});
+
+    AudioController.readerClosed();
+
+    currentBook=null;
+
+    /*
+ * On narrow screens the library is a user-controlled drawer.
+ * Closing a book must not automatically open it.
+ */
+if(
+    window.innerWidth<=999 &&
+    typeof SkyReader!=="undefined" &&
+    typeof SkyReader.toggleLibrary==="function"
+){
+
+    SkyReader.toggleLibrary(false);
+
+    window.dispatchEvent(
+        new Event("sr:library-toggle")
+    );
+
+}
+
+
+    return true;
+
+}
 
     return request(async()=>{
         await Reader.next();
@@ -351,27 +441,54 @@ navigation.previous=function(){
 
 navigation.openMagazine = async function(book,startPage=null){
 
-    if(!book){
-        return false;
-    }
+/*
+ * If the requested book is already open, do not create a second
+ * Reader.open() transaction. Navigate directly to the requested page.
+ *
+ * Because this path bypasses Reader.open(), it also bypasses the
+ * "bookOpened" event that normally hides the loading indicator.
+ */
+if(
+    !openingPromise &&
+    Reader.isOpen() &&
+    currentBook &&
+    currentBook.id===book.id
+){
 
-    if(openingPromise && openingBookId===book.id){
-        return openingPromise;
-    }
+    const targetPage=Number(startPage);
 
-    /* Library/Read Again selections requesting page 1 intentionally start a
-       fresh reader instance. This prevents stale spread/page state from
-       leaking into a newly selected book and matches the stable Read Again
-       initialization path. */
-    if(!openingPromise && Reader.isOpen() && currentBook && currentBook.id===book.id){
-        if(Number(startPage)===1){
-            Reader.close({playSound:false});
-            AudioController.readerClosed();
-            currentBook=null;
-        }else{
-            return true;
+    if(
+        Number.isFinite(targetPage) &&
+        targetPage>=1
+    ){
+
+        const moved=await navigation.goToPage(targetPage);
+
+        if(
+            typeof UI!=="undefined" &&
+            typeof UI.hideLoading==="function"
+        ){
+
+            UI.hideLoading();
+
         }
+
+        return moved;
+
     }
+
+    if(
+        typeof UI!=="undefined" &&
+        typeof UI.hideLoading==="function"
+    ){
+
+        UI.hideLoading();
+
+    }
+
+    return true;
+
+}
 
     /* Never interrupt an active opening transaction with a second book.
        The original transaction is allowed to finish; this is the primary
@@ -464,19 +581,41 @@ async function(){
 
     if(!Reader.isOpen()){
 
+        clearReaderBookmarkOverlay();
+
         return;
 
     }
 
     return request(async()=>{
 
-        
+        clearReaderBookmarkOverlay();
 
         Reader.close({playSound:true});
 
         AudioController.readerClosed();
 
         currentBook=null;
+       
+    /*
+ * On narrow screens the library is a user-controlled drawer.
+ * Closing a book must not automatically open it.
+ */
+if(
+    window.innerWidth<=999 &&
+    typeof SkyReader!=="undefined" &&
+    typeof SkyReader.toggleLibrary==="function"
+){
+
+    SkyReader.toggleLibrary(false);
+
+    window.dispatchEvent(
+        new Event("sr:library-toggle")
+    );
+
+}
+
+
 
     });
 
@@ -910,16 +1049,13 @@ navigation.restoreBookmark=function(bookmark){
 
     }
 
-    if(
-
-        !currentBook ||
-
-        bookmark.book!==currentBook
-
-    ){
-
+    if(!currentBook){
         return false;
+    }
 
+    const bookmarkBookId=String(bookmark.bookId ?? bookmark.book ?? "");
+    if(!bookmarkBookId || bookmarkBookId!==String(currentBook.id ?? "")){
+        return false;
     }
 
     navigation.goToPage(

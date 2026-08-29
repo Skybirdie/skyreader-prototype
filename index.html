@@ -32,7 +32,7 @@
 <style>
 #reloadScreen{position:fixed;inset:0;z-index:999999;display:flex;align-items:center;justify-content:center;background:#eef1f5;opacity:1;transition:opacity .35s ease;pointer-events:auto;}
 #reloadScreen.isReady{opacity:0;pointer-events:none;}
-#reloadScreen img{width:auto;height:100px;object-fit:cover;}
+#reloadScreen img{width:auto;height:100%;object-fit:cover;}
 #reloadScreen .reloadFallback{font:600 16px/1.4 Inter,Arial,sans-serif;color:#66707a;text-align:center;padding:24px;}
 </style>
 </head>
@@ -40,7 +40,7 @@
 <body>
 
 <div id="reloadScreen" role="status" aria-live="polite">
-<img src="assets/reload.gif" alt="Loading Meditation Mornings" style="opacity:0.4;" onerror="this.style.display='none';this.nextElementSibling.hidden=false;">
+<img src="assets/reload.png" alt="Loading Meditation Mornings" onerror="this.style.display='none';this.nextElementSibling.hidden=false;">
 <div class="reloadFallback" hidden>Loading MMicj…</div>
 </div>
 
@@ -61,10 +61,15 @@
 
 <h1 id="appTitle"></h1>
 
+<div id="topBarRightControls">
+<button id="bookmarkPanelButton"         class="topBarButton" type="button" title="Bookmarks" aria-label="Bookmarks" aria-pressed="false">
+<svg class="icon"><use href="#icon-bookmark"></use></svg>
+</button>
 
-<button id="settingsButton" class="iconButton" type="button" title="Settings" aria-label="Settings">
+<button id="settingsButton"         class="topBarButton" type="button" title="Settings" aria-label="Settings">
 <svg class="icon"><use href="#icon-settings"></use></svg>
 </button>
+</div>
 
 </header>
 
@@ -77,7 +82,7 @@
 
 <div class="sectionHeader">
 
-<h2>Library</h2>
+<h2>Rooting</h2>
 
 <div id="libraryOrganizationControls" aria-label="Library organization">
 <button id="librarySortButton" class="libraryOrgButton" type="button" title="Sort Library" aria-label="Sort Library">⇅</button>
@@ -143,8 +148,8 @@
 </div>
 
 <div>
-<h2>Start Reading</h2>
-<p>Choose a publication to begin.</p>
+<h2>Meditation Mornings</h2>
+<p>in Christ Jesus</p>
 </div>
 
 </div>
@@ -196,11 +201,22 @@
 <svg class="icon"><use href="#icon-fullscreen"></use></svg>
 </button>
 
+
+<button id="bookmarkAddButton" class="iconButton" type="button" title="Bookmark this page" aria-label="Bookmark this page" aria-pressed="false">
+<svg class="icon"><use href="#icon-bookmark-add-outline"></use></svg>
+</button>
+
 <button id="nextButton" class="iconButton" type="button" title="Next page" aria-label="Next page">
 <svg class="icon"><use href="#icon-next"></use></svg>
 </button>
 
 </nav>
+
+<div id="bookmarkFlag" class="bookmarkFlag" aria-label="Remove bookmark">
+    <svg class="icon">
+        <use href="#icon-bookmark-add-filled"></use>
+    </svg>
+</div>
 
 
 <div id="statusBar">
@@ -326,6 +342,39 @@ stroke-linecap="round"
 stroke-linejoin="round"/>
 </symbol>
 
+<symbol id="icon-bookmark" viewBox="0 0 24 24">
+<path d="M6 3H18C18.5523 3 19 3.44772 19 4V21L12 17L5 21V4C5 3.44772 5.44772 3 6 3Z"
+fill="none"
+stroke="currentColor"
+stroke-width="2"
+stroke-linecap="round"
+stroke-linejoin="round"/>
+</symbol>
+
+<symbol id="icon-bookmark-add-outline" viewBox="0 0 24 24">
+<path d="M6 3H18C18.5523 3 19 3.44772 19 4V21L12 17L5 21V4C5 3.44772 5.44772 3 6 3Z"
+fill="none"
+stroke="currentColor"
+stroke-width="2"
+stroke-linecap="round"
+stroke-linejoin="round"/>
+<path d="M12 7V13M9 10H15"
+fill="none"
+stroke="currentColor"
+stroke-width="2.75"
+stroke-linecap="round"/>
+</symbol>
+
+
+<symbol id="icon-bookmark-add-filled" viewBox="0 0 24 24">
+<path d="M6 3H18C18.5523 3 19 3.44772 19 4V21L12 17L5 21V4C5 3.44772 5.44772 3 6 3Z"
+fill="currentColor"
+stroke="currentColor"
+stroke-width="2"
+stroke-linecap="round"
+stroke-linejoin="round"/>
+</symbol>
+
 <symbol id="icon-muted" viewBox="0 0 24 24">
 <path d="M5 10H9L14 6V18L9 14H5Z"
 fill="currentColor"/>
@@ -349,6 +398,7 @@ stroke-linecap="round"/>
 
 <script src="js/skyreader.js"></script>
 <script src="js/storage.js"></script>
+<script src="js/bookmarks.js"></script>
 <script src="js/keyValueStore.js"></script>
 <script src="js/favorites.js"></script>
 <script src="js/recentReading.js"></script>
@@ -357,7 +407,6 @@ stroke-linecap="round"/>
 <script src="js/manifest.js?v=1.1.7"></script>
 <script src="js/librarySorter.js?v=1.1.7"></script>
 <script src="js/library.js"></script>
-<script src="js/recentShelf.js"></script>
 <script src="js/animation.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/pdfengine.js"></script>
@@ -365,6 +414,7 @@ stroke-linecap="round"/>
 <script src="js/renderer.js"></script>
 <script src="js/reader.js"></script>
 <script src="js/navigation.js"></script>
+<script src="js/bookmarkPanel.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/settingsPanel.js"></script>
 <script src="js/app.js"></script>

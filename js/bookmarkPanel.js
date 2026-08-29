@@ -1,3 +1,4 @@
+
 "use strict";
 
 /*
@@ -7,9 +8,11 @@
 
  Responsibilities
 
-• Display bookmarks
+• Display all bookmarks
+• Display book name and page
 • Jump to bookmark
 • Delete bookmark
+• Available regardless of current book
 • Standalone module
 
 =========================================================
@@ -31,6 +34,12 @@ let initialized=false;
 panel.build=function(parent){
 
     if(initialized){
+
+        return;
+
+    }
+
+    if(!parent){
 
         return;
 
@@ -82,6 +91,37 @@ panel.build=function(parent){
 };
 
 /*-------------------------------------------------------
+ Find Book
+-------------------------------------------------------*/
+
+function findBook(bookId){
+
+    if(
+        typeof SkyReader==="undefined" ||
+        !Array.isArray(SkyReader.library)
+    ){
+
+        return null;
+
+    }
+
+    const id=String(bookId ?? "").trim();
+
+    if(!id){
+
+        return null;
+
+    }
+
+    return SkyReader.library.find(
+
+        book=>String(book.id ?? "").trim()===id
+
+    ) || null;
+
+}
+
+/*-------------------------------------------------------
  Refresh
 -------------------------------------------------------*/
 
@@ -95,35 +135,99 @@ panel.refresh=function(){
 
     list.innerHTML="";
 
-    const currentBook=
+    /*
+     * The bookmark panel is global.
+     * Retrieve bookmarks from every book.
+     */
 
-        SRNavigation.book();
+    const storedItems=
+        typeof Bookmarks.all==="function"
+            ? Bookmarks.all()
+            : [];
 
-    const items=
+    const validItems=[];
 
-        Bookmarks.all()
+    storedItems.forEach(item=>{
 
-        .filter(
+        if(!item)return;
 
-            b=>b.book===currentBook
+        const book=SkyReader.library.find(
 
-        )
-
-        .sort(
-
-            (a,b)=>a.page-b.page
+            candidate=>
+                String(candidate.id)===String(item.bookId)
 
         );
 
-    if(items.length===0){
+        /*
+         * Remove bookmarks whose book no longer exists.
+         */
+
+        if(!book){
+
+            if(typeof Bookmarks.remove==="function"){
+                Bookmarks.remove(item.id);
+            }
+
+            return;
+
+        }
+
+        const page=Number(item.page);
+
+        /*
+         * Page must be a valid positive page number.
+         */
+
+        if(!Number.isInteger(page) || page<1){
+
+            if(typeof Bookmarks.remove==="function"){
+                Bookmarks.remove(item.id);
+            }
+
+            return;
+
+        }
+
+        /*
+         * If the book has a known page count, reject bookmarks
+         * that point beyond the actual book.
+         *
+         * Unknown page counts are allowed because the reader
+         * may determine the count dynamically.
+         */
+
+        const pageCount=Number(book.pageCount);
+
+        if(
+            Number.isFinite(pageCount) &&
+            pageCount>0 &&
+            page>pageCount
+        ){
+
+            if(typeof Bookmarks.remove==="function"){
+                Bookmarks.remove(item.id);
+            }
+
+            return;
+
+        }
+
+        validItems.push({
+
+            item:item,
+            book:book
+
+        });
+
+    });
+
+    if(validItems.length===0){
 
         const empty=document.createElement("div");
 
         empty.className="sr-bookmark-empty";
 
-        empty.textContent=
-
-            "No bookmarks.";
+        empty.textContent="No bookmarks.";
 
         list.appendChild(empty);
 
@@ -131,23 +235,25 @@ panel.refresh=function(){
 
     }
 
-    items.forEach(item=>{
+    validItems.forEach(entry=>{
 
         list.appendChild(
 
-            createBookmark(item)
+            createBookmark(
+                entry.item,
+                entry.book
+            )
 
         );
 
     });
 
 };
-
 /*-------------------------------------------------------
  Bookmark Row
 -------------------------------------------------------*/
 
-function createBookmark(item){
+function createBookmark(item,book){
 
     const row=document.createElement("div");
 
@@ -155,45 +261,87 @@ function createBookmark(item){
 
     const page=document.createElement("button");
 
+    page.type="button";
+
     page.className="sr-bookmark-page";
 
-    page.textContent=
 
-        "Page "+
+const bookTitle=document.createElement("span");
 
-        (item.page+1);
+bookTitle.className="sr-bookmark-book";
+
+bookTitle.textContent=
+    book.title || "Untitled";
+
+const pageNumber=document.createElement("span");
+
+pageNumber.className="sr-bookmark-page-number";
+
+pageNumber.textContent=
+    "Page "+item.page;
+
+page.appendChild(bookTitle);
+page.appendChild(pageNumber);
+
+
 
     page.addEventListener(
 
-        "click",
+    "click",
 
-        ()=>{
+    ()=>{
 
-            SRNavigation.goToPage(
+        if(!book)return;
 
-                item.page
+        if(
+            typeof Library!=="undefined" &&
+            typeof Library.select==="function"
+        ){
 
+            Library.select(
+                book,
+                Number(item.page)
             );
 
             panel.hide();
 
         }
 
-    );
+    }
+
+);
 
     const remove=document.createElement("button");
+
+    remove.type="button";
 
     remove.className="sr-bookmark-delete";
 
     remove.textContent="🗑";
 
+    remove.setAttribute(
+        "aria-label",
+        "Delete bookmark"
+    );
+
+    remove.title="Delete bookmark";
+
     remove.addEventListener(
 
         "click",
 
-        ()=>{
+        event=>{
 
-            Bookmarks.remove(item.id);
+            event.stopPropagation();
+
+            if(
+                window.Bookmarks &&
+                typeof Bookmarks.remove==="function"
+            ){
+
+                Bookmarks.remove(item.id);
+
+            }
 
             panel.refresh();
 
@@ -209,25 +357,83 @@ function createBookmark(item){
 
 }
 
+
 /*-------------------------------------------------------
  Visibility
 -------------------------------------------------------*/
 
 panel.show=function(){
 
-    panel.refresh();
+    if(!initialized){
+
+        /*
+         * Normally the application builds the panel during
+         * initialization. This fallback keeps the toolbar
+         * button functional even if that build step has not
+         * occurred yet.
+         */
+
+        const parent=document.getElementById("readerPanel");
+
+        if(parent){
+
+            panel.build(parent);
+
+        }
+
+    }
+
+    if(!initialized || !root){
+
+        return;
+
+    }
+
+    /*
+     * Make the panel visible first.
+     * Refreshing its contents must never prevent the panel
+     * itself from opening.
+     */
 
     root.hidden=false;
+
+    panel.refresh();
 
 };
 
 panel.hide=function(){
 
-    root.hidden=true;
+    if(root){
+
+        root.hidden=true;
+
+    }
 
 };
 
 panel.toggle=function(){
+
+    /*
+     * Lazy-build the panel if necessary.
+     */
+
+    if(!initialized){
+
+        const parent=document.getElementById("readerPanel");
+
+        if(parent){
+
+            panel.build(parent);
+
+        }
+
+    }
+
+    if(!root){
+
+        return;
+
+    }
 
     if(root.hidden){
 
@@ -247,7 +453,10 @@ panel.toggle=function(){
 
 panel.visible=function(){
 
-    return !root.hidden;
+    return Boolean(
+        root &&
+        !root.hidden
+    );
 
 };
 
@@ -286,3 +495,4 @@ panel.destroy=function(){
 return panel;
 
 })();
+

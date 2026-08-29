@@ -207,6 +207,12 @@ document.getElementById(
 
 dom.viewerFullscreenButton = document.getElementById("viewerFullscreenButton");
 
+dom.bookmarkPanelButton = document.getElementById("bookmarkPanelButton");
+
+dom.bookmarkAddButton = document.getElementById("bookmarkAddButton");
+
+dom.bookmarkFlag = document.getElementById("bookmarkFlag");
+
 dom.title=
 document.getElementById("readerTitle");
 
@@ -317,6 +323,343 @@ dom.progress.value=0;
 
 }
 
+
+/*-------------------------------------------------------
+  Bookmark Overlay Positioning
+-------------------------------------------------------*/
+
+let bookmarkPositionFrame=null;
+let bookmarkPositionAttempts=0;
+
+/*
+ * Bookmark storage is always logical-page based.  Display mode is only a
+ * presentation concern: a single page can have one bookmark, while a spread
+ * can display zero, one, or two independently bookmarked logical pages.
+ */
+function getBookmarkSpread(pos){
+    const currentPage=Number(pos && pos.page);
+    const spread=typeof Reader!=="undefined" && typeof Reader.spread==="function"
+        ? Reader.spread()
+        : null;
+    if(spread && Number.isFinite(Number(spread.start)) && Number.isFinite(Number(spread.end))){
+        return {start:Number(spread.start),end:Number(spread.end)};
+    }
+    return {start:currentPage,end:currentPage};
+}
+
+function visibleBookmarksForCurrentView(bookmarks,pos){
+    const spread=getBookmarkSpread(pos);
+    return (Array.isArray(bookmarks)?bookmarks:[]).filter(bookmark=>{
+        const page=Number(bookmark.page);
+        return page>=spread.start && page<=spread.end;
+    });
+}
+
+function bookmarkFlags(){
+    if(!dom.bookmarkFlag)return [];
+    return [dom.bookmarkFlag,...document.querySelectorAll('.bookmarkFlag.bookmarkFlagExtra')];
+}
+
+function clearExtraBookmarkFlags(){
+    document.querySelectorAll('.bookmarkFlag.bookmarkFlagExtra').forEach(el=>el.remove());
+}
+
+function makeBookmarkFlag(bookmark,index){
+    let flag=index===0 ? dom.bookmarkFlag : null;
+
+    if(!flag){
+        flag=document.createElement('div');
+        flag.className='bookmarkFlag bookmarkFlagExtra';
+        flag.setAttribute('aria-label','Remove bookmark');
+        document.body.appendChild(flag);
+    }
+
+    /*
+     * Use the custom PNG for the page overlay.
+     * Fall back to the existing SVG if the PNG cannot load.
+     */
+    if(!flag.querySelector('img.bookmarkCustomIcon')){
+        const img=document.createElement('img');
+        img.className='icon bookmarkCustomIcon';
+        img.src='assets/icons/bookmark.png';
+        img.alt='';
+
+        img.onerror=function(){
+            img.onerror=null;
+
+            const svg=document.createElementNS(
+                'http://www.w3.org/2000/svg',
+                'svg'
+            );
+
+            svg.setAttribute('class','icon');
+
+            const use=document.createElementNS(
+                'http://www.w3.org/2000/svg',
+                'use'
+            );
+
+            use.setAttribute('href','#icon-bookmark-add-filled');
+
+            svg.appendChild(use);
+            img.replaceWith(svg);
+        };
+
+        flag.innerHTML='';
+        flag.appendChild(img);
+    }
+
+    flag.dataset.bookmarkId=String(bookmark.id||'');
+    flag.dataset.bookmarkPage=String(bookmark.page);
+
+    return flag;
+}
+
+function positionBookmarkFlagsWhenReady(items,onReady){
+
+    if(bookmarkPositionFrame){
+        cancelAnimationFrame(bookmarkPositionFrame);
+        bookmarkPositionFrame=null;
+    }
+
+    bookmarkPositionAttempts=0;
+
+    const check=()=>{
+
+        bookmarkPositionAttempts++;
+
+        let allReady=true;
+
+        const visiblePages=[
+            ...document.querySelectorAll(
+                '.sky180Page:not(.sky180SyntheticPage)'
+            )
+        ].filter(page=>{
+
+            const rect=page.getBoundingClientRect();
+
+            return rect.width>1 &&
+                   rect.height>1 &&
+                   rect.bottom>0 &&
+                   rect.right>0 &&
+                   rect.top<window.innerHeight &&
+                   rect.left<window.innerWidth;
+
+        });
+
+        for(const item of items){
+
+            const pageNumber=Number(item.bookmark.page);
+
+            const target=visiblePages.find(page=>
+                Number(page.dataset.page)===pageNumber
+            );
+
+            if(!target || !item.flag){
+
+                allReady=false;
+                continue;
+
+            }
+
+            const rect=target.getBoundingClientRect();
+
+            /*
+             * Determine whether another real physical page is visibly
+             * positioned to the right of this page.
+             *
+             * If so, this is the left page of a true visible spread.
+             * Otherwise it is a single physical page or the right page.
+             *
+             * This correctly treats the cover as a single physical page
+             * even if the reader's logical spread state includes it in a
+             * synthetic/internal spread.
+             */
+            const isLeftPage=visiblePages.some(other=>{
+
+                if(other===target)return false;
+
+                const otherRect=other.getBoundingClientRect();
+
+                const verticallyAligned=
+                    Math.abs(otherRect.top-rect.top)<10;
+
+                const toTheRight=
+                    otherRect.left>=rect.right-10;
+
+                return verticallyAligned && toTheRight;
+
+            });
+
+            const gutterInset=8;
+
+            const x=isLeftPage
+                ? rect.left+gutterInset-item.flag.offsetWidth/2
+                : rect.right-item.flag.offsetWidth/2;
+
+            const y=
+                rect.top-item.flag.offsetHeight/2;
+
+            item.flag.style.left=
+                `${Math.round(x)}px`;
+
+            item.flag.style.top=
+                `${Math.round(y)}px`;
+
+        }
+
+        if(allReady || bookmarkPositionAttempts>=30){
+
+            bookmarkPositionFrame=null;
+
+            if(typeof onReady==="function"){
+                onReady();
+            }
+
+            return;
+
+        }
+
+        bookmarkPositionFrame=
+            requestAnimationFrame(check);
+
+    };
+
+    bookmarkPositionFrame=
+        requestAnimationFrame(check);
+
+}
+
+
+function scheduleBookmarkFlagReposition(){
+
+    /*
+     * Hide the bookmark while StPageFlip settles the physical page.
+     * The final refresh will calculate its position and reveal it once.
+     */
+    bookmarkFlags().forEach(flag=>{
+        flag.classList.remove("active");
+    });
+
+    const refresh=()=>{
+        if(typeof refreshBookmarkState==="function"){
+            refreshBookmarkState();
+        }
+    };
+
+    /*
+     * The first frame allows the page-turn state to settle.
+     * The later pass handles the cover-page case where StPageFlip
+     * completes its physical positioning slightly later.
+     */
+    requestAnimationFrame(()=>{
+        requestAnimationFrame(refresh);
+    });
+
+    setTimeout(refresh,350);
+
+}
+
+
+function hideBookmarkFlag(){
+    bookmarkFlags().forEach(flag=>{
+        flag.classList.remove('visible','active','turning');
+        flag.dataset.bookmarkBook='';
+        flag.dataset.bookmarkPage='';
+        flag.dataset.bookmarkId='';
+    });
+    clearExtraBookmarkFlags();
+}
+
+
+
+function clearBookmarkOverlay(){
+
+    hideBookmarkFlag();
+
+    if(dom.bookmarkAddButton){
+
+        dom.bookmarkAddButton.classList.remove('bookmarked');
+
+        dom.bookmarkAddButton.innerHTML=
+            '<svg class="icon">'+
+            '<use href="#icon-bookmark-add-outline"></use>'+
+            '</svg>';
+
+        dom.bookmarkAddButton.setAttribute(
+            'aria-pressed',
+            'false'
+        );
+
+        dom.bookmarkAddButton.setAttribute(
+            'aria-label',
+            'Bookmark this page'
+        );
+
+        dom.bookmarkAddButton.title=
+            'Bookmark this page';
+
+    }
+
+}
+
+
+
+/*-------------------------------------------------------
+  Bookmark State
+-------------------------------------------------------*/
+
+function refreshBookmarkState(){
+    if(!window.Bookmarks || typeof SRNavigation==='undefined' ||
+       typeof SRNavigation.bookmark!=='function')return;
+
+    const pos=SRNavigation.bookmark();
+    if(!pos || !pos.book)return;
+
+    const bookmarks=typeof Bookmarks.forBook==='function'
+        ? Bookmarks.forBook(pos.book) : [];
+    const visible=visibleBookmarksForCurrentView(bookmarks,pos);
+    const bookmarked=visible.length>0;
+
+    if(dom.bookmarkAddButton){
+        /* The toolbar describes the current visible reading location. */
+        dom.bookmarkAddButton.classList.toggle('bookmarked',bookmarked);
+        dom.bookmarkAddButton.innerHTML=`<svg class="icon"><use href="${bookmarked?'#icon-bookmark-add-filled':'#icon-bookmark-add-outline'}"></use></svg>`;
+        dom.bookmarkAddButton.setAttribute('aria-pressed',bookmarked?'true':'false');
+        dom.bookmarkAddButton.setAttribute('aria-label',bookmarked?'Page bookmarked':'Bookmark this page');
+        dom.bookmarkAddButton.title=bookmarked?'Page bookmarked':'Bookmark this page';
+    }
+
+    if(!bookmarked){ hideBookmarkFlag(); return; }
+
+    clearExtraBookmarkFlags();
+    const items=visible.map((bookmark,index)=>({bookmark,flag:makeBookmarkFlag(bookmark,index)}));
+    items.forEach(({flag,bookmark})=>{
+        flag.dataset.bookmarkBook=String(pos.book.id||pos.book);
+        flag.classList.remove('turning','active');
+    });
+
+    positionBookmarkFlagsWhenReady(items,()=>{
+        const current=typeof SRNavigation.bookmark==='function' ? SRNavigation.bookmark() : null;
+        if(!current || !current.book)return;
+        items.forEach(({flag})=>flag.classList.add('active'));
+    });
+}
+
+/*-------------------------------------------------------
+  Bookmark Turn Reset
+-------------------------------------------------------*/
+
+function resetBookmarkFlagForTurn(){
+
+    bookmarkFlags().forEach(flag=>{
+        flag.classList.add("turning");
+        flag.classList.remove("visible","active");
+    });
+
+}
+
+
 /*-------------------------------------------------------
   Toolbar
 -------------------------------------------------------*/
@@ -329,6 +672,8 @@ if(dom.previousButton){
 dom.previousButton.onclick=()=>{
 
     if(pinching)return;
+
+    resetBookmarkFlagForTurn();
 
     if(typeof SRNavigation!=="undefined"){
         SRNavigation.previous();
@@ -343,6 +688,8 @@ dom.nextButton.onclick=()=>{
 
     if(pinching)return;
 
+    resetBookmarkFlagForTurn();
+
     if(typeof SRNavigation!=="undefined"){
         SRNavigation.next();
     }
@@ -350,6 +697,19 @@ dom.nextButton.onclick=()=>{
 };
 
 }
+
+document.addEventListener("click",event=>{
+    const flag=event.target && event.target.closest ? event.target.closest('.bookmarkFlag') : null;
+    if(!flag || !flag.classList.contains('active'))return;
+    if(!window.Bookmarks)return;
+    const id=flag.dataset.bookmarkId;
+    if(id)Bookmarks.remove(id);
+    refreshBookmarkState();
+    if(window.BookmarkPanel && typeof BookmarkPanel.visible==='function' && BookmarkPanel.visible()){
+        BookmarkPanel.refresh();
+    }
+});
+
 
 if(dom.rotateButton){
 
@@ -392,6 +752,50 @@ updateMuteIcon();
 updateMuteIcon();
 
 }
+
+if(dom.bookmarkPanelButton){
+
+dom.bookmarkPanelButton.onclick=()=>{
+
+if(!window.BookmarkPanel || typeof BookmarkPanel.toggle!=="function")return;
+
+BookmarkPanel.toggle();
+
+dom.bookmarkPanelButton.setAttribute(
+"aria-pressed",
+BookmarkPanel.visible()?"true":"false"
+);
+
+};
+
+}
+
+if(dom.bookmarkAddButton){
+
+dom.bookmarkAddButton.onclick=()=>{
+
+if(!window.Bookmarks || typeof SRNavigation==="undefined" || typeof SRNavigation.bookmark!=="function")return;
+
+const pos=SRNavigation.bookmark();
+
+if(!pos.book)return;
+
+Bookmarks.add(pos.book,pos.page);
+
+refreshBookmarkState();
+
+if(window.BookmarkPanel && typeof BookmarkPanel.visible==="function" && BookmarkPanel.visible()){
+BookmarkPanel.refresh();
+}
+
+};
+
+refreshBookmarkState();
+
+}
+
+
+
 }
 
 /*-------------------------------------------------------
@@ -625,6 +1029,8 @@ window.addEventListener("resize",()=>{
 
 requestAnimationFrame(positionReaderArrows);
 
+scheduleBookmarkFlagReposition();
+
 });
 
 /*-------------------------------------------------------
@@ -640,6 +1046,37 @@ ui.initialize=function(){
 originalInitialize();
 
 connectToolbar();
+
+/*
+ * resetBookmarkFlagForTurn() was previously only wired to the
+ * previous/nextButton onclick handlers, so any other way of turning a
+ * page -- dragging/swiping the book directly, which St.PageFlip
+ * handles with its own internal pointer listeners -- never triggered
+ * it. The flag would then stay visibly "stuck" through a turn instead
+ * of disappearing, exactly when navigating via a live in-book gesture
+ * rather than the toolbar arrows.
+ *
+ * Renderer forwards Sky180FlipEngine's own "state" event (see
+ * renderer.js), which fires for every flip regardless of what
+ * initiated it -- so hooking the reset here instead makes it
+ * trigger-source-agnostic: any state other than "read" means a flip is
+ * in progress, and the flag should already be hidden by then.
+ */
+if(typeof Renderer!=="undefined" && typeof Renderer.on==="function"){
+
+Renderer.on("state",state=>{
+
+if(state!=="read"){
+    resetBookmarkFlagForTurn();
+}else{
+    requestAnimationFrame(()=>{
+        scheduleBookmarkFlagReposition();
+    });
+}
+
+});
+
+}
 
 /* The DOM cache is populated by originalInitialize(), so attach the
  * viewer-focus control only after the button actually exists.  The old
@@ -1272,6 +1709,8 @@ book.title
 
 }
 
+
+
 function updatePageIndicator(){
 
 if(!dom.pageIndicator)return;
@@ -1347,27 +1786,38 @@ if(libraryRevealTimer){
     libraryRevealTimer=null;
 }
 
+/*
+ * On narrow screens the library drawer is user-controlled.
+ * Closing a book must return to the viewer landing without
+ * automatically opening the drawer.
+ */
+const narrowScreen=window.innerWidth<=999;
+
 const reveal=()=>{
 
-libraryRevealTimer=null;
-sidebarVisible=true;
+    libraryRevealTimer=null;
 
-if(typeof SkyReader!=="undefined" &&
-   typeof SkyReader.showViewerLibrary==="function"){
-    /* Immediate library displays (initial load / explicit toggle) should not
-       replay the return animation. Delayed book-close returns still animate. */
-    SkyReader.showViewerLibrary(Boolean(delayReturn));
-}
+    /*
+     * Desktop: library remains visible.
+     * Narrow: viewer landing can appear, but the drawer stays closed.
+     */
+    sidebarVisible=!narrowScreen;
 
-if(dom.library){
+    if(typeof SkyReader!=="undefined" &&
+       typeof SkyReader.showViewerLibrary==="function"){
 
-dom.library.classList.remove(
+        SkyReader.showViewerLibrary(Boolean(delayReturn));
 
-"libraryHidden"
+    }
 
-);
+    if(dom.library){
 
-}
+        dom.library.classList.toggle(
+            "libraryHidden",
+            narrowScreen
+        );
+
+    }
 
 };
 
@@ -1447,6 +1897,12 @@ dom.loading.setAttribute("aria-busy","false");
 dom.loading.classList.remove("visible");
 
 }
+
+ui.hideLoading=function(){
+
+    hideLoading();
+
+};
 
 function beginBookOpen(text="Loading..."){
 
@@ -1571,6 +2027,8 @@ ui.hideLibrary();
 
 requestAnimationFrame(positionReaderArrows);
 
+scheduleBookmarkFlagReposition();
+
 }
 
 );
@@ -1611,6 +2069,10 @@ if(dom.progress){
     dom.progress.value=page;
 
 }
+
+requestAnimationFrame(()=>{
+    scheduleBookmarkFlagReposition();
+});
 
 });
 

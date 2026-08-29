@@ -31,6 +31,7 @@ select(book,page=null){
 
 },
 
+
 getOrganization(panel="main"){
     const defaults={sort:"alphabetical",filter:"all",category:""};
     const org=SkyReader.ui.organization||(SkyReader.ui.organization={});
@@ -639,7 +640,24 @@ switch(e.key){
 
 case "Escape":
 
-SkyReader.toggleLibrary(true);
+if(Reader.isOpen()){
+
+    if(typeof SRNavigation!=="undefined" &&
+       typeof SRNavigation.closeMagazine==="function"){
+
+        SRNavigation.closeMagazine();
+
+    }
+
+}else if(window.innerWidth>999){
+
+    /*
+     * On wide screens ESC may restore the library because it is
+     * permanently part of the desktop layout.
+     */
+    SkyReader.toggleLibrary(true);
+
+}
 
 break;
 

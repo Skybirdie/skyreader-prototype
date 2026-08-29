@@ -120,6 +120,30 @@ body{
   user-select:none;
 }
 
+#topBarRightControls{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  margin-right:20px;
+  gap:10px;
+  height:clamp(30px,4vh,36px);
+
+}
+
+#topBarRightControls .topBarButton{
+  position:relative;
+  flex:0 0 auto;
+  color:var(--text);
+  background:var(--panel);
+border: none;
+}
+
+.topBarButton:hover{
+  background:var(--panel2);
+  transform:translateY(-2px);
+  box-shadow:var(--hover-shadow);
+}
+
 #settingsButton{
   grid-column:3;
   justify-self:end;
@@ -1329,14 +1353,12 @@ body{
   align-items:center;
   gap:7px;
   width:calc(360px - 30px);
-  min-width:0;
 }
 
 #topSearchGroup #searchBox{
   display:none!important;
   flex:1 1 auto;
   width:auto;
-  min-width:0;
   height:34px;
   padding:0 11px;
   opacity:1;
@@ -1397,6 +1419,158 @@ html[data-theme="dark"] #topBar .iconButton{
 
 #readerPanel #toolbar #viewerFullscreenButton{right:14px!important;left:auto!important;}
 #readerPanel #toolbar #muteButton{right:64px!important;left:auto!important;}
+#readerPanel #toolbar #bookmarkAddButton{right:164px!important;left:auto!important;}
+
+/*
+ * The outline+plus button is the "add" affordance -- visible only when
+ * the current page has no bookmark. Once bookmarked, it hides entirely;
+ * the filled flag (now resting on the page) becomes the only visible
+ * indicator, and clicking it removes the bookmark.
+ */
+#readerPanel #toolbar #bookmarkAddButton.bookmarked{
+  opacity:0!important;
+  visibility:hidden!important;
+  pointer-events:none!important;
+}
+
+/*
+ * Bookmark page overlay.
+ *
+ * The JavaScript positions the container using left/top.
+ * The transform is reserved exclusively for the gentle
+ * entrance animation.
+ */
+
+.bookmarkFlag{
+  position:fixed;
+  width:var(--button-size);
+  height:var(--button-size);
+
+  display:flex;
+  align-items:center;
+  justify-content:center;
+
+  color:#d9a63c;
+
+  pointer-events:none;
+  cursor:default;
+
+  z-index:250;
+
+  opacity:0;
+
+  transform:translateY(-8px);
+  transition:
+    opacity .22s ease,
+    transform .35s cubic-bezier(.22,.61,.36,1);
+
+  will-change:opacity;
+}
+
+.bookmarkFlag.active{
+  opacity:1;
+  transform:translateY(0);
+}
+
+.bookmarkFlag.turning{
+  opacity:0 !important;
+  transition:none !important;
+  pointer-events:none !important;
+}
+
+.bookmarkFlag .icon,
+.bookmarkFlag img{
+  position:absolute;
+  inset:0;
+  margin:auto;
+
+  width:var(--icon-size);
+  height:var(--icon-size)*3;
+
+  object-fit:contain;
+}
+
+
+
+/*
+ * Keep the toolbar add icon centered independently.
+ */
+#readerPanel #toolbar #bookmarkAddButton .icon{
+  position:absolute;
+  inset:0;
+  margin:auto;
+}
+
+/*
+ * Center each icon independently within its button rather than relying
+ * solely on the button's own flex layout -- keeps the icon centered
+ * regardless of how many sibling elements share the button.
+ */
+#readerPanel #toolbar #bookmarkAddButton .icon,
+.bookmarkFlag .icon{
+  position:absolute;
+  inset:0;
+  margin:auto;
+}
+
+
+.sr-bookmark-page{
+  display:flex;
+  flex-direction:column;
+  flex:1 1 auto;
+  align-items:flex-start;
+  justify-content:center;
+  white-space:normal;
+  overflow-wrap:anywhere;
+  text-align:left;
+  line-height:1.25;
+
+}
+
+.sr-bookmark-book{
+  display:inline;
+  font-weight:600;
+}
+
+.sr-bookmark-page-number{
+  display:block;
+  font-size:.9em;
+  opacity:.75;
+  white-space:nowrap;
+  margin-left:.35em;
+}
+
+.sr-bookmark-panel{
+  width:min(420px,calc(100vw - 24px));
+  max-width:calc(100vw - 24px);
+  box-sizing:border-box;
+}
+
+.sr-bookmark-list{
+  width:100%;
+}
+
+.sr-bookmark-row{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  width:100%;
+  box-sizing:border-box;
+}
+
+.sr-bookmark-delete{
+  flex:0 0 auto;
+}
+
+@media (max-width:999px){
+
+  .sr-bookmark-panel{
+    width:calc(100vw - 24px);
+    max-width:calc(100vw - 24px);
+  }
+
+}
+
 
 #readerPanel #toolbar #rotateButton{
   right:114px!important;
@@ -1412,6 +1586,8 @@ html[data-theme="dark"] #topBar .iconButton{
 
 #readerPanel #toolbar #rotateButton svg,
 #readerPanel #toolbar #muteButton svg,
+#readerPanel #toolbar #bookmarkPanelButton svg,
+#readerPanel #toolbar #bookmarkAddButton svg,
 #readerPanel #toolbar #viewerFullscreenButton svg{
   color:var(--control-text)!important;
   stroke:currentColor;
@@ -1583,6 +1759,7 @@ html[data-theme="dark"] #readerPanel #toolbar .iconButton{
   #readerPanel #toolbar .iconButton{width:38px;height:38px;}
   #readerPanel #toolbar #rotateButton{right:101px!important;}
   #readerPanel #toolbar #muteButton{right:53px!important;}
+  #readerPanel #toolbar #bookmarkAddButton{right:149px!important;}
   #readerPanel #toolbar #viewerFullscreenButton{right:5px!important;}
 }
 

@@ -54,7 +54,8 @@ renderer.events={
     progress:null,
     ready:null,
     page:null,
-    error:null
+    error:null,
+    state:null
 };
 
 function emit(name,...args){
@@ -124,9 +125,9 @@ renderer.initialize=function(){
             emit("page",currentPage,pageCount);
         });
 
-        Sky180FlipEngine.on("state",state=>{
-            /* Presentation state intentionally stays inside the engine. */
-        });
+Sky180FlipEngine.on("state",state=>{
+    emit("state",state);
+});
 
         Sky180FlipEngine.on("orientation",()=>{
             renderer.resize();

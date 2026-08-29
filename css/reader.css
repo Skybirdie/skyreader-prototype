@@ -739,7 +739,8 @@ max-height:70vh;
 
 overflow:auto;
 
-background:rgba(255,255,255,.92);
+  background:var(--panel2);
+  color:var(--text);
 
 backdrop-filter:blur(12px);
 
@@ -762,12 +763,13 @@ justify-content:space-between;
 align-items:center;
 
 margin-bottom:14px;
+border-bottom: 1px grey solid;
 
 }
 
 .sr-bookmark-header h3{
 
-margin:0;
+margin:10px;
 
 font-size:18px;
 
@@ -785,7 +787,8 @@ cursor:pointer;
 
 font-size:18px;
 
-color:#444;
+  background:var(--panel2);
+  color:var(--text);
 
 }
 
@@ -821,11 +824,18 @@ border:none;
 
 border-radius:10px;
 
-background:#efefef;
+  background:var(--panel2);
+  color:var(--text);
 
 cursor:pointer;
 
 text-align:left;
+
+white-space:nowrap;
+
+overflow:hidden;
+
+text-overflow:ellipsis;
 
 transition:background .2s ease;
 
@@ -841,22 +851,24 @@ background:#dcdcdc;
 
 width:36px;
 
-height:36px;
+height:50px;
 
 border:none;
 
 border-radius:10px;
 
-background:#efefef;
+  background:var(--panel2);
+  color:var(--text);
 
 cursor:pointer;
+font-size:18px;
 
 }
 
 .sr-bookmark-delete:hover{
 
-background:#dcdcdc;
-
+background:#721C24;
+  color:#dcdcdc;
 }
 
 .sr-bookmark-empty{

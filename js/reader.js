@@ -356,6 +356,11 @@ return currentBook!==null;
 
 reader.close=function(options={playSound:true}){
 
+if(typeof clearBookmarkOverlay==="function"){
+    clearBookmarkOverlay();
+}
+
+
 openGeneration++;
 
 if(!currentBook){
@@ -477,35 +482,30 @@ return reader;
 };
 
 /*-------------------------------------------------------
-  Future API
+  Bookmark API
 -------------------------------------------------------*/
 
 reader.bookmarks={
 
-add(){
-
-console.warn(
-
-"Bookmarks will be implemented in Session 6."
-
-);
-
+add(page=currentPage){
+    if(!currentBook || !window.Bookmarks)return null;
+    return Bookmarks.add(currentBook,page);
 },
 
-remove(){
+remove(id){
+    return window.Bookmarks ? Bookmarks.remove(id) : false;
+},
 
-console.warn(
-
-"Bookmarks will be implemented in Session 6."
-
-);
-
+has(page=currentPage){
+    return !!(currentBook && window.Bookmarks && Bookmarks.has(currentBook,page));
 },
 
 list(){
+    return currentBook && window.Bookmarks ? Bookmarks.forBook(currentBook) : [];
+},
 
-return[];
-
+all(){
+    return window.Bookmarks ? Bookmarks.all() : [];
 }
 
 };
