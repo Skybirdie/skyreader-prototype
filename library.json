@@ -90,30 +90,7 @@
     }
 
   ]
-};
+}
 
-const testVideos = [
-    {
-        id: "video-001",
-        title: "Landscape Test",
-        subtitle: "16:9",
-        thumbnail: "",
-        video: "assets/video/test-landscape.mp4",
-        author: "unknown",
-        category: "Test",
-        date: "202608300200"
-    },
-    {
-        id: "video-002",
-        title: "Portrait Test",
-        subtitle: "9:16",
-        thumbnail: "",
-        video: "assets/video/test-portrait.mp4",
-        author: "unknown",
-        category: "Test",
-        date: "202608300201"
-    }
-];
 
-VideoLibrary.load(testVideos);
 
