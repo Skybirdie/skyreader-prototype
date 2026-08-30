@@ -467,6 +467,26 @@ button{
 
 <body>
 
+<div id="reloadScreen" role="status" aria-live="polite">
+    <img
+        src="assets/reload.gif"
+        alt="Loading Meditation Mornings"
+        onerror="this.style.display='none';this.nextElementSibling.hidden=false;"
+    >
+
+    <div class="reloadFallback" hidden>
+        Loading MMicj…
+    </div>
+</div>
+
+<div id="videoViewer">
+
+    <div id="videoError" hidden></div>
+
+    <main id="videoList"></main>
+
+</div>
+
 <div id="app">
 
 
@@ -626,14 +646,14 @@ Select a video to begin.
      VIDEO CONTRACT ADAPTER
 ====================================================== -->
 
-<script src="videoGlideContract.js"></script>
+<script src="videoGlideContract.js?v=1.0.0"></script>
 
 
 <!-- =====================================================
      VIDEO VIEWER
 ====================================================== -->
 
-<script src="videoViewer.js"></script>
+<script src="videoViewer.js?v=1.0.0"></script>
 
 
 </body>

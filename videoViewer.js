@@ -2,44 +2,52 @@
 
 /*
 =========================================================
- MMicj Video Viewer — Phase 2
+ Video Viewer — Phase 2 Minimal Test
 
  Responsibilities:
-
-   1. Load Video Contract
-   2. Normalize video records
-   3. Display video library
-   4. Open selected video
-   5. Play direct video sources
-   6. Recognize YouTube sources
-   7. Navigate previous/next
-   8. Display video metadata
-
- The contract adapter remains the single data boundary.
-
- No Glide-specific logic belongs in this file.
+   1. Load the Glide video contract
+   2. Render the supplied videos
+   3. Support direct video URLs
+   4. Support YouTube URLs
+   5. Dismiss the startup loading screen
 =========================================================
 */
 
-window.VideoViewer = (function(){
+(function(){
 
-const api = {};
-
-let manifest = null;
-
-let videos = [];
-
-let currentIndex = -1;
-
-let videoElement = null;
+function get(id){
+    return document.getElementById(id);
+}
 
 
 /*-------------------------------------------------------
- DOM helper
+ Loading screen
 -------------------------------------------------------*/
 
-function $(id){
-    return document.getElementById(id);
+function hideLoading(){
+    const screen=get("reloadScreen");
+
+    if(screen){
+        screen.classList.add("isReady");
+    }
+}
+
+
+/*-------------------------------------------------------
+ Error display
+-------------------------------------------------------*/
+
+function showError(message){
+
+    console.error("Video Viewer:",message);
+
+    const container=get("videoError");
+
+    if(container){
+        container.textContent=message;
+        container.hidden=false;
+    }
+
 }
 
 
@@ -47,1117 +55,332 @@ function $(id){
  URL normalization
 -------------------------------------------------------*/
 
-function cleanUrl(value){
+function normalizeUrl(value){
 
-    let text =
-        String(value ?? "").trim();
+    if(value===undefined || value===null){
+        return "";
+    }
 
+    let url=String(value).trim();
+
+    if(!url){
+        return "";
+    }
 
     /*
-    Glide may wrap the value in quotation marks.
+    Glide may provide Markdown links:
+
+    [https://example.com/video.mp4](https://example.com/video.mp4)
+
+    Extract the actual URL.
     */
 
-    if(
-        text.length >= 2 &&
-        text.startsWith('"') &&
-        text.endsWith('"')
-    ){
-        text =
-            text.slice(1,-1).trim();
+    const markdownMatch=url.match(
+        /^\[([^\]]+)\]\((https?:\/\/[^)]+)\)$/
+    );
+
+    if(markdownMatch){
+        return markdownMatch[2].trim();
     }
 
 
     /*
-    Glide Markdown:
-
-    [https://example.com/video.mp4](https://example.com/video.mp4)
+    Handle angle brackets or accidental surrounding
+    quotation marks.
     */
 
-    text =
-        text.replace(
-            /^\[([^\]]+)\]\(([^)]+)\)$/,
-            "$2"
+    url=url.replace(/^["']+|["']+$/g,"");
+    url=url.replace(/^<|>$/g,"");
+
+    return url.trim();
+}
+
+
+/*-------------------------------------------------------
+ YouTube detection
+-------------------------------------------------------*/
+
+function getYouTubeId(url){
+
+    try{
+
+        const parsed=new URL(url);
+
+        /*
+        youtube.com/watch?v=XXXXXXXXXXX
+        */
+
+        if(
+            parsed.hostname.includes("youtube.com") &&
+            parsed.searchParams.get("v")
+        ){
+            return parsed.searchParams.get("v");
+        }
+
+
+        /*
+        youtu.be/XXXXXXXXXXX
+        */
+
+        if(parsed.hostname==="youtu.be"){
+            return parsed.pathname.slice(1).split("/")[0];
+        }
+
+
+        /*
+        youtube.com/embed/XXXXXXXXXXX
+        */
+
+        const embedMatch=parsed.pathname.match(
+            /\/embed\/([^/?]+)/
+        );
+
+        if(
+            parsed.hostname.includes("youtube.com") &&
+            embedMatch
+        ){
+            return embedMatch[1];
+        }
+
+    }catch(error){
+        return null;
+    }
+
+    return null;
+}
+
+
+/*-------------------------------------------------------
+ Render one video
+-------------------------------------------------------*/
+
+function renderVideo(video){
+
+    const url=normalizeUrl(video.video);
+
+    if(!url){
+        return null;
+    }
+
+
+    const wrapper=document.createElement("article");
+
+    wrapper.className="videoCard";
+
+
+    const title=document.createElement("h2");
+
+    title.textContent=video.title || "Untitled video";
+
+    wrapper.appendChild(title);
+
+
+    const youtubeId=getYouTubeId(url);
+
+
+    if(youtubeId){
+
+        const iframe=document.createElement("iframe");
+
+        iframe.className="videoPlayer";
+
+        iframe.src=
+            "https://www.youtube.com/embed/" +
+            encodeURIComponent(youtubeId);
+
+        iframe.title=
+            video.title || "Video";
+
+        iframe.allow=
+            "accelerometer; autoplay; clipboard-write; " +
+            "encrypted-media; gyroscope; picture-in-picture; web-share";
+
+        iframe.allowFullscreen=true;
+
+        wrapper.appendChild(iframe);
+
+    }else{
+
+        const player=document.createElement("video");
+
+        player.className="videoPlayer";
+
+        player.controls=true;
+
+        player.preload="metadata";
+
+        player.playsInline=true;
+
+        player.src=url;
+
+
+        if(video.thumbnail){
+
+            const thumbnail=normalizeUrl(video.thumbnail);
+
+            if(thumbnail){
+                player.poster=thumbnail;
+            }
+
+        }
+
+
+        wrapper.appendChild(player);
+    }
+
+
+    return wrapper;
+}
+
+
+/*-------------------------------------------------------
+ Render manifest
+-------------------------------------------------------*/
+
+function renderVideos(manifest){
+
+    const container=get("videoList");
+
+    if(!container){
+        throw new Error("videoList element not found.");
+    }
+
+
+    container.innerHTML="";
+
+
+    const videos=
+        manifest &&
+        Array.isArray(manifest.videos)
+            ? manifest.videos
+            : [];
+
+
+    if(!videos.length){
+
+        const empty=document.createElement("p");
+
+        empty.textContent="No videos were supplied.";
+
+        container.appendChild(empty);
+
+        return;
+    }
+
+
+    videos.forEach(function(video){
+
+        const card=renderVideo(video);
+
+        if(card){
+            container.appendChild(card);
+        }
+
+    });
+
+}
+
+
+/*-------------------------------------------------------
+ Startup
+-------------------------------------------------------*/
+
+async function init(){
+
+    try{
+
+        console.log("Video Viewer: initializing...");
+
+
+        if(
+            !window.VideoGlideContract ||
+            typeof window.VideoGlideContract.load!=="function"
+        ){
+
+            throw new Error(
+                "VideoGlideContract is not available."
+            );
+
+        }
+
+
+        console.log(
+            "Video Viewer: loading Glide video contract..."
         );
 
 
-    return text.trim();
-}
+        const manifest=
+            await window.VideoGlideContract.load();
 
 
-/*-------------------------------------------------------
- Determine source type
--------------------------------------------------------*/
+        if(!manifest){
 
-function sourceType(url){
-
-    const value =
-        cleanUrl(url);
-
-
-    try{
-
-        const parsed =
-            new URL(
-                value,
-                window.location.href
+            throw new Error(
+                "No video contract was found."
             );
 
-
-        const host =
-            parsed.hostname.toLowerCase();
-
-
-        if(
-            host === "youtube.com" ||
-            host === "www.youtube.com" ||
-            host === "m.youtube.com" ||
-            host === "youtu.be" ||
-            host === "www.youtube-nocookie.com"
-        ){
-
-            return "youtube";
-
         }
+
+
+        console.log(
+            "Video Viewer: contract loaded.",
+            manifest
+        );
+
+
+        renderVideos(manifest);
+
+
+        console.log(
+            "Video Viewer: videos rendered."
+        );
+
 
     }catch(error){
 
-        /*
-        Invalid URL is allowed to fall through to
-        native HTML5 handling so the browser can report
-        the actual loading problem.
-        */
-
-    }
-
-
-    return "html5";
-}
-
-
-/*-------------------------------------------------------
- Extract YouTube video ID
--------------------------------------------------------*/
-
-function youtubeId(url){
-
-    try{
-
-        const parsed =
-            new URL(
-                cleanUrl(url),
-                window.location.href
-            );
-
-
-        const host =
-            parsed.hostname.toLowerCase();
-
-
-        if(
-            host === "youtu.be" ||
-            host === "www.youtu.be"
-        ){
-
-            return parsed
-                .pathname
-                .replace(/^\/+/,"")
-                .split("/")[0];
-
-        }
-
-
-        if(
-            host.includes("youtube.com")
-        ){
-
-            const queryId =
-                parsed.searchParams.get("v");
-
-
-            if(queryId){
-                return queryId;
-            }
-
-
-            const parts =
-                parsed.pathname
-                .split("/")
-                .filter(Boolean);
-
-
-            const embedIndex =
-                parts.indexOf("embed");
-
-
-            if(
-                embedIndex >= 0 &&
-                parts[embedIndex + 1]
-            ){
-
-                return parts[
-                    embedIndex + 1
-                ];
-
-            }
-
-
-            const shortsIndex =
-                parts.indexOf("shorts");
-
-
-            if(
-                shortsIndex >= 0 &&
-                parts[shortsIndex + 1]
-            ){
-
-                return parts[
-                    shortsIndex + 1
-                ];
-
-            }
-
-        }
-
-    }catch(error){
-
-        console.warn(
-            "Unable to identify YouTube video.",
+        console.error(
+            "Video Viewer initialization failed:",
             error
         );
 
+
+        showError(
+            error && error.message
+                ? error.message
+                : "Unable to load videos."
+        );
+
+
+    }finally{
+
+        /*
+        IMPORTANT:
+
+        Never leave the startup screen permanently visible.
+        */
+
+        hideLoading();
+
     }
 
-
-    return "";
 }
 
 
 /*-------------------------------------------------------
- Status
+ Start after DOM is ready
 -------------------------------------------------------*/
 
-function setStatus(
-    message,
-    isError = false
-){
+if(document.readyState==="loading"){
 
-    const element =
-        $("statusMessage");
-
-
-    if(!element){
-        return;
-    }
-
-
-    element.textContent =
-        message || "";
-
-
-    element.classList.toggle(
-        "error",
-        !!isError
+    document.addEventListener(
+        "DOMContentLoaded",
+        init
     );
 
-}
+}else{
 
-
-/*-------------------------------------------------------
- Empty state
--------------------------------------------------------*/
-
-function showEmpty(){
-
-    $("emptyState")
-        ?.classList
-        .remove("hidden");
-
-
-    $("videoStage")
-        ?.classList
-        .add("hidden");
-
-
-    $("videoInfo")
-        ?.classList
-        .add("hidden");
+    init();
 
 }
-
-
-/*-------------------------------------------------------
- Viewer state
--------------------------------------------------------*/
-
-function showViewer(){
-
-    $("emptyState")
-        ?.classList
-        .add("hidden");
-
-
-    $("videoStage")
-        ?.classList
-        .remove("hidden");
-
-
-    $("videoInfo")
-        ?.classList
-        .remove("hidden");
-
-}
-
-
-/*-------------------------------------------------------
- Render video list
--------------------------------------------------------*/
-
-function renderList(){
-
-    const list =
-        $("videoList");
-
-
-    if(!list){
-        return;
-    }
-
-
-    list.innerHTML = "";
-
-
-    videos.forEach(
-        (item,index)=>{
-
-            const button =
-                document.createElement(
-                    "button"
-                );
-
-
-            button.type =
-                "button";
-
-
-            button.className =
-                "videoCard";
-
-
-            button.dataset.index =
-                String(index);
-
-
-            if(index === currentIndex){
-
-                button.classList.add(
-                    "active"
-                );
-
-            }
-
-
-            const thumbnail =
-                cleanUrl(
-                    item.thumbnail
-                );
-
-
-            const thumb =
-                document.createElement(
-                    "div"
-                );
-
-
-            thumb.className =
-                "videoCardThumb";
-
-
-            if(thumbnail){
-
-                const image =
-                    document.createElement(
-                        "img"
-                    );
-
-
-                image.src =
-                    thumbnail;
-
-
-                image.alt =
-                    "";
-
-
-                image.loading =
-                    "lazy";
-
-
-                image.onerror =
-                    function(){
-
-                        this.style.display =
-                            "none";
-
-                    };
-
-
-                thumb.appendChild(
-                    image
-                );
-
-            }else{
-
-                thumb.textContent =
-                    "No thumbnail";
-
-            }
-
-
-            const text =
-                document.createElement(
-                    "div"
-                );
-
-
-            text.className =
-                "videoCardText";
-
-
-            const title =
-                document.createElement(
-                    "strong"
-                );
-
-
-            title.textContent =
-                item.title ||
-                "Untitled video";
-
-
-            const subtitle =
-                document.createElement(
-                    "span"
-                );
-
-
-            subtitle.textContent =
-                item.subtitle ||
-                "";
-
-
-            text.appendChild(title);
-            text.appendChild(subtitle);
-
-
-            button.appendChild(thumb);
-            button.appendChild(text);
-
-
-            button.addEventListener(
-                "click",
-                function(){
-
-                    open(index);
-
-                }
-            );
-
-
-            list.appendChild(
-                button
-            );
-
-        }
-    );
-
-}
-
-
-/*-------------------------------------------------------
- Render metadata
--------------------------------------------------------*/
-
-function renderInfo(item){
-
-    $("videoTitle").textContent =
-        item.title ||
-        "Untitled video";
-
-
-    $("videoSubtitle").textContent =
-        item.subtitle ||
-        "";
-
-
-    $("videoAuthor").textContent =
-        item.author &&
-        item.author !== "unknown"
-            ? item.author
-            : "";
-
-
-    $("videoCategory").textContent =
-        item.category &&
-        item.category !== "unknown"
-            ? item.category
-            : "";
-
-
-    $("videoLength").textContent =
-        item.videoLength &&
-        item.videoLength !== "unknown"
-            ? item.videoLength
-            : "";
-
-
-    $("videoDate").textContent =
-        item.date ||
-        "";
-
-}
-
-
-/*-------------------------------------------------------
- Detect native MIME type
--------------------------------------------------------*/
-
-function detectMimeType(url){
-
-    const clean =
-        url
-            .split("?")[0]
-            .toLowerCase();
-
-
-    if(clean.endsWith(".mp4")){
-        return "video/mp4";
-    }
-
-
-    if(clean.endsWith(".webm")){
-        return "video/webm";
-    }
-
-
-    if(
-        clean.endsWith(".ogv") ||
-        clean.endsWith(".ogg")
-    ){
-
-        return "video/ogg";
-
-    }
-
-
-    return "";
-
-}
-
-
-/*-------------------------------------------------------
- Create native HTML5 video
--------------------------------------------------------*/
-
-function createHtml5Player(item){
-
-    const stage =
-        $("videoStage");
-
-
-    stage.innerHTML = "";
-
-
-    const video =
-        document.createElement(
-            "video"
-        );
-
-
-    video.id =
-        "videoPlayer";
-
-
-    video.className =
-        "videoPlayer";
-
-
-    video.controls =
-        true;
-
-
-    video.preload =
-        "metadata";
-
-
-    video.playsInline =
-        true;
-
-
-    const source =
-        document.createElement(
-            "source"
-        );
-
-
-    source.src =
-        cleanUrl(
-            item.video
-        );
-
-
-    const mime =
-        detectMimeType(
-            source.src
-        );
-
-
-    if(mime){
-
-        source.type =
-            mime;
-
-    }
-
-
-    video.appendChild(
-        source
-    );
-
-
-    video.addEventListener(
-        "loadedmetadata",
-        function(){
-
-            setStatus("");
-
-        }
-    );
-
-
-    video.addEventListener(
-        "error",
-        function(){
-
-            setStatus(
-                "Unable to load this video source.",
-                true
-            );
-
-        }
-    );
-
-
-    stage.appendChild(
-        video
-    );
-
-
-    videoElement =
-        video;
-
-}
-
-
-/*-------------------------------------------------------
- Create YouTube player
--------------------------------------------------------*/
-
-function createYouTubePlayer(item){
-
-    const stage =
-        $("videoStage");
-
-
-    stage.innerHTML = "";
-
-
-    const id =
-        youtubeId(
-            item.video
-        );
-
-
-    if(!id){
-
-        setStatus(
-            "Unable to identify the YouTube video.",
-            true
-        );
-
-        return;
-
-    }
-
-
-    const iframe =
-        document.createElement(
-            "iframe"
-        );
-
-
-    iframe.className =
-        "videoPlayer youtubePlayer";
-
-
-    iframe.src =
-        "https://www.youtube.com/embed/" +
-        encodeURIComponent(id) +
-        "?rel=0";
-
-
-    iframe.title =
-        item.title ||
-        "Video";
-
-
-    iframe.allow =
-        "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share";
-
-
-    iframe.allowFullscreen =
-        true;
-
-
-    iframe.referrerPolicy =
-        "strict-origin-when-cross-origin";
-
-
-    stage.appendChild(
-        iframe
-    );
-
-
-    videoElement =
-        null;
-
-}
-
-
-/*-------------------------------------------------------
- Open video
--------------------------------------------------------*/
-
-function open(index){
-
-    if(
-        !Number.isInteger(index) ||
-        index < 0 ||
-        index >= videos.length
-    ){
-
-        return;
-
-    }
-
-
-    /*
-    Stop the previous native video before replacing it.
-    */
-
-    if(videoElement){
-
-        try{
-            videoElement.pause();
-        }catch(error){}
-
-    }
-
-
-    currentIndex =
-        index;
-
-
-    const item =
-        videos[index];
-
-
-    renderList();
-
-    renderInfo(item);
-
-    showViewer();
-
-
-    const url =
-        cleanUrl(
-            item.video
-        );
-
-
-    if(!url){
-
-        setStatus(
-            "This video has no source URL.",
-            true
-        );
-
-        return;
-
-    }
-
-
-    if(
-        sourceType(url) === "youtube"
-    ){
-
-        createYouTubePlayer(
-            item
-        );
-
-    }else{
-
-        createHtml5Player(
-            item
-        );
-
-    }
-
-
-    document.title =
-        item.title
-            ? item.title +
-              " — MMicj Video"
-            : "MMicj Video";
-
-}
-
-
-/*-------------------------------------------------------
- Next
--------------------------------------------------------*/
-
-function next(){
-
-    if(!videos.length){
-        return;
-    }
-
-
-    const nextIndex =
-        currentIndex <
-        videos.length - 1
-
-            ? currentIndex + 1
-
-            : 0;
-
-
-    open(nextIndex);
-
-}
-
-
-/*-------------------------------------------------------
- Previous
--------------------------------------------------------*/
-
-function previous(){
-
-    if(!videos.length){
-        return;
-    }
-
-
-    const previousIndex =
-        currentIndex > 0
-
-            ? currentIndex - 1
-
-            : videos.length - 1;
-
-
-    open(previousIndex);
-
-}
-
-
-/*-------------------------------------------------------
- Normalize incoming records
--------------------------------------------------------*/
-
-function normalizeVideos(rawVideos){
-
-    return rawVideos.map(
-        (raw,index)=>({
-
-            id:
-                String(
-                    raw?.id ??
-                    ("video_" + index)
-                ).trim(),
-
-
-            title:
-                String(
-                    raw?.title ??
-                    ""
-                ).trim(),
-
-
-            subtitle:
-                String(
-                    raw?.subtitle ??
-                    ""
-                ).trim(),
-
-
-            thumbnail:
-                cleanUrl(
-                    raw?.thumbnail ??
-                    ""
-                ),
-
-
-            video:
-                cleanUrl(
-                    raw?.video ??
-                    raw?.url ??
-                    raw?.videoUrl ??
-                    ""
-                ),
-
-
-            author:
-                String(
-                    raw?.author ??
-                    ""
-                ).trim(),
-
-
-            category:
-                String(
-                    raw?.category ??
-                    ""
-                ).trim(),
-
-
-            videoLength:
-                raw?.videoLength ??
-                raw?.video_length ??
-                raw?.duration ??
-                "unknown",
-
-
-            date:
-                String(
-                    raw?.date ??
-                    ""
-                ).trim()
-
-        })
-    );
-
-}
-
-
-/*-------------------------------------------------------
- Load contract
--------------------------------------------------------*/
-
-async function load(){
-
-    if(
-        !window.VideoGlideContract ||
-        typeof window.VideoGlideContract.load !==
-            "function"
-    ){
-
-        throw new Error(
-            "VideoGlideContract is unavailable."
-        );
-
-    }
-
-
-    manifest =
-        await window.VideoGlideContract.load();
-
-
-    if(!manifest){
-
-        videos = [];
-
-        showEmpty();
-
-        setStatus(
-            "No video contract was supplied."
-        );
-
-        return;
-
-    }
-
-
-    const rawVideos =
-        Array.isArray(manifest)
-            ? manifest
-            : manifest.videos;
-
-
-    if(!Array.isArray(rawVideos)){
-
-        throw new Error(
-            "Video contract does not contain a video array."
-        );
-
-    }
-
-
-    videos =
-        normalizeVideos(
-            rawVideos
-        );
-
-
-    renderList();
-
-
-    if(videos.length){
-
-        open(0);
-
-
-        setStatus(
-            videos.length === 1
-                ? "1 video loaded."
-                : videos.length +
-                  " videos loaded."
-        );
-
-    }else{
-
-        showEmpty();
-
-        setStatus(
-            "The video contract contains no videos."
-        );
-
-    }
-
-}
-
-
-/*-------------------------------------------------------
- Close
--------------------------------------------------------*/
-
-function close(){
-
-    if(videoElement){
-
-        try{
-            videoElement.pause();
-        }catch(error){}
-
-    }
-
-
-    videoElement =
-        null;
-
-
-    currentIndex =
-        -1;
-
-
-    $("videoStage").innerHTML =
-        "";
-
-
-    showEmpty();
-
-    renderList();
-
-    document.title =
-        "MMicj Video";
-
-}
-
-
-/*-------------------------------------------------------
- Initialize
--------------------------------------------------------*/
-
-function init(){
-
-    $("previousButton")
-        ?.addEventListener(
-            "click",
-            previous
-        );
-
-
-    $("nextButton")
-        ?.addEventListener(
-            "click",
-            next
-        );
-
-
-    $("closeButton")
-        ?.addEventListener(
-            "click",
-            close
-        );
-
-
-    load().catch(
-        function(error){
-
-            console.error(
-                "Video Viewer startup error:",
-                error
-            );
-
-
-            showEmpty();
-
-
-            setStatus(
-                error?.message ||
-                "Unable to load video contract.",
-                true
-            );
-
-        }
-    );
-
-}
-
-
-/*-------------------------------------------------------
- Public API
--------------------------------------------------------*/
-
-api.init =
-    init;
-
-api.load =
-    load;
-
-api.open =
-    open;
-
-api.next =
-    next;
-
-api.previous =
-    previous;
-
-api.close =
-    close;
-
-
-return api;
 
 })();
-
-
-document.addEventListener(
-    "DOMContentLoaded",
-    function(){
-
-        VideoViewer.init();
-
-    }
-);
