@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+
+<title>MMicj Video</title>
+
+<meta name="theme-color" content="#ffffff">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="MMicj Video">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+
+:root{
+    --header-height:clamp(44px,5.5vh,68px);
+    --surface:#eef1f5;
+    --panel:#ffffff;
+    --text:#20262d;
+    --muted:#66707a;
+    --line:rgba(0,0,0,.10);
+}
+
+*{
+    box-sizing:border-box;
+}
+
+html,
+body{
+    margin:0;
+    width:100%;
+    height:100%;
+    overflow:hidden;
+    font-family:Inter,Arial,sans-serif;
+    background:var(--surface);
+    color:var(--text);
+}
+
+button{
+    font:inherit;
+}
+
+#app{
+    width:100%;
+    height:100%;
+    display:flex;
+    flex-direction:column;
+}
+
+
+/* =========================================================
+   HEADER
+========================================================= */
+
+#topBar{
+    height:var(--header-height);
+    min-height:var(--header-height);
+    flex:0 0 var(--header-height);
+
+    display:grid;
+    grid-template-columns:1fr auto 1fr;
+    align-items:center;
+
+    padding-inline:18px;
+
+    background:#fff;
+    border-bottom:1px solid var(--line);
+}
+
+#appTitle{
+    margin:0;
+
+    font-size:clamp(16px,2vw,22px);
+    font-weight:700;
+
+    text-align:center;
+}
+
+.topButton{
+    width:40px;
+    height:40px;
+
+    border:0;
+    border-radius:8px;
+
+    background:transparent;
+
+    cursor:pointer;
+
+    font-size:28px;
+    line-height:1;
+}
+
+.topButton:hover{
+    background:#f0f2f5;
+}
+
+
+/* =========================================================
+   WORKSPACE
+========================================================= */
+
+#workspace{
+    min-height:0;
+
+    flex:1;
+
+    display:grid;
+    grid-template-columns:
+        minmax(210px,280px)
+        minmax(0,1fr);
+}
+
+
+/* =========================================================
+   VIDEO LIBRARY
+========================================================= */
+
+#libraryPanel{
+    min-width:0;
+    min-height:0;
+
+    overflow:auto;
+
+    background:#fff;
+
+    border-right:1px solid var(--line);
+
+    padding:12px;
+}
+
+#videoList{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+}
+
+.videoCard{
+    display:grid;
+
+    grid-template-columns:
+        88px
+        minmax(0,1fr);
+
+    gap:10px;
+
+    width:100%;
+
+    padding:7px;
+
+    text-align:left;
+
+    border:1px solid transparent;
+    border-radius:10px;
+
+    background:transparent;
+
+    cursor:pointer;
+}
+
+.videoCard:hover,
+.videoCard.active{
+    background:#f2f4f7;
+    border-color:var(--line);
+}
+
+.videoCardThumb{
+    width:88px;
+
+    aspect-ratio:16/9;
+
+    overflow:hidden;
+
+    border-radius:7px;
+
+    background:#dfe3e8;
+
+    display:flex;
+    align-items:center;
+    justify-content:center;
+
+    color:var(--muted);
+
+    font-size:11px;
+}
+
+.videoCardThumb img{
+    width:100%;
+    height:100%;
+
+    object-fit:cover;
+}
+
+.videoCardText{
+    min-width:0;
+
+    display:flex;
+    flex-direction:column;
+
+    justify-content:center;
+
+    gap:4px;
+}
+
+.videoCardText strong{
+    font-size:13px;
+    line-height:1.25;
+}
+
+.videoCardText span{
+    color:var(--muted);
+    font-size:11px;
+}
+
+
+/* =========================================================
+   VIEWER
+========================================================= */
+
+#readerPanel{
+    min-width:0;
+    min-height:0;
+
+    display:flex;
+    flex-direction:column;
+
+    background:var(--surface);
+}
+
+#viewerBackground{
+    min-height:0;
+
+    flex:1;
+
+    padding:clamp(12px,2vw,28px);
+}
+
+#viewerArea{
+    width:100%;
+    height:100%;
+
+    min-height:0;
+
+    display:flex;
+
+    flex-direction:column;
+
+    align-items:center;
+    justify-content:center;
+}
+
+#videoStage{
+    width:min(1100px,100%);
+
+    max-height:calc(100% - 110px);
+
+    aspect-ratio:16/9;
+
+    display:flex;
+
+    align-items:center;
+    justify-content:center;
+
+    background:#000;
+
+    border-radius:10px;
+
+    overflow:hidden;
+
+    box-shadow:
+        0 10px 30px rgba(0,0,0,.14);
+}
+
+.videoPlayer{
+    display:block;
+
+    width:100%;
+    height:100%;
+
+    object-fit:contain;
+
+    border:0;
+}
+
+.youtubePlayer{
+    background:#000;
+}
+
+
+/* =========================================================
+   VIDEO INFORMATION
+========================================================= */
+
+#videoInfo{
+    width:min(1100px,100%);
+
+    padding-top:12px;
+}
+
+#videoTitle{
+    margin:0;
+
+    font-size:
+        clamp(17px,2vw,25px);
+}
+
+#videoSubtitle{
+    margin:4px 0 0;
+
+    color:var(--muted);
+
+    font-size:13px;
+}
+
+.videoMeta{
+    margin-top:6px;
+
+    display:flex;
+    flex-wrap:wrap;
+
+    gap:6px;
+
+    color:var(--muted);
+
+    font-size:11px;
+}
+
+.videoMeta span:not(:empty)::after{
+    content:" • ";
+}
+
+.videoMeta span:last-child::after{
+    content:"";
+}
+
+
+/* =========================================================
+   EMPTY STATE
+========================================================= */
+
+#emptyState{
+    text-align:center;
+
+    color:var(--muted);
+}
+
+#emptyState h2{
+    margin:0 0 8px;
+
+    color:var(--text);
+}
+
+
+/* =========================================================
+   TOOLBAR
+========================================================= */
+
+#toolbar{
+    height:52px;
+    min-height:52px;
+
+    flex:0 0 52px;
+
+    display:flex;
+
+    align-items:center;
+    justify-content:center;
+
+    gap:8px;
+
+    background:#fff;
+
+    border-top:1px solid var(--line);
+}
+
+.toolbarButton{
+    min-width:42px;
+    height:38px;
+
+    padding:0 14px;
+
+    border:0;
+    border-radius:7px;
+
+    background:transparent;
+
+    cursor:pointer;
+
+    font-size:22px;
+}
+
+.toolbarButton:hover{
+    background:#f0f2f5;
+}
+
+
+/* =========================================================
+   STATUS
+========================================================= */
+
+#statusBar{
+    position:fixed;
+
+    left:50%;
+    bottom:5px;
+
+    transform:translateX(-50%);
+
+    z-index:20;
+
+    pointer-events:none;
+
+    font-size:10px;
+
+    color:var(--muted);
+}
+
+#statusMessage.error{
+    color:#b3261e;
+}
+
+.hidden{
+    display:none !important;
+}
+
+
+/* =========================================================
+   MOBILE
+========================================================= */
+
+@media(max-width:700px){
+
+    #workspace{
+        grid-template-columns:1fr;
+
+        grid-template-rows:
+            minmax(100px,26vh)
+            minmax(0,1fr);
+    }
+
+    #libraryPanel{
+        border-right:0;
+
+        border-bottom:1px solid var(--line);
+    }
+
+    #viewerBackground{
+        padding:8px;
+    }
+
+    #videoStage{
+        border-radius:6px;
+    }
+
+}
+
+</style>
+
+</head>
+
+
+<body>
+
+<div id="app">
+
+
+<header id="topBar">
+
+<div>
+
+<button
+    id="closeButton"
+    class="topButton"
+    type="button"
+    title="Close video"
+    aria-label="Close video"
+>×</button>
+
+</div>
+
+
+<h1 id="appTitle">
+MMicj Video
+</h1>
+
+
+<div></div>
+
+</header>
+
+
+<main id="workspace">
+
+
+<!-- =====================================================
+     VIDEO LIBRARY
+====================================================== -->
+
+<aside id="libraryPanel">
+
+<div
+    id="videoList"
+    aria-label="Videos"
+></div>
+
+</aside>
+
+
+<!-- =====================================================
+     VIEWER
+====================================================== -->
+
+<section id="readerPanel">
+
+
+<div id="viewerBackground">
+
+<div id="viewerArea">
+
+
+<div id="emptyState">
+
+<h2>
+Video Viewer
+</h2>
+
+<p>
+Select a video to begin.
+</p>
+
+</div>
+
+
+<div
+    id="videoStage"
+    class="hidden"
+></div>
+
+
+<div
+    id="videoInfo"
+    class="hidden"
+>
+
+<h2 id="videoTitle"></h2>
+
+<p id="videoSubtitle"></p>
+
+
+<div class="videoMeta">
+
+<span id="videoAuthor"></span>
+
+<span id="videoCategory"></span>
+
+<span id="videoLength"></span>
+
+<span id="videoDate"></span>
+
+</div>
+
+</div>
+
+
+</div>
+
+</div>
+
+
+<!-- ===================================================
+     NAVIGATION
+==================================================== -->
+
+<nav id="toolbar">
+
+<button
+    id="previousButton"
+    class="toolbarButton"
+    type="button"
+    title="Previous video"
+    aria-label="Previous video"
+>
+‹
+</button>
+
+
+<button
+    id="nextButton"
+    class="toolbarButton"
+    type="button"
+    title="Next video"
+    aria-label="Next video"
+>
+›
+</button>
+
+</nav>
+
+
+</section>
+
+</main>
+
+
+<div
+    id="statusBar"
+    role="status"
+    aria-live="polite"
+>
+
+<span id="statusMessage"></span>
+
+</div>
+
+
+</div>
+
+
+<!-- =====================================================
+     VIDEO CONTRACT ADAPTER
+====================================================== -->
+
+<script src="videoGlideContract.js?v=1.0.0"></script>
+
+
+<!-- =====================================================
+     VIDEO VIEWER
+====================================================== -->
+
+<script src="videoViewer.js?v=1.0.0"></script>
+
+
+</body>
+</html>
