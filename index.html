@@ -23,6 +23,10 @@
 <link rel="stylesheet" href="css/style.css">
 <link rel="stylesheet" href="css/reader.css">
 <link rel="stylesheet" href="css/library.css">
+<link
+    rel="stylesheet"
+    href="video.css"
+>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>if(window.pdfjsLib){pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";}</script>
@@ -40,7 +44,7 @@
 <body>
 
 <div id="reloadScreen" role="status" aria-live="polite">
-<img src="assets/reload.png" alt="Loading Meditation Mornings" onerror="this.style.display='none';this.nextElementSibling.hidden=false;">
+<img src="assets/reload.gif" alt="Loading Meditation Mornings" onerror="this.style.display='none';this.nextElementSibling.hidden=false;">
 <div class="reloadFallback" hidden>Loading MMicj…</div>
 </div>
 
@@ -238,6 +242,69 @@
 
 </section>
 
+<section
+    id="videoSection"
+    class="video-section"
+>
+
+    <!-- =============================================
+         VIDEO LIBRARY
+    ============================================== -->
+
+    <aside
+        id="videoLibrary"
+        class="video-library"
+    >
+
+        <header
+            class="video-library-header"
+        >
+
+            <h2
+                class="video-library-title"
+            >
+                Videos
+            </h2>
+
+        </header>
+
+
+        <div
+            id="videoLibraryGrid"
+            class="video-library-grid"
+        ></div>
+
+    </aside>
+
+
+    <!-- =============================================
+         VIDEO VIEWER
+    ============================================== -->
+
+    <main
+        id="videoViewer"
+        class="video-viewer"
+    >
+
+        <h2
+            id="videoViewerTitle"
+            class="video-viewer-title"
+        ></h2>
+
+
+        <video
+            id="videoPlayer"
+            class="video-player"
+            controls
+            playsinline
+            preload="metadata"
+        ></video>
+
+    </main>
+
+</section>
+
+
 </main>
 
 </div>
@@ -418,6 +485,9 @@ stroke-linecap="round"/>
 <script src="js/ui.js"></script>
 <script src="js/settingsPanel.js"></script>
 <script src="js/app.js"></script>
+<script src="videoContract.js"></script>
+<script src="videoLibrary.js"></script>
+<script src="videoViewer.js"></script>
 
 </body>
 </html>
