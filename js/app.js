@@ -127,6 +127,10 @@ async function initializeModules(){
     SRNavigation.initialize();
 
     UI.initialize();
+    
+    VideoViewer.init();
+
+    VideoLibrary.init();
 
     initialized=true;
 
