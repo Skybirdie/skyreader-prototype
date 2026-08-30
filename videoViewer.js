@@ -2,385 +2,405 @@
 
 /*
 =========================================================
- Video Viewer — Phase 2 Minimal Test
 
- Responsibilities:
-   1. Load the Glide video contract
-   2. Render the supplied videos
-   3. Support direct video URLs
-   4. Support YouTube URLs
-   5. Dismiss the startup loading screen
+ SkyReader Video Viewer
+
 =========================================================
 */
 
-(function(){
+window.VideoViewer = (function () {
 
-function get(id){
-    return document.getElementById(id);
-}
+    let viewerElement = null;
+    let videoElement = null;
+    let titleElement = null;
 
-
-/*-------------------------------------------------------
- Loading screen
--------------------------------------------------------*/
-
-function hideLoading(){
-    const screen=get("reloadScreen");
-
-    if(screen){
-        screen.classList.add("isReady");
-    }
-}
-
-
-/*-------------------------------------------------------
- Error display
--------------------------------------------------------*/
-
-function showError(message){
-
-    console.error("Video Viewer:",message);
-
-    const container=get("videoError");
-
-    if(container){
-        container.textContent=message;
-        container.hidden=false;
-    }
-
-}
-
-
-/*-------------------------------------------------------
- URL normalization
--------------------------------------------------------*/
-
-function normalizeUrl(value){
-
-    if(value===undefined || value===null){
-        return "";
-    }
-
-    let url=String(value).trim();
-
-    if(!url){
-        return "";
-    }
-
-    /*
-    Glide may provide Markdown links:
-
-    [https://example.com/video.mp4](https://example.com/video.mp4)
-
-    Extract the actual URL.
-    */
-
-    const markdownMatch=url.match(
-        /^\[([^\]]+)\]\((https?:\/\/[^)]+)\)$/
-    );
-
-    if(markdownMatch){
-        return markdownMatch[2].trim();
-    }
+    let currentVideo = null;
 
 
     /*
-    Handle angle brackets or accidental surrounding
-    quotation marks.
+    -------------------------------------------------------
+     Initialize
+    -------------------------------------------------------
     */
 
-    url=url.replace(/^["']+|["']+$/g,"");
-    url=url.replace(/^<|>$/g,"");
+    function init(options = {}) {
 
-    return url.trim();
-}
+        viewerElement =
+            options.viewerElement ||
+            document.getElementById("videoViewer");
+
+        videoElement =
+            options.videoElement ||
+            document.getElementById("videoPlayer");
+
+        titleElement =
+            options.titleElement ||
+            document.getElementById("videoViewerTitle");
 
 
-/*-------------------------------------------------------
- YouTube detection
--------------------------------------------------------*/
-
-function getYouTubeId(url){
-
-    try{
-
-        const parsed=new URL(url);
-
-        /*
-        youtube.com/watch?v=XXXXXXXXXXX
-        */
-
-        if(
-            parsed.hostname.includes("youtube.com") &&
-            parsed.searchParams.get("v")
-        ){
-            return parsed.searchParams.get("v");
+        if (!videoElement) {
+            return;
         }
 
 
         /*
-        youtu.be/XXXXXXXXXXX
+        Detect the actual intrinsic dimensions
+        when the video's metadata becomes available.
         */
 
-        if(parsed.hostname==="youtu.be"){
-            return parsed.pathname.slice(1).split("/")[0];
-        }
-
-
-        /*
-        youtube.com/embed/XXXXXXXXXXX
-        */
-
-        const embedMatch=parsed.pathname.match(
-            /\/embed\/([^/?]+)/
+        videoElement.addEventListener(
+            "loadedmetadata",
+            handleMetadata
         );
 
-        if(
-            parsed.hostname.includes("youtube.com") &&
-            embedMatch
-        ){
-            return embedMatch[1];
+
+        /*
+        Keep the video constrained when
+        the viewer changes size.
+        */
+
+        window.addEventListener(
+            "resize",
+            refreshVideoLayout
+        );
+
+
+        refreshVideoLayout();
+    }
+
+
+    /*
+    -------------------------------------------------------
+     Open video
+    -------------------------------------------------------
+    */
+
+    function openVideo(video) {
+
+        if (!video || !videoElement) {
+            return;
         }
 
-    }catch(error){
-        return null;
-    }
-
-    return null;
-}
+        currentVideo =
+            video;
 
 
-/*-------------------------------------------------------
- Render one video
--------------------------------------------------------*/
+        /*
+        Update title
+        */
 
-function renderVideo(video){
+        if (titleElement) {
 
-    const url=normalizeUrl(video.video);
-
-    if(!url){
-        return null;
-    }
-
-
-    const wrapper=document.createElement("article");
-
-    wrapper.className="videoCard";
-
-
-    const title=document.createElement("h2");
-
-    title.textContent=video.title || "Untitled video";
-
-    wrapper.appendChild(title);
-
-
-    const youtubeId=getYouTubeId(url);
-
-
-    if(youtubeId){
-
-        const iframe=document.createElement("iframe");
-
-        iframe.className="videoPlayer";
-
-        iframe.src=
-            "https://www.youtube.com/embed/" +
-            encodeURIComponent(youtubeId);
-
-        iframe.title=
-            video.title || "Video";
-
-        iframe.allow=
-            "accelerometer; autoplay; clipboard-write; " +
-            "encrypted-media; gyroscope; picture-in-picture; web-share";
-
-        iframe.allowFullscreen=true;
-
-        wrapper.appendChild(iframe);
-
-    }else{
-
-        const player=document.createElement("video");
-
-        player.className="videoPlayer";
-
-        player.controls=true;
-
-        player.preload="metadata";
-
-        player.playsInline=true;
-
-        player.src=url;
-
-
-        if(video.thumbnail){
-
-            const thumbnail=normalizeUrl(video.thumbnail);
-
-            if(thumbnail){
-                player.poster=thumbnail;
-            }
+            titleElement.textContent =
+                video.title || "";
 
         }
 
 
-        wrapper.appendChild(player);
-    }
+        /*
+        Reset current source
+        */
+
+        videoElement.pause();
+
+        videoElement.removeAttribute(
+            "src"
+        );
+
+        videoElement.load();
 
 
-    return wrapper;
-}
+        /*
+        Apply source
+        */
+
+        videoElement.src =
+            video.video;
 
 
-/*-------------------------------------------------------
- Render manifest
--------------------------------------------------------*/
+        /*
+        Allow the browser to determine
+        intrinsic video dimensions.
+        */
 
-function renderVideos(manifest){
-
-    const container=get("videoList");
-
-    if(!container){
-        throw new Error("videoList element not found.");
-    }
+        videoElement.load();
 
 
-    container.innerHTML="";
+        /*
+        Update viewer state.
+        */
 
+        if (viewerElement) {
 
-    const videos=
-        manifest &&
-        Array.isArray(manifest.videos)
-            ? manifest.videos
-            : [];
-
-
-    if(!videos.length){
-
-        const empty=document.createElement("p");
-
-        empty.textContent="No videos were supplied.";
-
-        container.appendChild(empty);
-
-        return;
-    }
-
-
-    videos.forEach(function(video){
-
-        const card=renderVideo(video);
-
-        if(card){
-            container.appendChild(card);
-        }
-
-    });
-
-}
-
-
-/*-------------------------------------------------------
- Startup
--------------------------------------------------------*/
-
-async function init(){
-
-    try{
-
-        console.log("Video Viewer: initializing...");
-
-
-        if(
-            !window.VideoGlideContract ||
-            typeof window.VideoGlideContract.load!=="function"
-        ){
-
-            throw new Error(
-                "VideoGlideContract is not available."
+            viewerElement.classList.add(
+                "has-video"
             );
 
         }
 
 
-        console.log(
-            "Video Viewer: loading Glide video contract..."
+        refreshVideoLayout();
+    }
+
+
+    /*
+    -------------------------------------------------------
+     Close video
+    -------------------------------------------------------
+    */
+
+    function closeVideo() {
+
+        if (!videoElement) {
+            return;
+        }
+
+        videoElement.pause();
+
+        videoElement.removeAttribute(
+            "src"
         );
 
+        videoElement.load();
 
-        const manifest=
-            await window.VideoGlideContract.load();
+        currentVideo =
+            null;
 
 
-        if(!manifest){
+        if (titleElement) {
+            titleElement.textContent = "";
+        }
 
-            throw new Error(
-                "No video contract was found."
+
+        if (viewerElement) {
+
+            viewerElement.classList.remove(
+                "has-video"
             );
+
+        }
+    }
+
+
+    /*
+    -------------------------------------------------------
+     Metadata
+    -------------------------------------------------------
+    */
+
+    function handleMetadata() {
+
+        const width =
+            videoElement.videoWidth;
+
+        const height =
+            videoElement.videoHeight;
+
+
+        if (!width || !height) {
+            return;
+        }
+
+
+        const ratio =
+            width / height;
+
+
+        /*
+        Store the detected ratio on the
+        viewer for CSS/debugging/future use.
+        */
+
+        if (viewerElement) {
+
+            viewerElement.dataset.videoWidth =
+                width;
+
+            viewerElement.dataset.videoHeight =
+                height;
+
+            viewerElement.dataset.videoRatio =
+                ratio;
 
         }
 
 
-        console.log(
-            "Video Viewer: contract loaded.",
-            manifest
-        );
-
-
-        renderVideos(manifest);
-
-
-        console.log(
-            "Video Viewer: videos rendered."
-        );
-
-
-    }catch(error){
-
-        console.error(
-            "Video Viewer initialization failed:",
-            error
-        );
-
-
-        showError(
-            error && error.message
-                ? error.message
-                : "Unable to load videos."
-        );
-
-
-    }finally{
-
-        /*
-        IMPORTANT:
-
-        Never leave the startup screen permanently visible.
-        */
-
-        hideLoading();
-
+        refreshVideoLayout();
     }
 
-}
+
+    /*
+    -------------------------------------------------------
+     Refresh video layout
+    -------------------------------------------------------
+    */
+
+    function refreshVideoLayout() {
+
+        if (!viewerElement || !videoElement) {
+            return;
+        }
 
 
-/*-------------------------------------------------------
- Start after DOM is ready
--------------------------------------------------------*/
+        /*
+        The viewer itself never changes size
+        because of the video.
 
-if(document.readyState==="loading"){
+        The video is constrained inside it.
+        */
 
-    document.addEventListener(
-        "DOMContentLoaded",
-        init
-    );
+        videoElement.style.maxWidth =
+            "100%";
 
-}else{
+        videoElement.style.maxHeight =
+            "100%";
 
-    init();
+        videoElement.style.width =
+            "100%";
 
-}
+        videoElement.style.height =
+            "100%";
+
+        videoElement.style.objectFit =
+            "contain";
+    }
+
+
+    /*
+    -------------------------------------------------------
+     Playback
+    -------------------------------------------------------
+    */
+
+    function play() {
+
+        if (!videoElement) {
+            return;
+        }
+
+        return videoElement.play();
+    }
+
+
+    function pause() {
+
+        if (!videoElement) {
+            return;
+        }
+
+        videoElement.pause();
+    }
+
+
+    function togglePlay() {
+
+        if (!videoElement) {
+            return;
+        }
+
+        if (videoElement.paused) {
+            return play();
+        }
+
+        pause();
+    }
+
+
+    /*
+    -------------------------------------------------------
+     Mute
+    -------------------------------------------------------
+    */
+
+    function setMuted(value) {
+
+        if (!videoElement) {
+            return;
+        }
+
+        videoElement.muted =
+            Boolean(value);
+    }
+
+
+    function toggleMute() {
+
+        if (!videoElement) {
+            return;
+        }
+
+        videoElement.muted =
+            !videoElement.muted;
+    }
+
+
+    /*
+    -------------------------------------------------------
+     Fullscreen
+    -------------------------------------------------------
+    */
+
+    function fullscreen() {
+
+        if (!videoElement) {
+            return;
+        }
+
+        if (
+            document.fullscreenElement
+        ) {
+
+            document.exitFullscreen();
+
+            return;
+        }
+
+
+        if (
+            videoElement.requestFullscreen
+        ) {
+
+            videoElement.requestFullscreen();
+
+        }
+    }
+
+
+    /*
+    -------------------------------------------------------
+     Current video
+    -------------------------------------------------------
+    */
+
+    function getCurrentVideo() {
+
+        return currentVideo;
+    }
+
+
+    /*
+    -------------------------------------------------------
+     Public API
+    -------------------------------------------------------
+    */
+
+    return {
+
+        init,
+        openVideo,
+        closeVideo,
+
+        play,
+        pause,
+        togglePlay,
+
+        setMuted,
+        toggleMute,
+
+        fullscreen,
+
+        getCurrentVideo
+
+    };
 
 })();
