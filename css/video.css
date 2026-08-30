@@ -1,339 +1,347 @@
-/* =========================================================
-   Video Viewer — Phase 2
-   Minimal responsive video presentation
-   ========================================================= */
+/*
+=========================================================
+
+ SkyReader Video Section
+
+=========================================================
+*/
 
 
-/* ---------------------------------------------------------
-   Base
-   --------------------------------------------------------- */
+/*-------------------------------------------------------
+ Video Section
+-------------------------------------------------------*/
 
-html,
-body{
-    width:100%;
-    height:100%;
-    margin:0;
-    padding:0;
-    overflow:hidden;
-}
+.video-section {
 
-body{
-    font-family:Inter,Arial,sans-serif;
-    background:#eef1f5;
-}
+    width: 100%;
+    height: 100%;
 
+    min-width: 0;
+    min-height: 0;
 
-/* ---------------------------------------------------------
-   Startup loading screen
-   --------------------------------------------------------- */
+    display: flex;
 
-#reloadScreen{
-    position:fixed;
-    inset:0;
-    z-index:999999;
-
-    display:flex;
-    align-items:center;
-    justify-content:center;
-
-    background:#eef1f5;
-
-    opacity:1;
-    transition:opacity .35s ease;
-
-    pointer-events:auto;
-}
-
-#reloadScreen.isReady{
-    opacity:0;
-    pointer-events:none;
-}
-
-#reloadScreen img{
-    width:auto;
-    height:100%;
-    max-width:100%;
-    object-fit:cover;
-}
-
-#reloadScreen .reloadFallback{
-    font:600 16px/1.4 Inter,Arial,sans-serif;
-    color:#66707a;
-    text-align:center;
-    padding:24px;
+    overflow: hidden;
 }
 
 
-/* ---------------------------------------------------------
-   Main video viewer
-   --------------------------------------------------------- */
+/*-------------------------------------------------------
+ Library
+-------------------------------------------------------*/
 
-#videoViewer{
-    width:100%;
-    height:100%;
+.video-library {
 
-    box-sizing:border-box;
+    width: 320px;
 
-    display:flex;
-    flex-direction:column;
+    flex: 0 0 320px;
 
-    overflow:hidden;
+    min-width: 0;
+    min-height: 0;
+
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 
-/* ---------------------------------------------------------
-   Video list
-   --------------------------------------------------------- */
+/*-------------------------------------------------------
+ Library Header
+-------------------------------------------------------*/
 
-#videoList{
-    width:100%;
-    height:100%;
+.video-library-header {
 
-    box-sizing:border-box;
+    display: flex;
 
-    display:flex;
-    flex-direction:column;
-    align-items:center;
+    align-items: center;
 
-    overflow-y:auto;
-    overflow-x:hidden;
+    justify-content: space-between;
 
-    padding:24px;
-    gap:28px;
-
-    scrollbar-width:thin;
+    padding: 12px 16px;
 }
 
 
-/* ---------------------------------------------------------
-   Individual video card
-   --------------------------------------------------------- */
+.video-library-title {
 
-.videoCard{
-    width:min(100%,1100px);
+    margin: 0;
 
-    box-sizing:border-box;
-
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-
-    flex:0 0 auto;
+    font-size: 18px;
 }
 
 
-/* ---------------------------------------------------------
-   Video title
-   --------------------------------------------------------- */
+/*-------------------------------------------------------
+ Library Grid
+-------------------------------------------------------*/
 
-.videoCard h2{
-    width:100%;
+.video-library-grid {
 
-    margin:0 0 14px;
+    display: grid;
 
-    text-align:center;
+    grid-template-columns:
+        repeat(2, minmax(0, 1fr));
 
-    font-size:clamp(18px,2vw,26px);
-    line-height:1.25;
-    font-weight:600;
+    gap: 12px;
 
-    color:#222;
+    padding: 12px;
 }
 
 
-/* ---------------------------------------------------------
-   Video player
-   --------------------------------------------------------- */
+/*-------------------------------------------------------
+ Video Card
+-------------------------------------------------------*/
 
-.videoPlayer{
-    display:block;
+.video-card {
 
-    width:auto;
-    max-width:100%;
+    appearance: none;
+
+    border: 0;
+
+    padding: 0;
+
+    margin: 0;
+
+    background: transparent;
+
+    text-align: left;
+
+    cursor: pointer;
+
+    min-width: 0;
+}
+
+
+.video-card-thumbnail {
+
+    position: relative;
+
+    width: 100%;
+
+    aspect-ratio: 16 / 9;
+
+    overflow: hidden;
+
+    background: #222;
+
+}
+
+
+.video-card-thumbnail img {
+
+    display: block;
+
+    width: 100%;
+    height: 100%;
+
+    object-fit: cover;
+}
+
+
+.video-card-no-thumbnail {
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    color: white;
+
+    font-size: 12px;
+}
+
+
+/*-------------------------------------------------------
+ Play Indicator
+-------------------------------------------------------*/
+
+.video-card-play {
+
+    position: absolute;
+
+    left: 50%;
+    top: 50%;
+
+    transform:
+        translate(-50%, -50%);
+
+    width: 42px;
+    height: 42px;
+
+    border-radius: 50%;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    background: rgba(0,0,0,.55);
+
+    color: white;
+
+    font-size: 16px;
+}
+
+
+/*-------------------------------------------------------
+ Card Information
+-------------------------------------------------------*/
+
+.video-card-info {
+
+    padding-top: 7px;
+}
+
+
+.video-card-title {
+
+    font-size: 14px;
+
+    line-height: 1.25;
+
+    overflow: hidden;
+
+    text-overflow: ellipsis;
+
+    white-space: nowrap;
+}
+
+
+.video-card-meta {
+
+    margin-top: 3px;
+
+    font-size: 11px;
+
+    opacity: .65;
+}
+
+
+/*-------------------------------------------------------
+ Selected Card
+-------------------------------------------------------*/
+
+.video-card.selected
+.video-card-title {
+
+    font-weight: 600;
+}
+
+
+/*-------------------------------------------------------
+ Viewer
+-------------------------------------------------------*/
+
+.video-viewer {
+
+    position: relative;
+
+    flex: 1 1 auto;
+
+    min-width: 0;
+    min-height: 0;
+
+    width: 100%;
+    height: 100%;
+
+    overflow: hidden;
 
     /*
-       The important constraint:
+    This is YOUR designed background.
 
-       Keep the entire video inside the available
-       viewport while preserving its natural aspect ratio.
+    It belongs to the viewer, not the
+    video element.
     */
 
-    max-height:calc(100vh - 120px);
+    background: #111;
 
-    height:auto;
+    display: flex;
 
-    aspect-ratio:16 / 9;
-
-    object-fit:contain;
-
-    background:#000;
-
-    border-radius:8px;
-
-    box-shadow:0 4px 18px rgba(0,0,0,.16);
+    align-items: center;
+    justify-content: center;
 }
 
 
-/* ---------------------------------------------------------
-   Native <video> element
+/*-------------------------------------------------------
+ Video
+-------------------------------------------------------*/
 
-   Do not force a fixed width/height. The browser should
-   preserve the video's intrinsic aspect ratio.
-   --------------------------------------------------------- */
+.video-player {
 
-video.videoPlayer{
-    width:auto;
-    height:auto;
-
-    max-width:100%;
-    max-height:calc(100vh - 120px);
-
-    object-fit:contain;
-}
-
-
-/* ---------------------------------------------------------
-   YouTube iframe
-   --------------------------------------------------------- */
-
-iframe.videoPlayer{
-    width:min(100%,1100px);
+    display: block;
 
     /*
-       16:9 responsive ratio.
+    Never allow the video to determine
+    the size of the viewer.
     */
 
-    aspect-ratio:16 / 9;
+    width: 100%;
+    height: 100%;
 
-    height:auto;
+    max-width: 100%;
+    max-height: 100%;
 
-    border:0;
+    /*
+    Preserve the actual video aspect ratio.
+    */
 
-    background:#000;
+    object-fit: contain;
+
+    /*
+    Important:
+
+    The video itself does NOT supply
+    the background.
+    */
+
+    background: transparent;
 }
 
 
-/* ---------------------------------------------------------
-   Error message
-   --------------------------------------------------------- */
+/*-------------------------------------------------------
+ Viewer Title
+-------------------------------------------------------*/
 
-#videoError{
-    width:min(100% - 32px,700px);
+.video-viewer-title {
 
-    box-sizing:border-box;
+    position: absolute;
 
-    margin:24px auto;
-    padding:14px 18px;
+    left: 16px;
+    top: 16px;
 
-    border-radius:8px;
+    z-index: 5;
 
-    background:#fff;
-
-    color:#a33;
-
-    font-size:15px;
-    line-height:1.45;
-
-    box-shadow:0 2px 10px rgba(0,0,0,.08);
+    pointer-events: none;
 }
 
 
-/* ---------------------------------------------------------
-   Narrow / mobile screens
-   --------------------------------------------------------- */
+/*-------------------------------------------------------
+ Narrow Layout
+-------------------------------------------------------*/
 
-@media (max-width:700px){
+@media (max-width: 800px) {
 
-    #videoList{
-        padding:12px;
-        gap:20px;
+    .video-section {
+
+        position: relative;
     }
 
 
-    .videoCard{
-        width:100%;
+    .video-library {
+
+        position: absolute;
+
+        left: 0;
+        top: 0;
+        bottom: 0;
+
+        width: min(320px, 88vw);
+
+        z-index: 20;
+
+        background: inherit;
     }
 
 
-    .videoCard h2{
-        margin-bottom:10px;
+    .video-viewer {
 
-        font-size:18px;
+        width: 100%;
+        height: 100%;
     }
-
-
-    .videoPlayer{
-        width:100%;
-        max-width:100%;
-
-        border-radius:4px;
-
-        /*
-           Leave enough room for the title and browser/
-           embed surroundings.
-        */
-
-        max-height:calc(100vh - 90px);
-    }
-
-
-    video.videoPlayer{
-        width:100%;
-        height:auto;
-
-        max-height:calc(100vh - 90px);
-    }
-
-
-    iframe.videoPlayer{
-        width:100%;
-        height:auto;
-
-        aspect-ratio:16 / 9;
-    }
-
-}
-
-
-/* ---------------------------------------------------------
-   Very short landscape screens
-   --------------------------------------------------------- */
-
-@media (max-height:500px) and (orientation:landscape){
-
-    #videoList{
-        padding:8px 16px;
-        gap:16px;
-    }
-
-
-    .videoCard h2{
-        margin-bottom:6px;
-
-        font-size:16px;
-    }
-
-
-    .videoPlayer{
-        max-height:calc(100vh - 55px);
-    }
-
-
-    video.videoPlayer{
-        max-height:calc(100vh - 55px);
-    }
-
-}
-
-
-/* ---------------------------------------------------------
-   Reduced motion
-   --------------------------------------------------------- */
-
-@media (prefers-reduced-motion:reduce){
-
-    #reloadScreen{
-        transition:none;
-    }
-
 }
