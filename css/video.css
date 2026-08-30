@@ -1,0 +1,339 @@
+/* =========================================================
+   Video Viewer — Phase 2
+   Minimal responsive video presentation
+   ========================================================= */
+
+
+/* ---------------------------------------------------------
+   Base
+   --------------------------------------------------------- */
+
+html,
+body{
+    width:100%;
+    height:100%;
+    margin:0;
+    padding:0;
+    overflow:hidden;
+}
+
+body{
+    font-family:Inter,Arial,sans-serif;
+    background:#eef1f5;
+}
+
+
+/* ---------------------------------------------------------
+   Startup loading screen
+   --------------------------------------------------------- */
+
+#reloadScreen{
+    position:fixed;
+    inset:0;
+    z-index:999999;
+
+    display:flex;
+    align-items:center;
+    justify-content:center;
+
+    background:#eef1f5;
+
+    opacity:1;
+    transition:opacity .35s ease;
+
+    pointer-events:auto;
+}
+
+#reloadScreen.isReady{
+    opacity:0;
+    pointer-events:none;
+}
+
+#reloadScreen img{
+    width:auto;
+    height:100%;
+    max-width:100%;
+    object-fit:cover;
+}
+
+#reloadScreen .reloadFallback{
+    font:600 16px/1.4 Inter,Arial,sans-serif;
+    color:#66707a;
+    text-align:center;
+    padding:24px;
+}
+
+
+/* ---------------------------------------------------------
+   Main video viewer
+   --------------------------------------------------------- */
+
+#videoViewer{
+    width:100%;
+    height:100%;
+
+    box-sizing:border-box;
+
+    display:flex;
+    flex-direction:column;
+
+    overflow:hidden;
+}
+
+
+/* ---------------------------------------------------------
+   Video list
+   --------------------------------------------------------- */
+
+#videoList{
+    width:100%;
+    height:100%;
+
+    box-sizing:border-box;
+
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+
+    overflow-y:auto;
+    overflow-x:hidden;
+
+    padding:24px;
+    gap:28px;
+
+    scrollbar-width:thin;
+}
+
+
+/* ---------------------------------------------------------
+   Individual video card
+   --------------------------------------------------------- */
+
+.videoCard{
+    width:min(100%,1100px);
+
+    box-sizing:border-box;
+
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+
+    flex:0 0 auto;
+}
+
+
+/* ---------------------------------------------------------
+   Video title
+   --------------------------------------------------------- */
+
+.videoCard h2{
+    width:100%;
+
+    margin:0 0 14px;
+
+    text-align:center;
+
+    font-size:clamp(18px,2vw,26px);
+    line-height:1.25;
+    font-weight:600;
+
+    color:#222;
+}
+
+
+/* ---------------------------------------------------------
+   Video player
+   --------------------------------------------------------- */
+
+.videoPlayer{
+    display:block;
+
+    width:auto;
+    max-width:100%;
+
+    /*
+       The important constraint:
+
+       Keep the entire video inside the available
+       viewport while preserving its natural aspect ratio.
+    */
+
+    max-height:calc(100vh - 120px);
+
+    height:auto;
+
+    aspect-ratio:16 / 9;
+
+    object-fit:contain;
+
+    background:#000;
+
+    border-radius:8px;
+
+    box-shadow:0 4px 18px rgba(0,0,0,.16);
+}
+
+
+/* ---------------------------------------------------------
+   Native <video> element
+
+   Do not force a fixed width/height. The browser should
+   preserve the video's intrinsic aspect ratio.
+   --------------------------------------------------------- */
+
+video.videoPlayer{
+    width:auto;
+    height:auto;
+
+    max-width:100%;
+    max-height:calc(100vh - 120px);
+
+    object-fit:contain;
+}
+
+
+/* ---------------------------------------------------------
+   YouTube iframe
+   --------------------------------------------------------- */
+
+iframe.videoPlayer{
+    width:min(100%,1100px);
+
+    /*
+       16:9 responsive ratio.
+    */
+
+    aspect-ratio:16 / 9;
+
+    height:auto;
+
+    border:0;
+
+    background:#000;
+}
+
+
+/* ---------------------------------------------------------
+   Error message
+   --------------------------------------------------------- */
+
+#videoError{
+    width:min(100% - 32px,700px);
+
+    box-sizing:border-box;
+
+    margin:24px auto;
+    padding:14px 18px;
+
+    border-radius:8px;
+
+    background:#fff;
+
+    color:#a33;
+
+    font-size:15px;
+    line-height:1.45;
+
+    box-shadow:0 2px 10px rgba(0,0,0,.08);
+}
+
+
+/* ---------------------------------------------------------
+   Narrow / mobile screens
+   --------------------------------------------------------- */
+
+@media (max-width:700px){
+
+    #videoList{
+        padding:12px;
+        gap:20px;
+    }
+
+
+    .videoCard{
+        width:100%;
+    }
+
+
+    .videoCard h2{
+        margin-bottom:10px;
+
+        font-size:18px;
+    }
+
+
+    .videoPlayer{
+        width:100%;
+        max-width:100%;
+
+        border-radius:4px;
+
+        /*
+           Leave enough room for the title and browser/
+           embed surroundings.
+        */
+
+        max-height:calc(100vh - 90px);
+    }
+
+
+    video.videoPlayer{
+        width:100%;
+        height:auto;
+
+        max-height:calc(100vh - 90px);
+    }
+
+
+    iframe.videoPlayer{
+        width:100%;
+        height:auto;
+
+        aspect-ratio:16 / 9;
+    }
+
+}
+
+
+/* ---------------------------------------------------------
+   Very short landscape screens
+   --------------------------------------------------------- */
+
+@media (max-height:500px) and (orientation:landscape){
+
+    #videoList{
+        padding:8px 16px;
+        gap:16px;
+    }
+
+
+    .videoCard h2{
+        margin-bottom:6px;
+
+        font-size:16px;
+    }
+
+
+    .videoPlayer{
+        max-height:calc(100vh - 55px);
+    }
+
+
+    video.videoPlayer{
+        max-height:calc(100vh - 55px);
+    }
+
+}
+
+
+/* ---------------------------------------------------------
+   Reduced motion
+   --------------------------------------------------------- */
+
+@media (prefers-reduced-motion:reduce){
+
+    #reloadScreen{
+        transition:none;
+    }
+
+}
