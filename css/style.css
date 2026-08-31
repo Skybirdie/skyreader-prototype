@@ -89,7 +89,6 @@ body{
   flex-direction:column;
   overflow:hidden;
   background:var(--panel);
-  padding:clamp(4px,1vh,10px) 0;
 }
 
 #topBar{
