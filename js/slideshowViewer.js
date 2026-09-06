@@ -3,6 +3,7 @@
 window.SlideshowViewer = (function () {
     let root, stage, title, status, audio, landing, current = null, index = 0, timer = null, playing = false, muted = false, transitionBusy = false;
     let audioMode = "none";
+    let audioCompleted = false;
     let musicAudio = null;
     let effectAudio = null;
     const EFFECT_URL = "assets/audio/slide.mp3";
@@ -36,8 +37,12 @@ window.SlideshowViewer = (function () {
             }, true);
         }
         audio?.addEventListener("ended", () => {
-            if (audioMode === "original" && current?.audio && playing) { audio.currentTime = 0; audio.play().catch(() => {}); }
-            if (audioMode === "music" && musicAudio?.src && playing) { musicAudio.currentTime = 0; musicAudio.play().catch(() => {}); }
+            if (audioMode === "original" && current?.audio) {
+                audioCompleted = true;
+                // Do not restart the audio. The slideshow may continue
+                // through the remaining slides until it reaches the end.
+                if (playing && slideCount() && index >= slideCount() - 1) finish();
+            }
         });
         window.addEventListener("resize", refreshLayout);
         renderLanding();
@@ -333,9 +338,20 @@ function stopForMediaManager() {
 
     function startSelectedAudio(){
         stopAudio();
+        audioCompleted=false;
         if(!current)return;
         if(audioMode === "original" && current.audio && audio){ audio.src=current.audio; audio.muted=muted; audio.load(); if(playing)audio.play().catch(()=>{}); }
-        else if(audioMode === "music" && MUSIC_LIBRARY.length){ const track=MUSIC_LIBRARY[0]; musicAudio=new Audio(track.url); musicAudio.loop=true; musicAudio.muted=muted; if(playing)musicAudio.play().catch(()=>{}); }
+        else if(audioMode === "music" && MUSIC_LIBRARY.length){
+            const track=MUSIC_LIBRARY[0];
+            musicAudio=new Audio(track.url);
+            musicAudio.loop=false;
+            musicAudio.muted=muted;
+            musicAudio.addEventListener("ended",()=>{
+                audioCompleted=true;
+                if(playing && slideCount() && index >= slideCount() - 1) finish();
+            });
+            if(playing)musicAudio.play().catch(()=>{});
+        }
     }
     function setAudioMode(mode){
         const select=document.getElementById("slideshowAudioMode");
@@ -400,10 +416,24 @@ function stopForMediaManager() {
     function next(fromTimer=false){
         if(!current)return;
         const total=slideCount();
+        if(!total)return;
 
         if(index<total-1){
             if(audioMode==="effects") playSound(EFFECT_URL);
             show(index+1,1,fromTimer);
+            return;
+        }
+
+        // While selected original/music audio is still playing, repeat the
+        // slide sequence. Once that audio has actually ended, continue only
+        // forward to the final slide and finish there.
+        const audioIsDrivingPlayback =
+            (audioMode === "original" || audioMode === "music") &&
+            !audioCompleted;
+
+        if(audioIsDrivingPlayback){
+            if(audioMode==="effects") playSound(EFFECT_URL);
+            show(0,1,fromTimer);
         }else if(playing){
             finish();
         }
