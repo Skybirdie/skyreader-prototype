@@ -47,6 +47,7 @@
    - compact Glide object lists
    - Markdown-wrapped URLs
    - comma-separated Markdown URLs
+   - comma-separated plain URLs (e.g. multiple images)
    - legacy book/video/slideshow structures
    - missing optional fields
    - malformed individual content items
@@ -346,6 +347,182 @@ window.GlideContract = (function () {
     }
 
 
+    /*
+     ---------------------------------------------------
+     Safe "compact key" fixer
+
+     Converts:
+
+       {id:"1",type:"book"}
+
+     into:
+
+       {"id":"1","type":"book"}
+
+     IMPORTANT — string-safety:
+
+     A naive global regex here is dangerous. Content values
+     can legitimately contain a comma followed by something
+     that LOOKS like "identifier:" — most commonly a comma-
+     separated list of image URLs, where one entry starts
+     with "https:".
+
+     Example of the failure this fix prevents:
+
+       "media":"https://a/one.png, https://b/two.png"
+
+     A naive regex sees the comma inside that string,
+     followed by "https" and ":", and "fixes" it into:
+
+       "media":"https://a/one.png, "https"://b/two.png"
+
+     — which corrupts the URL and breaks JSON.parse.
+
+     The fix: mask out every already-quoted string first, so
+     the key-fixing regex can never see inside a string
+     value, then restore the strings afterward untouched.
+     ---------------------------------------------------
+    */
+
+    function quoteUnquotedKeys(source) {
+
+        const strings = [];
+
+        const masked = source.replace(
+            /"(?:[^"\\]|\\.)*"/g,
+            (match) => {
+                strings.push(match);
+                return "\u0000" + (strings.length - 1) + "\u0000";
+            }
+        );
+
+        const fixed = masked.replace(
+            /([{,])\s*([A-Za-z_$][\w$]*)\s*:/g,
+            '$1"$2":'
+        );
+
+        return fixed.replace(
+            /\u0000(\d+)\u0000/g,
+            (match, index) => strings[Number(index)]
+        );
+    }
+
+
+    /*
+     ---------------------------------------------------
+     Splits the (already unwrapped) inner content of an
+     array into the substrings for each top-level {...}
+     object, without being fooled by braces, commas, or
+     quotes that live inside string values.
+     ---------------------------------------------------
+    */
+
+    function splitTopLevelObjects(arrayInnerText) {
+
+        const objects = [];
+
+        let depth = 0;
+        let inString = false;
+        let escaped = false;
+        let start = -1;
+
+        for (let i = 0; i < arrayInnerText.length; i++) {
+
+            const ch = arrayInnerText[i];
+
+            if (inString) {
+
+                if (escaped) {
+                    escaped = false;
+                } else if (ch === "\\") {
+                    escaped = true;
+                } else if (ch === '"') {
+                    inString = false;
+                }
+
+                continue;
+            }
+
+            if (ch === '"') {
+                inString = true;
+                continue;
+            }
+
+            if (ch === "{") {
+
+                if (depth === 0) {
+                    start = i;
+                }
+
+                depth++;
+
+            } else if (ch === "}") {
+
+                depth--;
+
+                if (depth === 0 && start >= 0) {
+                    objects.push(arrayInnerText.slice(start, i + 1));
+                    start = -1;
+                }
+            }
+        }
+
+        return objects;
+    }
+
+
+    /*
+     ---------------------------------------------------
+     Parses an already-bracketed "[{...},{...}]" array
+     text. If the whole array fails to parse (one bad
+     item can otherwise take the entire batch down with
+     it), falls back to parsing each top-level object
+     independently and keeps whichever ones succeed.
+     ---------------------------------------------------
+    */
+
+    function parseArrayResilient(normalized) {
+
+        const whole = parseJsonText(normalized);
+
+        if (whole) {
+            return whole;
+        }
+
+        const inner = normalized
+            .trim()
+            .replace(/^\[/, "")
+            .replace(/\]$/, "");
+
+        const chunks = splitTopLevelObjects(inner);
+
+        const recovered = [];
+
+        chunks.forEach((chunk, index) => {
+
+            try {
+
+                recovered.push(
+                    JSON.parse(chunk)
+                );
+
+            } catch (error) {
+
+                console.warn(
+                    "[GlideContract] Skipping unparseable content item",
+                    index,
+                    error
+                );
+            }
+
+        });
+
+        return recovered.length
+            ? parseObject(recovered)
+            : null;
+    }
+
+
     function parseCompactText(text) {
 
         let normalized = cleanString(text);
@@ -385,12 +562,12 @@ window.GlideContract = (function () {
          into:
 
            {"id":"1","type":"book"}
+
+         — safely, without reaching inside string values
+         (see quoteUnquotedKeys above).
         */
 
-        normalized = normalized.replace(
-            /([{,])\s*([A-Za-z_$][\w$]*)\s*:/g,
-            '$1"$2":'
-        );
+        normalized = quoteUnquotedKeys(normalized);
 
         /*
          Convert a comma-separated list of objects
@@ -424,7 +601,7 @@ window.GlideContract = (function () {
             normalized = "[" + normalized + "]";
         }
 
-        const parsed = parseJsonText(normalized);
+        const parsed = parseArrayResilient(normalized);
 
         if (!parsed) {
 
