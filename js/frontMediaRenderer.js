@@ -154,22 +154,252 @@ function openFull(item){
         controlsRight.appendChild(control("fullscreen","Open full viewer",()=>openFull(item)));
     }
     function renderVideo(item,token){
-        const ui=shell(item,"video");
-        const video=document.createElement("video"); video.className="front-media-video"; video.src=(typeof item.raw.video === "string" ? item.raw.video : item.raw.video?.url)||item.raw.videoUrl||item.raw.media||item.raw.url||""; video.preload="metadata"; video.playsInline=true; video.controls=false; video.setAttribute("aria-label",item.title||"Video");
-        ui.content.appendChild(video);
-        const play=control("play","Play video",b=>{if(video.paused) video.play().catch(()=>{}); else video.pause();});
-        const mute=control("volume","Mute video",()=>{video.muted=!video.muted; mute.innerHTML=""; mute.appendChild(icon(video.muted?"volume-off":"volume")); mute.title=video.muted?"Unmute video":"Mute video"; mute.setAttribute("aria-label",mute.title);});
-        const progress=document.createElement("input"); progress.type="range"; progress.min="0"; progress.max="100"; progress.value="0"; progress.step="0.1"; progress.className="front-media-progress"; progress.setAttribute("aria-label","Video progress");
-        progress.addEventListener("input",()=>{if(video.duration)video.currentTime=(Number(progress.value)/100)*video.duration;});
-        ui.controlsLeft.append(mute);
-        ui.controlsCenter.append(play,progress);
-        addOpenControl(ui.controlsRight,item);
-        const sync=()=>{play.innerHTML="";play.appendChild(icon(video.paused?"play":"pause"));play.title=video.paused?"Play video":"Pause video";play.setAttribute("aria-label",play.title); if(video.duration)progress.value=(video.currentTime/video.duration)*100; ui.status.textContent=video.duration?`${formatTime(video.currentTime)} / ${formatTime(video.duration)}`:"";};
-        ["play","pause","timeupdate","loadedmetadata","ended"].forEach(e=>video.addEventListener(e,sync));
-        video.addEventListener("ended",()=>{progress.value=100;});
-        cleanupFn=()=>{video.pause();video.removeAttribute("src");video.load();};
-        sync();
+    const ui=shell(item,"video");
+
+    /*
+     * New Content Contract:
+     *   media = video URL
+     *
+     * Legacy/runtime compatibility fields are retained only as
+     * fallbacks. The centerpiece must not depend on them.
+     */
+    function resolveVideoMedia(value){
+        if(value == null) return "";
+
+        // Normal canonical form:
+        // media: "https://example.com/video.mp4"
+        if(typeof value === "string"){
+            let url=value.trim();
+
+            if(!url) return "";
+
+            // Glide may wrap URLs as:
+            // [URL](URL)
+            const markdownMatch=url.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+            if(markdownMatch){
+                url=markdownMatch[2].trim() || markdownMatch[1].trim();
+            }
+
+            return url;
+        }
+
+        // Defensive compatibility for an object-shaped media value.
+        if(typeof value === "object"){
+            if(typeof value.url === "string"){
+                return resolveVideoMedia(value.url);
+            }
+
+            if(typeof value.video === "string"){
+                return resolveVideoMedia(value.video);
+            }
+
+            if(typeof value.media === "string"){
+                return resolveVideoMedia(value.media);
+            }
+        }
+
+        // Defensive handling if something incorrectly arrives as an array.
+        if(Array.isArray(value)){
+            return value.length ? resolveVideoMedia(value[0]) : "";
+        }
+
+        return "";
     }
+
+    const raw=item?.raw || item || {};
+
+    // NEW CONTRACT IS AUTHORITATIVE:
+    // media -> video URL
+    let videoUrl=resolveVideoMedia(raw.media);
+
+    // Runtime/legacy fallbacks only.
+    if(!videoUrl){
+        videoUrl=resolveVideoMedia(raw.video);
+    }
+
+    if(!videoUrl){
+        videoUrl=resolveVideoMedia(raw.videoUrl);
+    }
+
+    if(!videoUrl){
+        videoUrl=resolveVideoMedia(raw.url);
+    }
+
+    console.log(
+        "[FrontMediaRenderer] Video centerpiece:",
+        {
+            id:item?.id,
+            title:item?.title,
+            media:raw.media,
+            resolvedVideoUrl:videoUrl
+        }
+    );
+
+    const video=document.createElement("video");
+
+    video.className="front-media-video";
+    video.preload="metadata";
+    video.playsInline=true;
+    video.controls=false;
+    video.setAttribute("aria-label",item.title||"Video");
+
+    if(videoUrl){
+        video.src=videoUrl;
+    }else{
+        console.error(
+            "[FrontMediaRenderer] No video media URL found.",
+            raw
+        );
+    }
+
+    ui.content.appendChild(video);
+
+    const play=control(
+        "play",
+        "Play video",
+        b=>{
+            if(video.paused){
+                video.play().catch(error=>{
+                    console.warn(
+                        "[FrontMediaRenderer] Video play failed.",
+                        error
+                    );
+                });
+            }else{
+                video.pause();
+            }
+        }
+    );
+
+    const mute=control(
+        "volume",
+        "Mute video",
+        ()=>{
+            video.muted=!video.muted;
+
+            mute.innerHTML="";
+            mute.appendChild(
+                icon(video.muted?"volume-off":"volume")
+            );
+
+            mute.title=
+                video.muted
+                    ?"Unmute video"
+                    :"Mute video";
+
+            mute.setAttribute(
+                "aria-label",
+                mute.title
+            );
+        }
+    );
+
+    const progress=document.createElement("input");
+
+    progress.type="range";
+    progress.min="0";
+    progress.max="100";
+    progress.value="0";
+    progress.step="0.1";
+    progress.className="front-media-progress";
+    progress.setAttribute(
+        "aria-label",
+        "Video progress"
+    );
+
+    progress.addEventListener(
+        "input",
+        ()=>{
+            if(video.duration){
+                video.currentTime=
+                    (Number(progress.value)/100)*
+                    video.duration;
+            }
+        }
+    );
+
+    ui.controlsLeft.append(mute);
+    ui.controlsCenter.append(play,progress);
+
+    addOpenControl(
+        ui.controlsRight,
+        item
+    );
+
+    const sync=()=>{
+        play.innerHTML="";
+
+        play.appendChild(
+            icon(
+                video.paused
+                    ?"play"
+                    :"pause"
+            )
+        );
+
+        play.title=
+            video.paused
+                ?"Play video"
+                :"Pause video";
+
+        play.setAttribute(
+            "aria-label",
+            play.title
+        );
+
+        if(video.duration){
+            progress.value=
+                (video.currentTime/video.duration)*100;
+        }
+
+        ui.status.textContent=
+            video.duration
+                ?`${formatTime(video.currentTime)} / ${formatTime(video.duration)}`
+                :"";
+    };
+
+    [
+        "play",
+        "pause",
+        "timeupdate",
+        "loadedmetadata",
+        "ended"
+    ].forEach(event=>{
+        video.addEventListener(event,sync);
+    });
+
+    video.addEventListener(
+        "ended",
+        ()=>{
+            progress.value=100;
+        }
+    );
+
+    video.addEventListener(
+        "error",
+        ()=>{
+            console.error(
+                "[FrontMediaRenderer] Centerpiece video failed to load.",
+                {
+                    id:item?.id,
+                    url:videoUrl,
+                    media:raw.media,
+                    error:video.error
+                }
+            );
+
+            ui.status.textContent="Video unavailable";
+        }
+    );
+
+    cleanupFn=()=>{
+        video.pause();
+        video.removeAttribute("src");
+        video.load();
+    };
+
+    sync();
+}
     function formatTime(v){if(!Number.isFinite(v))return "0:00";const m=Math.floor(v/60),s=Math.floor(v%60);return `${m}:${String(s).padStart(2,"0")}`;}
 
     /*
