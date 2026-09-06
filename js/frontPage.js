@@ -108,17 +108,26 @@ window.FrontPage = (function () {
 
         if (!category) return null;
 
+        function cleanUrl(value){
+            if(value == null) return "";
+            let url=String(value).trim();
+            if(!url) return "";
+            const match=url.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+            return (match ? (match[2] || match[1] || "") : url).trim();
+        }
+
+        const thumbnail =
+            cleanUrl(item.thumbnail) ||
+            cleanUrl(item.cover) ||
+            cleanUrl(item.slides?.[0]?.image) ||
+            cleanUrl(Array.isArray(item.media) ? item.media[0] : item.media) ||
+            "assets/default-thumbnail.png";
+
         return {
             id: String(item.id || "").trim(),
             title: String(item.title || "Untitled").trim(),
             category,
-            thumbnail: String(
-                item.thumbnail ||
-                item.cover ||
-                item.slides?.[0]?.image ||
-                (Array.isArray(item.media) ? item.media[0] : item.media) ||
-                "assets/default-thumbnail.png"
-            ).trim() || "assets/default-thumbnail.png",
+            thumbnail,
             date: window.SkyDate
                 ? SkyDate.key(item.date)
                 : String(item.date || "").trim(),

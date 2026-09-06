@@ -256,6 +256,31 @@ function openFull(item){
         }
 
         /*
+         * Thumbnails are part of the unified contract and may also
+         * arrive from Glide wrapped as Markdown links. Keep the
+         * thumbnail separate from media: it is the visual poster for
+         * MP4 video and the fallback image for failed previews.
+         */
+        function resolveThumbnail(value){
+            if(value == null) return "";
+            if(typeof value === "string"){
+                let url=value.trim();
+                if(!url) return "";
+                const match=url.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+                if(match) url=(match[2] || match[1] || "").trim();
+                return url;
+            }
+            if(typeof value === "object" && typeof value.url === "string")
+                return resolveThumbnail(value.url);
+            return "";
+        }
+
+        const thumbnailUrl=
+            resolveThumbnail(raw.thumbnail) ||
+            resolveThumbnail(item.thumbnail) ||
+            "assets/default-thumbnail.png";
+
+        /*
          * IMPORTANT:
          *
          * Keep this test aligned with VideoViewer.loadVideoPlayer().
@@ -348,6 +373,7 @@ function openFull(item){
 
         video.className="front-media-video";
         video.preload="metadata";
+        video.poster=thumbnailUrl;
         video.playsInline=true;
         video.controls=false;
         video.setAttribute(
