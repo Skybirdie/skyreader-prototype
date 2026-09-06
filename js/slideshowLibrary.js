@@ -68,7 +68,9 @@ const fallbackThumbnail = "assets/default-thumbnail.png";
 img.src = item.thumbnail || (
     item.source === "pdf"
         ? fallbackThumbnail
-        : item.slides?.[0]?.image || fallbackThumbnail
+        : item.slides?.[0]?.image ||
+          (Array.isArray(item.media) ? item.media[0] : "") ||
+          fallbackThumbnail
 );
 
 img.alt = item.title || "";

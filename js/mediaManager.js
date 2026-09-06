@@ -54,28 +54,12 @@ window.MediaManager = (function () {
     }
 
 
-const backgroundMediaToggle =
-    document.getElementById(
-        "backgroundMediaPlayback"
-    );
+/*
+     * SettingsPanel owns the actual settings control.  Do not query or bind
+     * the checkbox here because SettingsPanel creates it dynamically after
+     * this module is loaded.
+     */
 
-if (backgroundMediaToggle) {
-
-    backgroundMediaToggle.checked =
-        MediaManager.getBackgroundPlayback();
-
-    backgroundMediaToggle.addEventListener(
-        "change",
-        () => {
-
-            MediaManager.setBackgroundPlayback(
-                backgroundMediaToggle.checked
-            );
-
-        }
-    );
-
-}
 
 
     function setBackgroundPlayback(value) {

@@ -155,7 +155,7 @@ function openFull(item){
     }
     function renderVideo(item,token){
         const ui=shell(item,"video");
-        const video=document.createElement("video"); video.className="front-media-video"; video.src=item.raw.video||item.raw.videoUrl||item.raw.url||""; video.preload="metadata"; video.playsInline=true; video.controls=false; video.setAttribute("aria-label",item.title||"Video");
+        const video=document.createElement("video"); video.className="front-media-video"; video.src=(typeof item.raw.video === "string" ? item.raw.video : item.raw.video?.url)||item.raw.videoUrl||item.raw.media||item.raw.url||""; video.preload="metadata"; video.playsInline=true; video.controls=false; video.setAttribute("aria-label",item.title||"Video");
         ui.content.appendChild(video);
         const play=control("play","Play video",b=>{if(video.paused) video.play().catch(()=>{}); else video.pause();});
         const mute=control("volume","Mute video",()=>{video.muted=!video.muted; mute.innerHTML=""; mute.appendChild(icon(video.muted?"volume-off":"volume")); mute.title=video.muted?"Unmute video":"Mute video"; mute.setAttribute("aria-label",mute.title);});
@@ -185,10 +185,10 @@ function openFull(item){
     ---------------------------------------------------------
     */
     function setupAudio(item){
-        const config=item.raw && item.raw.audioConfig;
-        if(!config || !config.url) return null;
-        const audio=new Audio(config.url);
-        audio.loop=!!config.loop;
+        const url = item.raw && (typeof item.raw.audio === "string" ? item.raw.audio : item.raw.audio?.url);
+        if(!url) return null;
+        const audio=new Audio(url);
+        audio.loop=false;
         audio.muted=false;
         return audio;
     }
@@ -198,7 +198,7 @@ function openFull(item){
 async function renderSlideshow(item,token){
     const ui=shell(item,"slideshow");
 
-    const slides=Array.isArray(item.raw.slides)?item.raw.slides:[];
+    const slides=Array.isArray(item.raw.slides)?item.raw.slides.map(slide => typeof slide === "string" ? {image:slide} : slide).filter(slide => slide && slide.image):[];
 
     /*
     ---------------------------------------------------------
@@ -712,7 +712,7 @@ async function renderSlideshow(item,token){
         async function go(delta){if(!pdf||busy)return;const target=Math.max(1,Math.min(pdf.numPages,page+delta));if(target===page)return;page=target;await draw();}
         try{
             if(!window.pdfjsLib)throw new Error("PDF.js unavailable");
-            const url=item.raw.pdf||item.raw.url||item.raw.PDF||""; if(!url)throw new Error("PDF URL missing");
+            const url=item.raw.pdf||item.raw.media||item.raw.url||item.raw.PDF||""; if(!url)throw new Error("PDF URL missing");
             pdf=await pdfjsLib.getDocument({url}).promise; if(token!==generation)return; await draw();
         }catch(e){console.error("[FrontMediaRenderer] PDF preview failed",e);ui.content.innerHTML="";const img=document.createElement("img");img.className="front-media-fallback";img.src=item.thumbnail||"assets/default-thumbnail.png";img.alt=item.title||"";ui.content.appendChild(img);ui.status.textContent="PDF preview unavailable";}
         cleanupFn=()=>{pdf=null;}; update();
