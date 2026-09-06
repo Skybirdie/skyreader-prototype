@@ -807,22 +807,26 @@ const isYouTube =
 
     clearActivePlayer();
 
-    if (isYouTube) {
+if (isYouTube) {
 
-        activePlayerType = "iframe";
+    activePlayerType = "iframe";
 
-        const iframe = ensureIframePlayer();
+    const iframe = ensureIframePlayer();
 
-        iframe.src = video.video;
+    iframe.src =
+        window.ContentContract &&
+        typeof ContentContract.toYouTubeEmbedUrl === "function"
+            ? ContentContract.toYouTubeEmbedUrl(video.video)
+            : video.video;
 
-        iframe.style.display = "block";
-        iframe.style.width = "100%";
-        iframe.style.height = "100%";
-        iframe.style.maxWidth = "100%";
-        iframe.style.maxHeight = "100%";
+    iframe.style.display = "block";
+    iframe.style.width = "100%";
+    iframe.style.height = "100%";
+    iframe.style.maxWidth = "100%";
+    iframe.style.maxHeight = "100%";
 
-        return;
-    }
+    return;
+}
 
     // Everything else is treated as a normal video URL.
     activePlayerType = "video";

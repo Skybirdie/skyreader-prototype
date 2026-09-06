@@ -203,9 +203,33 @@ window.ContentContract = (function () {
     }
 
 
-    function isYouTubeUrl(value) {
-        return /youtube\.com|youtu\.be/i.test(string(value));
-    }
+function isYouTubeUrl(value) {
+    return /youtube\.com|youtu\.be/i.test(string(value));
+}
+
+
+function extractYouTubeId(value) {
+
+    const url = string(value);
+
+    // Covers: watch?v=ID, youtu.be/ID, /embed/ID, /shorts/ID,
+    // with or without extra query params/timestamps after the ID.
+    const match = url.match(
+        /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/
+    );
+
+    return match ? match[1] : "";
+}
+
+
+function toYouTubeEmbedUrl(value) {
+
+    const id = extractYouTubeId(value);
+
+    return id
+        ? `https://www.youtube.com/embed/${id}`
+        : string(value);
+}
 
 
     function isVideoUrl(value) {
@@ -942,6 +966,12 @@ window.ContentContract = (function () {
 
     api.isYouTubeUrl =
         isYouTubeUrl;
+
+api.isYouTubeUrl =
+    isYouTubeUrl;
+
+api.toYouTubeEmbedUrl =
+    toYouTubeEmbedUrl;
 
     api.unwrapMarkdownUrl =
         markdownUrl;
