@@ -93,7 +93,7 @@ html[data-theme="dark"] #frontPage{
     transition:filter .22s ease, transform .22s ease;
 }
 
-.front-door:hover{filter:brightness(1.20);}
+.front-door:hover{filter:brightness(1.08);}
 .front-door:focus-visible{
     box-shadow:0 0 0 3px var(--front-focus,#fff), 0 0 0 6px color-mix(in srgb,var(--front-door-color,#222) 70%,transparent);
     z-index:90;
@@ -112,7 +112,7 @@ html[data-theme="dark"] #frontPage{
     transition:transform .35s ease, filter .35s ease;
 }
 .front-door:hover img,
-.front-door:focus-visible img{transform:scale(1.035);filter:brightness(1.08);}
+.front-door:focus-visible img{transform:scale(1.030);filter:brightness(1.08);}
 
 .front-door::after{
     content:"";
