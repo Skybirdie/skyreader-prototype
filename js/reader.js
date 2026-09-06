@@ -221,6 +221,18 @@ reader.open=async function(book,startPage=null){
         currentPage=Renderer.page();
         totalPages=Renderer.pages();
 
+        /*
+         * The PDF itself is authoritative. A supplied pageCount may be
+         * stale, missing, or simply wrong. Preserve the supplied value for
+         * diagnostics, but correct the live book object to the actual count.
+         */
+        if(window.Manifest &&
+           typeof Manifest.reconcileBookCount==="function"){
+            Manifest.reconcileBookCount(book,totalPages);
+        }else{
+            book.pageCount=totalPages;
+        }
+
         emit("bookOpened",book);
 
         saveReadingPosition();
@@ -416,6 +428,17 @@ if(typeof UI!=="undefined" && typeof UI.showLibrary==="function")
     UI.showLibrary(true);
 
 };
+
+const readerCloseButton = document.getElementById("readerCloseButton");
+
+if(readerCloseButton){
+    readerCloseButton.addEventListener("click",()=>{
+        if(typeof Reader!=="undefined" &&
+           typeof Reader.close==="function"){
+            Reader.close({playSound:true});
+        }
+    });
+}
 
 /*-------------------------------------------------------
   Refresh

@@ -1,5 +1,4 @@
 {
-
   "books": [
     {
       "id": "sample",
@@ -10,7 +9,8 @@
       "author": "unknown",
       "category": "unknown",
       "pageCount": "unknown",
-      "date": "202607200700"
+      "date": "202607200700",
+      "dateAdd": "202607200700"
     },
     {
       "id": "sample2",
@@ -21,11 +21,9 @@
       "author": "Sky",
       "category": "Education",
       "pageCount": "unknown",
-      "date": "202603201830"
-    }
-
-,
-
+      "date": "202603201830",
+      "dateAdd": "202603201830"
+    },
     {
       "id": "sample4",
       "title": "Trees",
@@ -35,10 +33,9 @@
       "author": "Andrew L.",
       "category": "General",
       "pageCount": "2",
-      "date": "202607200807"
-    }
-,
-
+      "date": "202607200807",
+      "dateAdd": "202607200807"
+    },
     {
       "id": "sample5",
       "title": "Light",
@@ -48,10 +45,9 @@
       "author": "Andrew L.",
       "category": "General",
       "pageCount": "2",
-      "date": "202607200808"
-    }
-,
-
+      "date": "202607200808",
+      "dateAdd": "202607200808"
+    },
     {
       "id": "sample6",
       "title": "Source",
@@ -61,10 +57,9 @@
       "author": "Andrew L.",
       "category": "General",
       "pageCount": "2",
-      "date": "202607200809"
-    }
-,
-
+      "date": "202607200809",
+      "dateAdd": "202607200809"
+    },
     {
       "id": "sample7",
       "title": "Water, living waters never run dry; you will never thirst",
@@ -74,9 +69,9 @@
       "author": "Andrew L.",
       "category": "General",
       "pageCount": "2",
-      "date": "202607200810"
+      "date": "202607200810",
+      "dateAdd": "202607200810"
     },
-
     {
       "id": "sample8",
       "title": "Khurasan",
@@ -86,11 +81,8 @@
       "author": "Andrew L.",
       "category": "General",
       "pageCount": "2",
-      "date": "202507200811"
+      "date": "202507200811",
+      "dateAdd": "202507200811"
     }
-
   ]
 }
-
-
-

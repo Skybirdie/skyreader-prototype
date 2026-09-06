@@ -99,6 +99,8 @@ document.getElementById(
 
 );
 
+dom.topBar=document.getElementById("topBar");
+
 dom.viewer=
 
 document.getElementById(
@@ -2181,42 +2183,76 @@ ui.toggleFullscreen=
 
 async function(){
 
-if(
+try{
 
-!document.fullscreenElement
+    if(!document.fullscreenElement){
 
-){
+        await document.documentElement.requestFullscreen();
 
-await document.documentElement
+    }else{
 
-.requestFullscreen();
+        await document.exitFullscreen();
 
-fullscreen=true;
+    }
 
-}
+}catch(error){
 
-else{
-
-await document.exitFullscreen();
-
-fullscreen=false;
+    /*
+     * The fullscreenchange event remains the authoritative source
+     * of fullscreen state.  Do not manually force the state here.
+     */
+    console.warn("[UI] Fullscreen change failed",error);
 
 }
 
 };
 
 document.addEventListener(
-
 "fullscreenchange",
-
 ()=>{
 
-fullscreen=
+    fullscreen=!!document.fullscreenElement;
 
-!!document.fullscreenElement;
+    /*
+     * Reader fullscreen uses the same browser fullscreen API as before.
+     * The additional class only controls the Reader interface chrome.
+     * Other sections are not affected.
+     */
+    document.documentElement.classList.toggle(
+        "readerFullscreen",
+        fullscreen
+    );
+
+    document.body.classList.toggle(
+        "readerFullscreen",
+        fullscreen
+    );
+
+    /*
+     * Keep the Reader toolbar and application top bar synchronized
+     * with fullscreen.
+     */
+    if(fullscreen){
+
+    ui.hideToolbar();
+
+}else if(typeof Reader!=="undefined" &&
+         typeof Reader.isOpen==="function" &&
+         Reader.isOpen()){
+
+    ui.showToolbar();
 
 }
 
+    requestAnimationFrame(()=>{
+
+        positionReaderArrows();
+
+        window.dispatchEvent(new Event("resize"));
+
+    });
+
+}
 );
 
 /*-------------------------------------------------------

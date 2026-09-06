@@ -5,6 +5,9 @@
 
  SkyReader Library Sorter
 
+ Newest/Oldest continue to use the visibility/publication "date" field.
+ dateAdd is upload provenance and is not used for publication chronology.
+
  Responsibilities
 
 • Sort books

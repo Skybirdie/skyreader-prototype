@@ -89,6 +89,7 @@ body{
   flex-direction:column;
   overflow:hidden;
   background:var(--panel);
+
 }
 
 #topBar{
@@ -143,6 +144,20 @@ border: none;
   box-shadow:var(--hover-shadow);
 }
 
+/* ---------------------------------------------------------
+   Reader fullscreen
+   --------------------------------------------------------- */
+
+html:fullscreen #topBar{
+  display:none !important;
+  height:0 !important;
+  min-height:0 !important;
+  flex:0 0 0 !important;
+  padding:0 !important;
+  overflow:hidden !important;
+}
+
+
 #settingsButton{
   grid-column:3;
   justify-self:end;
@@ -185,7 +200,7 @@ border: none;
   justify-content:center;
   padding:clamp(8px,1.5vh,28px);
   background-color:var(--panel2);
-  background-image:linear-gradient(var(--viewer-overlay),var(--viewer-overlay)),url("../assets/background.jpg");
+  background-image:url("../assets/background.jpg");
   background-position:center;
   background-repeat:no-repeat;
   background-size:cover;
@@ -322,7 +337,7 @@ border: none;
 #viewerLibrary.isLeaving{
   opacity:0;
   visibility:hidden;
-  transform:translateY(calc(-50% + 12px)) scale(.985);
+  transform:translateY(calc(-50% + 90px)) scale(.985);
   transition:
     opacity .34s ease,
     transform .34s ease,
@@ -331,13 +346,13 @@ border: none;
 }
 
 #viewerLibrary.isReturning{
-  animation:viewerLibraryReturn .48s cubic-bezier(.22,.8,.25,1);
+  animation:viewerLibraryReturn .82s cubic-bezier(.22,.61,.36,1);
 }
 
 @keyframes viewerLibraryReturn{
   0%{
     opacity:0;
-    transform:translateY(calc(-50% + 18px)) scale(.985)
+    transform:translateY(calc(-50% + 90px)) scale(.985)
   }
   100%{
     opacity:1;
@@ -1416,9 +1431,12 @@ html[data-theme="dark"] #topBar .iconButton{
 #readerPanel #toolbar:not(.hidden) .iconButton{opacity:1;visibility:visible;}
 #readerPanel #toolbar.hidden{display:none!important;}
 
-#readerPanel #toolbar #viewerFullscreenButton{right:14px!important;left:auto!important;}
-#readerPanel #toolbar #muteButton{right:64px!important;left:auto!important;}
-#readerPanel #toolbar #bookmarkAddButton{right:164px!important;left:auto!important;}
+#readerPanel #toolbar #readerCloseButton{right:14px!important;left:auto!important;}
+#readerPanel #toolbar #viewerFullscreenButton{right:64px!important;left:auto!important;}
+#readerPanel #toolbar #muteButton{right:114px!important;left:auto!important;}
+#readerPanel #toolbar #readerShareButton{right:164px!important;left:auto!important;}
+#readerPanel #toolbar #rotateButton{right:214px!important;left:auto!important;}
+#readerPanel #toolbar #bookmarkAddButton{right:264px!important;left:auto!important;}
 
 /*
  * The outline+plus button is the "add" affordance -- visible only when
@@ -1571,23 +1589,11 @@ html[data-theme="dark"] #topBar .iconButton{
 }
 
 
-#readerPanel #toolbar #rotateButton{
-  right:114px!important;
-  left:auto!important;
-  font-size:25px!important;
-  font-family:"Segoe UI Symbol","Noto Sans Symbols 2","Arial Unicode MS",sans-serif!important;
-  line-height:1;
-  display:flex!important;
-  align-items:center;
-  justify-content:center;
-  padding:0!important;
-}
-
 #readerPanel #toolbar #rotateButton svg,
 #readerPanel #toolbar #muteButton svg,
-#readerPanel #toolbar #bookmarkPanelButton svg,
 #readerPanel #toolbar #bookmarkAddButton svg,
-#readerPanel #toolbar #viewerFullscreenButton svg{
+#readerPanel #toolbar #viewerFullscreenButton svg,
+#readerPanel #toolbar #readerCloseButton svg{
   color:var(--control-text)!important;
   stroke:currentColor;
 }
@@ -1613,21 +1619,6 @@ html[data-theme="dark"] #readerPanel #toolbar .iconButton{
 }
 
 
-/* =========================================================
-   MOBILE — READER CONTROL TOP CLEARANCE
-   ========================================================= */
-
-@media (max-width:759px){
-
-  #readerPanel #toolbar{
-    inset:0;
-  }
-
-  #readerPanel #toolbar .iconButton{
-    margin-top:2px;
-  }
-
-}
 
 /* ---------- Settings ---------- */
 
@@ -1655,6 +1646,10 @@ html[data-theme="dark"] #readerPanel #toolbar .iconButton{
 .sr-settings-body{padding:10px 20px 20px;}
 .sr-setting-row{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:15px 0;border-bottom:1px solid var(--line);font-size:14px;}
 .sr-setting-row input[type="checkbox"]{width:20px;height:20px;accent-color:var(--text);}
+
+.sr-setting-row span{
+  flex:1;
+}
 .sr-setting-range{flex-wrap:wrap;}
 .sr-setting-range input[type="range"]{width:100%;}
 .sr-settings-action{width:100%;margin-top:18px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--panel2);color:var(--text);cursor:pointer;font:inherit;}
@@ -1718,6 +1713,19 @@ html[data-theme="dark"] #readerPanel #toolbar .iconButton{
 
   #topBar{
     padding-top:max(0px,env(safe-area-inset-top));
+    grid-row:1;
+
+    position:relative;
+
+    width:100%;
+
+    display:flex;
+
+    align-items:center;
+    justify-content:center;
+
+    padding-inline:
+        clamp(8px,1.5vw,18px);
   }
 
   #workspace{
@@ -1756,10 +1764,17 @@ html[data-theme="dark"] #readerPanel #toolbar .iconButton{
   }
 
   #readerPanel #toolbar .iconButton{width:38px;height:38px;}
-  #readerPanel #toolbar #rotateButton{right:101px!important;}
-  #readerPanel #toolbar #muteButton{right:53px!important;}
-  #readerPanel #toolbar #bookmarkAddButton{right:149px!important;}
-  #readerPanel #toolbar #viewerFullscreenButton{right:5px!important;}
+
+#readerPanel #toolbar #readerCloseButton{
+  right:5px!important;
+  left:auto!important;
+}
+
+  #readerPanel #toolbar #viewerFullscreenButton{right:53px!important;}
+  #readerPanel #toolbar #muteButton{right:101px!important;}
+  #readerPanel #toolbar #readerShareButton{right:149px!important;}
+  #readerPanel #toolbar #rotateButton{right:197px!important;}
+  #readerPanel #toolbar #bookmarkAddButton{right:245px!important;}
 }
 
  #statusBar {
@@ -1928,6 +1943,10 @@ html[data-theme="dark"] #readerPanel #toolbar .iconButton{
 
   }
 
+
+
+
+
   #narrowLibraryToggle .icon{width:22px!important;height:22px!important;}
   #narrowLibraryToggle.isOpen{opacity:0!important;visibility:hidden!important;pointer-events:none!important;}
 
@@ -1936,6 +1955,8 @@ html[data-theme="dark"] #readerPanel #toolbar .iconButton{
     background:rgba(12,15,20,.30)!important;
     color:#f2f5f7!important;
   }
+
+
 
   /* Read Again retains the desktop vertical hierarchy inside the drawer. */
   #continueReading.continueCollapsed{
@@ -2039,3 +2060,584 @@ html[data-theme="dark"] #readerPanel #toolbar .iconButton{
 #libraryFilterMenu{right:0;}
 .libraryOrgMenu select{display:block;width:100%;max-width:220px;border:0;outline:0;background:transparent;color:var(--text);font:13px Inter,Arial,sans-serif;padding:5px 3px;}
 .libraryEmptyState{column-span:all;width:100%;padding:18px 10px;text-align:center;color:var(--muted);font-size:13px;}
+
+
+
+/* =========================================================
+   COMPACT MEDIA SWITCHER — narrow screens
+   ========================================================= */
+
+.responsive-app-menu-button{
+  display:none;
+height:34px;
+max-width:35vw;
+  align-items:center;justify-content:center;
+  padding:10px;border:1px solid var(--line,rgba(0,0,0,.16));
+  border-radius:10px;background:var(--control-bg,rgba(255,255,255,.22));
+  color:var(--control-text,var(--text,#222));
+  cursor:pointer;position:relative;z-index:2050;
+}
+
+.responsive-app-current{
+    display:inline;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+}
+
+.section-menu-chevron{
+    flex:0 0 16px;
+    fill:none;
+    stroke:currentColor;
+    stroke-width:1.8;
+    stroke-linecap:round;
+    stroke-linejoin:round;
+}
+
+.responsive-app-menu-button .icon{width:20px;height:20px}
+.responsive-app-menu{
+  display:none;
+  position:absolute;
+  top:calc(100% + 6px);right:0;z-index:2100;
+  min-width:150px;padding:6px;
+  border:1px solid var(--line,rgba(0,0,0,.16));
+  border-radius:12px;
+  background:var(--panel,rgba(255,255,255,.94));
+  color:var(--text,#222);
+  box-shadow:0 12px 30px rgba(0,0,0,.22);
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+}
+.responsive-app-menu.is-open{display:flex;flex-direction:column;gap:3px}
+.responsive-app-menu button{
+  appearance:none;border:0;border-radius:8px;padding:9px 11px;
+  background:var(--panel);color:var(--text);text-align:left;font:600 13px/1.2 inherit;
+  cursor:pointer;white-space:nowrap;
+}
+.responsive-app-menu button:hover,.responsive-app-menu button:focus-visible{
+  background:color-mix(in srgb,var(--text,#222) 10%,transparent);outline:none;
+}
+
+@media (max-width:999px){
+  #topBar{min-width:0;overflow:visible}
+  #topBarRightControls{min-width:0;max-width:48vw;gap:5px;position:relative}
+  #topBarRightControls .app-switcher{display:none}
+  #topBarRightControls .responsive-app-menu-button{display:inline-flex}
+  #topBarRightControls .responsive-app-menu{right:0}
+
+  #topSearchGroup{min-width:0;max-width:52vw}
+  #searchBox{max-width:42vw}
+}
+
+@media (max-width:480px){
+  #topBar{padding-inline:6px!important;gap:5px!important}
+  #topBarRightControls{max-width:42vw}
+  #topBarRightControls .topBarButton{width:32px;height:32px}
+  #topBarRightControls .responsive-app-menu-button{
+  width:32px;
+  height:32px;
+  flex-basis:32px;
+  border-radius:16px;
+}
+}
+
+/* ---------------------------------------------------------
+   Mobile section selector
+   --------------------------------------------------------- */
+
+@media (max-width:999px){
+
+  #topBarRightControls .responsive-app-menu-button{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+
+    width:42px;
+    height:42px;
+    flex:0 0 42px;
+
+    padding:10px;
+
+    border:1px solid
+      color-mix(in srgb,var(--control-text) 22%,transparent);
+
+    border-radius:21px;
+
+    background:rgba(255,255,255,.30)!important;
+    color:var(--control-text);
+
+    backdrop-filter:blur(7px);
+
+    box-shadow:0 5px 18px rgba(0,0,0,.16);
+
+    cursor:pointer;
+
+    transition:
+      background .18s ease,
+      transform .18s ease,
+      box-shadow .18s ease;
+  }
+
+
+    .responsive-app-menu-button{
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        gap:6px;
+
+        min-width:0;
+        max-width:160px;
+
+        padding:6px 9px;
+
+        border:1px solid rgba(255,255,255,.22);
+        border-radius:7px;
+
+        background:rgba(255,255,255,.06);
+        color:var(--control-text);
+
+        cursor:pointer;
+
+        box-sizing:border-box;
+    }
+
+
+    .responsive-app-menu-button:hover{
+        background:rgba(255,255,255,.10);
+    }
+
+    .responsive-app-current{
+        font:600 11px/1 Inter,Arial,sans-serif;
+        white-space:nowrap;
+        overflow:hidden;
+        text-overflow:ellipsis;
+    }
+
+    .section-menu-radial-icon{
+        width:15px;
+        height:15px;
+        flex:0 0 15px;
+
+        fill:none;
+        stroke:currentColor;
+        stroke-width:1.5;
+        stroke-linecap:round;
+    }
+
+    .section-menu-chevron{
+        width:11px;
+        height:11px;
+        flex:0 0 11px;
+    }
+}
+
+
+
+  #topBarRightControls .responsive-app-menu-button:hover{
+    background:rgba(255,255,255,.42)!important;
+    transform:translateY(-2px);
+    box-shadow:0 6px 18px rgba(0,0,0,.18);
+  }
+
+
+  #topBarRightControls .responsive-app-menu-button:active{
+    transform:scale(.96);
+  }
+
+
+  .section-menu-radial-icon{
+    width:20px;
+    height:20px;
+
+    display:block;
+
+    fill:none;
+    stroke:currentColor;
+    stroke-width:1.65;
+    stroke-linecap:round;
+    stroke-linejoin:round;
+
+    pointer-events:none;
+  }
+
+
+  /*
+   * Mobile section dropdown.
+   *
+   * Visually follows the Slideshow audio-mode control:
+   * translucent surface, blur, rounded corners and shadow.
+   */
+
+  #topBarRightControls .responsive-app-menu{
+    position:absolute;
+
+    top:calc(100% + 8px);
+    right:0;
+
+    min-width:148px;
+
+    display:flex;
+    flex-direction:column;
+
+    gap:3px;
+
+    padding:6px;
+
+    border:1px solid
+      color-mix(in srgb,var(--control-text) 22%,transparent);
+
+    border-radius:14px;
+
+    background:var(--panel);
+
+    backdrop-filter:blur(7px);
+
+    box-shadow:0 8px 24px rgba(0,0,0,.18);
+
+    overflow:hidden;
+
+    opacity:0;
+    visibility:hidden;
+    pointer-events:none;
+
+    transform:
+      translateY(-5px)
+      scale(.98);
+
+    transform-origin:top right;
+
+    transition:
+      opacity .16s ease,
+      visibility .16s ease,
+      transform .16s ease;
+
+    z-index:1000;
+  }
+
+
+  #topBarRightControls .responsive-app-menu.is-open{
+    opacity:1;
+    visibility:visible;
+    pointer-events:auto;
+    transform:
+      translateY(0)
+      scale(1);
+  }
+
+
+  #topBarRightControls .responsive-app-menu button{
+    width:100%;
+
+    min-height:36px;
+
+    padding:7px 12px;
+
+    border:0;
+    border-radius:9px;
+
+    background:transparent;
+
+    color:var(--control-text);
+
+    font-size:12px;
+    font-weight:500;
+
+    text-align:left;
+
+    cursor:pointer;
+
+    transition:
+      background .15s ease,
+      transform .15s ease;
+  }
+
+
+  #topBarRightControls .responsive-app-menu button:hover{
+    background:rgba(255,255,255,.30);
+  }
+
+
+  #topBarRightControls .responsive-app-menu button:active{
+    transform:scale(.98);
+  }
+
+
+  #topBarRightControls .responsive-app-menu button.active{
+    background:rgba(255,255,255,.24);
+  }
+
+}
+
+@media (max-width:480px){
+
+    .responsive-app-menu-button{
+        max-width:135px;
+        padding:6px 8px;
+        gap:5px;
+    }
+
+    .responsive-app-current{
+        font-size:10px;
+    }
+
+    .section-menu-radial-icon{
+        width:14px;
+        height:14px;
+        flex-basis:14px;
+    }
+}
+
+
+
+/* Reader drawer toggle shares the same top-bar placement as Video/Slideshow. */
+@media (max-width:999px){
+  #topBar{
+    grid-template-columns:auto minmax(0,1fr) auto;
+    gap:5px;
+    padding-inline:5px;
+    overflow:visible;
+  }
+  #narrowLibraryToggle{
+    position:relative!important;
+    top:auto!important;left:auto!important;
+    grid-column:1;
+    width:34px!important;height:34px!important;
+    min-width:34px!important;min-height:34px!important;
+    margin:0!important;
+    z-index:2001!important;
+    background:rgba(12,15,20,.30) !important;
+  }
+  #topSearchGroup{grid-column:2;min-width:0;max-width:100%;width:auto!important}
+  #topBar #appTitle{position:absolute;left:50%;transform:translateX(-50%);max-width:42vw;pointer-events:none}
+}
+
+@media (max-width:480px){
+  #topBarRightControls .responsive-app-menu-button{
+    height:32px;
+    min-height:32px;
+    width:auto;
+    flex:0 1 auto;
+    border-radius:10px;
+  }
+}
+
+/* ---------------------------------------------------------
+   Narrow Reader top bar — left cluster / right cluster
+   --------------------------------------------------------- */
+@media (max-width:999px){
+  #topBar{
+    position:relative;
+    display:flex!important;
+    align-items:center;
+    justify-content:flex-start!important;
+    gap:6px;
+    padding-inline:5px;
+  }
+  #narrowLibraryToggle{
+    position:relative!important;
+    inset:auto!important;
+    flex:0 0 34px!important;
+    order:1;
+  }
+  #topSearchGroup{
+    order:2;
+    flex:0 1 auto;
+    width:auto!important;
+    min-width:0;
+    max-width:min(52vw,360px);
+    margin:0!important;
+  }
+  #topBar #appTitle{
+    position:absolute!important;
+    left:50%!important;
+    transform:translateX(-50%)!important;
+    max-width:34vw;
+    pointer-events:none;
+  }
+  #topBarRightControls{
+    order:3;
+    margin-left:auto!important;
+    margin-right:0!important;
+    flex:0 0 auto;
+    max-width:none!important;
+    gap:5px;
+  }
+}
+
+@media (max-width:480px){
+  #topBar{gap:3px;padding-inline:3px!important;}
+  #narrowLibraryToggle{flex-basis:32px!important;width:32px!important;height:32px!important;min-width:32px!important;}
+  #topBarRightControls{gap:3px;}
+}
+
+
+
+/* =========================================================
+   SHARED MEDIA TOP-BAR STANDARD — Reader / Video / Slideshow
+   ========================================================= */
+:root{
+  --media-topbar-height:clamp(44px,5.5vh,68px);
+  --media-topbar-button-height:42px;
+}
+
+#topBar{
+  --header-height:var(--media-topbar-height);
+  height:var(--media-topbar-height)!important;
+  min-height:var(--media-topbar-height)!important;
+  flex:0 0 var(--media-topbar-height)!important;
+}
+
+/* Shared section-menu button */
+#topBarRightControls .responsive-app-menu-button,
+.video-top-bar-right-controls .responsive-app-menu-button,
+.slideshow-top-bar-right .responsive-app-menu-button{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  width:auto;
+  min-width:0;
+  max-width:min(180px,42vw);
+  height:var(--media-topbar-button-height);
+  min-height:var(--media-topbar-button-height);
+  flex:0 1 auto;
+  padding:10px;
+  border:1px solid var(--line,rgba(0,0,0,.16));
+  border-radius:7px;
+  color:var(--control-text,var(--text,#222));
+  cursor:pointer;
+  position:relative;
+  z-index:2050;
+  backdrop-filter:blur(7px);
+  -webkit-backdrop-filter:blur(7px);
+  box-shadow:0 5px 18px rgba(0,0,0,.16);
+  background:rgba(255,255,255,.30)!important;
+  box-sizing:border-box;
+  overflow:hidden;
+}
+
+#topBarRightControls .responsive-app-menu-button .icon,
+.video-top-bar-right-controls .responsive-app-menu-button .icon,
+.slideshow-top-bar-right .responsive-app-menu-button .icon{
+  width:20px;
+  height:20px;
+  flex:0 0 20px;
+}
+
+.responsive-app-current{
+  display:inline-block;
+  min-width:0;
+  max-width:100%;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  font:600 clamp(10px,1.15vw,12px)/1 Inter,Arial,sans-serif;
+}
+
+/* Reader / Video / Slideshow narrow library buttons */
+#narrowLibraryToggle,
+.video-narrow-library-toggle,
+.slideshow-narrow-library-toggle{
+  align-items:center;
+  justify-content:center;
+  width:var(--media-topbar-button-height)!important;
+  height:var(--media-topbar-button-height)!important;
+  min-width:var(--media-topbar-button-height)!important;
+  min-height:var(--media-topbar-button-height)!important;
+  flex:0 0 var(--media-topbar-button-height)!important;
+  padding:10px!important;
+  border:1px solid var(--line,rgba(0,0,0,.16))!important;
+  border-radius:7px!important;
+  color:var(--control-text,var(--text,#222))!important;
+  cursor:pointer;
+  position:relative;
+  z-index:2050;
+  backdrop-filter:blur(7px);
+  -webkit-backdrop-filter:blur(7px);
+  box-shadow:0 5px 18px rgba(0,0,0,.16);
+  background:rgba(255,255,255,.30)!important;
+  box-sizing:border-box;
+}
+
+#narrowLibraryToggle .icon,
+.video-narrow-library-toggle .icon,
+.slideshow-narrow-library-toggle .icon{
+  width:20px;
+  height:20px;
+}
+
+@media (max-width:480px){
+  #topBarRightControls .responsive-app-menu-button,
+  .video-top-bar-right-controls .responsive-app-menu-button,
+  .slideshow-top-bar-right .responsive-app-menu-button{
+    max-width:min(180px,42vw);
+    height:var(--media-topbar-button-height);
+    min-height:var(--media-topbar-button-height);
+    flex:0 1 auto;
+    padding:10px 8px;
+    border-radius:7px;
+  }
+
+  .responsive-app-current{
+    font-size:clamp(9px,3.1vw,11px);
+  }
+}
+
+
+/* =========================================================
+   SkyMedia section navigation transition
+
+   Soft fade + very small vertical movement.
+   Only opacity and transform are animated so navigation
+   remains lightweight.
+   ========================================================= */
+
+@media (prefers-reduced-motion: no-preference){
+
+    .sky-section-transition-out{
+        animation:
+            skySectionOut
+            260ms
+            cubic-bezier(.22,.7,.2,1)
+            both;
+        pointer-events:none;
+    }
+
+    .sky-section-transition-in{
+        animation:
+            skySectionIn
+            300ms
+            cubic-bezier(.22,.7,.2,1)
+            both;
+    }
+
+    @keyframes skySectionOut{
+        from{
+            opacity:1;
+            transform:translateY(0);
+        }
+        to{
+            opacity:0;
+            transform:translateY(-8px);
+        }
+    }
+
+    @keyframes skySectionIn{
+        from{
+            opacity:0;
+            transform:translateY(8px);
+        }
+        to{
+            opacity:1;
+            transform:translateY(0);
+        }
+    }
+}
+
+@media (prefers-reduced-motion:reduce){
+
+    .sky-section-transition-out,
+    .sky-section-transition-in{
+        animation:none!important;
+    }
+
+}

@@ -23,6 +23,9 @@
 <link rel="stylesheet" href="css/style.css">
 <link rel="stylesheet" href="css/reader.css">
 <link rel="stylesheet" href="css/library.css">
+<link rel="stylesheet" href="css/video.css">
+<link rel="stylesheet" href="css/slideshow.css">
+<link rel="stylesheet" href="css/front-page.css?v=wave3">
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>if(window.pdfjsLib){pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";}</script>
@@ -32,7 +35,7 @@
 <style>
 #reloadScreen{position:fixed;inset:0;z-index:999999;display:flex;align-items:center;justify-content:center;background:#eef1f5;opacity:1;transition:opacity .35s ease;pointer-events:auto;}
 #reloadScreen.isReady{opacity:0;pointer-events:none;}
-#reloadScreen img{width:auto;height:100%;object-fit:cover;}
+#reloadScreen img{width:auto;height:100px;object-fit:cover;}
 #reloadScreen .reloadFallback{font:600 16px/1.4 Inter,Arial,sans-serif;color:#66707a;text-align:center;padding:24px;}
 </style>
 </head>
@@ -40,9 +43,39 @@
 <body>
 
 <div id="reloadScreen" role="status" aria-live="polite">
-<img src="assets/reload.png" alt="Loading Meditation Mornings" onerror="this.style.display='none';this.nextElementSibling.hidden=false;">
+<img src="assets/reload.gif" alt="Loading Meditation Mornings" onerror="this.style.display='none';this.nextElementSibling.hidden=false;">
 <div class="reloadFallback" hidden>Loading MMicj…</div>
 </div>
+
+
+<!-- =====================================================
+     FRONT PAGE
+     Visual seven-door portal. The category names are temporary
+     placeholders and are supplied by js/frontPage.js.
+     ===================================================== -->
+<section id="frontPage" class="front-page app-section-hidden" aria-label="SkyMedia Front Page">
+    <img id="frontBackground" src="assets/front-background.gif" alt="" aria-hidden="true">
+    <div id="frontStage">
+        <!-- Centerpiece and upper/lower category doors are created by frontPage.js. -->
+    </div>
+    <div id="frontTopWave" class="front-wave front-wave-top" aria-label="Top category doors"></div>
+    <div id="frontWave" class="front-wave front-wave-bottom" aria-label="Bottom category doors"></div>
+
+    <button id="frontMenuButton" type="button" aria-label="Open media navigation" aria-expanded="false">
+        <svg class="icon" aria-hidden="true"><use href="#icon-menu"></use></svg>
+    </button>
+    <nav id="frontMenuPanel" aria-label="Media section navigation">
+        <button type="button" class="front-menu-switch" data-app-target="reader" aria-pressed="false">
+            <svg class="icon" aria-hidden="true"><use href="#icon-open-book"></use></svg><span>Booklets</span>
+        </button>
+        <button type="button" class="front-menu-switch" data-app-target="video" aria-pressed="false">
+            <svg class="icon" aria-hidden="true"><use href="#icon-video"></use></svg><span>Videos</span>
+        </button>
+        <button type="button" class="front-menu-switch" data-app-target="slideshow" aria-pressed="false">
+            <svg class="icon" aria-hidden="true"><use href="#icon-slideshow"></use></svg><span>Exhortations</span>
+        </button>
+    </nav>
+</section>
 
 <div id="app">
 
@@ -62,6 +95,46 @@
 <h1 id="appTitle"></h1>
 
 <div id="topBarRightControls">
+
+<button class="responsive-app-menu-button"
+        type="button"
+        aria-label="Open section menu"
+        aria-expanded="false">
+
+    <svg class="section-menu-radial-icon"
+         viewBox="0 0 24 24"
+         aria-hidden="true">
+        <line x1="12" y1="12" x2="12" y2="3"></line>
+        <line x1="12" y1="12" x2="19.8" y2="7.5"></line>
+        <line x1="12" y1="12" x2="19.8" y2="16.5"></line>
+        <line x1="12" y1="12" x2="12" y2="21"></line>
+        <line x1="12" y1="12" x2="4.2" y2="16.5"></line>
+        <line x1="12" y1="12" x2="4.2" y2="7.5"></line>
+    </svg>
+
+    <span class="responsive-app-current"
+          aria-live="polite">Booklets</span>
+
+    <svg class="section-menu-chevron"
+         viewBox="0 0 24 24"
+         aria-hidden="true">
+        <polyline points="6,9 12,15 18,9"></polyline>
+    </svg>
+
+</button>
+
+<nav class="responsive-app-menu" aria-label="Media section menu">
+    <button type="button" data-app-target="front">Home</button>
+    <button type="button" data-app-target="front">Booklets</button>
+    <button type="button" data-app-target="video">Videos</button>
+    <button type="button" data-app-target="slideshow">Exhortations</button>
+</nav>
+<div class="app-switcher" role="tablist" aria-label="Switch media section">
+<button type="button" class="app-switch-button" data-app-target="front" aria-pressed="false" role="tab">Home</button>
+<button type="button" class="app-switch-button" data-app-target="reader" aria-pressed="false" role="tab">Booklets</button>
+<button type="button" class="app-switch-button" data-app-target="video" aria-pressed="false" role="tab">Videos</button>
+<button type="button" class="app-switch-button" data-app-target="slideshow" aria-pressed="false" role="tab">Exhortations</button>
+</div>
 <button id="bookmarkPanelButton"         class="topBarButton" type="button" title="Bookmarks" aria-label="Bookmarks" aria-pressed="false">
 <svg class="icon"><use href="#icon-bookmark"></use></svg>
 </button>
@@ -201,6 +274,14 @@
 <svg class="icon"><use href="#icon-fullscreen"></use></svg>
 </button>
 
+<button id="readerCloseButton" class="iconButton" type="button" title="Close book" aria-label="Close book">
+<svg class="icon"><use href="#icon-close"></use></svg>
+</button>
+
+<button id="readerShareButton" class="iconButton" type="button" title="Share book" aria-label="Share book">
+<svg class="icon"><use href="#icon-share"></use></svg>
+</button>
+
 
 <button id="bookmarkAddButton" class="iconButton" type="button" title="Bookmark this page" aria-label="Bookmark this page" aria-pressed="false">
 <svg class="icon"><use href="#icon-bookmark-add-outline"></use></svg>
@@ -247,11 +328,21 @@
 <svg xmlns="http://www.w3.org/2000/svg" style="display:none">
 
 
+<symbol id="icon-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+<symbol id="icon-video" viewBox="0 0 24 24"><rect x="3" y="5" width="13" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="m16 9 5-3v12l-5-3z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+<symbol id="icon-slideshow" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="m8 14 3-4 2.5 3 2-2.5L19 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 21h8M12 18v3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+
+<symbol id="icon-screen" viewBox="0 0 24 24">
+<rect x="3" y="4" width="18" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
+<path d="M8 21h8M12 18v3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+</symbol>
+
 <symbol id="icon-open-book" viewBox="0 0 24 24">
 <path d="M12 6.5c-2.1-2-4.5-2.7-8-2.2v14.1c3.5-.5 5.9.2 8 2.1 2.1-1.9 4.5-2.6 8-2.1V4.3c-3.5-.5-5.9.2-8 2.2Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
 <path d="M12 6.5v14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
 </symbol>
 
+<symbol id="icon-share" viewBox="0 0 24 24"><path d="M12 15V3m0 0-4 4m4-4 4 4M5 11v8h14v-8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
 <symbol id="icon-close" viewBox="0 0 24 24">
 <path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
 </symbol>
@@ -307,6 +398,10 @@ stroke-linejoin="round"/>
 </symbol>
 
 
+<symbol id="icon-play" viewBox="0 0 24 24"><path d="M8 5l11 7-11 7V5Z" fill="currentColor"/></symbol>
+<symbol id="icon-pause" viewBox="0 0 24 24"><path d="M7 5h4v14H7zM13 5h4v14h-4z" fill="currentColor"/></symbol>
+<symbol id="icon-music" viewBox="0 0 24 24"><path d="M9 18V6l10-2v12M9 18a3 3 0 1 1-3-3 3 3 0 0 1 3 3Zm10-2a3 3 0 1 1-3-3 3 3 0 0 1 3 3Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+
 <symbol id="icon-volume" viewBox="0 0 24 24">
 <path d="M5 10H9L14 6V18L9 14H5Z"
 fill="currentColor"/>
@@ -316,6 +411,7 @@ stroke-width="2"
 stroke-linecap="round"/>
 </symbol>
 
+<symbol id="icon-volume-off" viewBox="0 0 24 24"><path d="M4 10v4h4l5 4V6l-5 4H4Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m17 9 4 6m0-6-4 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
 <symbol id="icon-fullscreen" viewBox="0 0 24 24">
 <path d="M8 3H3v5M16 3h5v5M3 16v5h5M21 16v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
 </symbol>
@@ -393,9 +489,17 @@ stroke-linecap="round"/>
 <path d="M20 4V9H15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
 <path d="M4 20V15H9" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
 </symbol>
+<symbol id="icon-restart" viewBox="0 0 24 24">
+<path d="M4 12a8 8 0 1 1 2.34 5.66" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M4 18v-6h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</symbol>
+<symbol id="icon-radial" viewBox="0 0 24 24">
+<path d="M12 3v18M4.2 7.5l15.6 9M19.8 7.5 4.2 16.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+</symbol>
 
 </svg>
 
+<script src="js/dateVisibility.js"></script>
 <script src="js/skyreader.js"></script>
 <script src="js/storage.js"></script>
 <script src="js/bookmarks.js"></script>
@@ -403,9 +507,10 @@ stroke-linecap="round"/>
 <script src="js/favorites.js"></script>
 <script src="js/recentReading.js"></script>
 <script src="js/recentShelf.js"></script>
-<script src="js/glideContract.js?v=1.1.7"></script>
-<script src="js/manifest.js?v=1.1.7"></script>
-<script src="js/librarySorter.js?v=1.1.7"></script>
+<script src="js/contentContract.js?v=3.0.0"></script>
+<script src="js/glideContract.js?v=3.0.0"></script>
+<script src="js/manifest.js?v=1.3.0"></script>
+<script src="js/librarySorter.js?v=1.2.0"></script>
 <script src="js/library.js"></script>
 <script src="js/animation.js"></script>
 <script src="js/audio.js"></script>
@@ -417,7 +522,768 @@ stroke-linecap="round"/>
 <script src="js/bookmarkPanel.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/settingsPanel.js"></script>
+<script src="js/mediaManager.js"></script>
+<script src="js/shareManager.js"></script>
 <script src="js/app.js"></script>
+<script src="js/videoContract.js"></script>
+<script src="js/videoFavorites.js"></script>
+<script src="js/videoSorter.js"></script>
+<script src="js/videoLibrary.js"></script>
+<script src="js/videoViewer.js"></script>
+<script src="js/videoUI.js"></script>
+<script src="js/slideshowContract.js"></script>
+<script src="js/slideshowFavorites.js"></script>
+<script src="js/slideshowSorter.js"></script>
+<script src="js/slideshowTransitions.js"></script>
+<script src="js/slideshowLibrary.js"></script>
+<script src="js/slideshowViewer.js"></script>
+<script src="js/slideshowUI.js"></script>
+<script src="js/frontMediaRenderer.js"></script>
+<script src="js/frontPage.js?v=4.0.0"></script>
+<script src="js/appSwitcher.js"></script>
+<script src="js/responsiveAppMenu.js"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function(){
+    const button=document.getElementById("frontMenuButton");
+    const panel=document.getElementById("frontMenuPanel");
+    if(!button||!panel) return;
+    const close=()=>{panel.classList.remove("is-open");button.setAttribute("aria-expanded","false");};
+    button.addEventListener("click", function(event){
+        event.stopPropagation();
+        const open=!panel.classList.contains("is-open");
+        panel.classList.toggle("is-open",open);
+        button.setAttribute("aria-expanded",open?"true":"false");
+    });
+    panel.addEventListener("click", function(event){
+        const target=event.target.closest("[data-app-target]");
+        if(!target) return;
+        if(window.AppSwitcher) AppSwitcher.show(target.dataset.appTarget);
+        close();
+    });
+    document.addEventListener("click", function(event){
+        if(!panel.contains(event.target)&&event.target!==button) close();
+    });
+});
+</script>
+
+<script>
+document.addEventListener("DOMContentLoaded", async function () {
+
+    /*
+     * Bring up the navigation and Front Page shell before the asynchronous
+     * Reader/Manifest boot.  This keeps Home reachable even if a later
+     * optional module has a startup problem.  The final FrontPage.refresh()
+     * below rebinds the doors to the normalized manifest once it is loaded.
+     */
+    if (window.FrontPage) FrontPage.init();
+    if (window.AppSwitcher) AppSwitcher.init();
+
+    /* Unified boot: Reader/Manifest load first so every section receives
+       the same normalized content collection.
+
+       A failure here must NOT abort the rest of startup. loadManifest()
+       inside App.start() may have already populated Manifest._data
+       successfully before a *later*, unrelated step inside App.start()
+       (book-specific UI wiring, etc.) throws. If we return here, Video,
+       Slideshow, and the Front Page never get a chance to read that
+       already-loaded data — the Front Page in particular is left
+       showing only its empty shell forever, even though real content
+       was available. So: log the failure and keep going. Every step
+       below already tolerates missing/partial data on its own. */
+    if (window.App && typeof App.start === "function") {
+        try {
+            await App.start();
+            document.documentElement.dataset.appStartError = "";
+        } catch (error) {
+            console.error("[SkyMedia] Unified application startup failed.", error);
+            document.documentElement.dataset.appStartError = error.message || String(error);
+        }
+    }
+
+    if (
+        window.VideoViewer &&
+        window.VideoLibrary
+    ) {
+      try {
+
+        VideoLibrary.init();
+
+        VideoViewer.init();
+
+        VideoUI.init();
+
+VideoLibrary.load(Manifest.videos());
+
+if (
+    window.VideoViewer &&
+    typeof VideoViewer.renderLanding === "function"
+) {
+
+    VideoViewer.renderLanding();
+
+}
+
+
+document
+    .querySelectorAll(
+        "[data-video-view]"
+    )
+    .forEach(button => {
+
+        button.addEventListener(
+            "click",
+            () => {
+
+                const view =
+                    button.dataset.videoView;
+
+                VideoLibrary.setView(
+                    view
+                );
+
+
+                document
+                    .querySelectorAll(
+                        "[data-video-view]"
+                    )
+                    .forEach(item => {
+
+                        item.classList.toggle(
+                            "active",
+                            item === button
+                        );
+
+                    });
+
+            }
+        );
+
+    });
+
+      } catch (error) {
+          console.error("[SkyMedia] Video section startup failed.", error);
+      }
+
+
+    }
+
+
+    /*
+    -----------------------------------------------------
+     Video library organization
+    -----------------------------------------------------
+    */
+
+    const videoSortButton = document.getElementById("videoSortButton");
+    const videoFilterButton = document.getElementById("videoFilterButton");
+    const videoSortMenu = document.getElementById("videoSortMenu");
+    const videoFilterMenu = document.getElementById("videoFilterMenu");
+    const videoSort = document.getElementById("videoSort");
+    const videoFilter = document.getElementById("videoFilter");
+    const videoCategory = document.getElementById("videoCategory");
+    const videoFilterActive = document.getElementById("videoFilterActive");
+
+    function closeVideoOrgMenus() {
+        if (videoSortMenu) videoSortMenu.classList.add("hidden");
+        if (videoFilterMenu) videoFilterMenu.classList.add("hidden");
+    }
+
+    function refreshVideoOrgControls() {
+        if (!window.VideoLibrary) return;
+        if (videoSort) videoSort.value = VideoLibrary.getSort();
+        if (videoFilter) videoFilter.value = VideoLibrary.getOrganizationFilter();
+        if (videoCategory) videoCategory.value = VideoLibrary.getCategory();
+        if (videoFilterActive) {
+            const active = VideoLibrary.getOrganizationFilter() !== "all" || VideoLibrary.getCategory() !== "all";
+            videoFilterActive.classList.toggle("active", active);
+        }
+    }
+
+    if (videoSortButton && videoSortMenu) {
+        videoSortButton.addEventListener("click", event => {
+            event.stopPropagation();
+            if (videoFilterMenu) videoFilterMenu.classList.add("hidden");
+            videoSortMenu.classList.toggle("hidden");
+        });
+    }
+
+    if (videoFilterButton && videoFilterMenu) {
+        videoFilterButton.addEventListener("click", event => {
+            event.stopPropagation();
+            if (videoSortMenu) videoSortMenu.classList.add("hidden");
+            videoFilterMenu.classList.toggle("hidden");
+        });
+    }
+
+    if (videoSort) {
+        videoSort.addEventListener("change", () => {
+            VideoLibrary.setSort(videoSort.value);
+            closeVideoOrgMenus();
+            refreshVideoOrgControls();
+        });
+    }
+
+    if (videoFilter) {
+        videoFilter.addEventListener("change", () => {
+            VideoLibrary.setOrganizationFilter(videoFilter.value);
+            refreshVideoOrgControls();
+        });
+    }
+
+    if (videoCategory) {
+        videoCategory.addEventListener("change", () => {
+            VideoLibrary.setCategory(videoCategory.value);
+            refreshVideoOrgControls();
+        });
+    }
+
+    document.addEventListener("click", event => {
+        if (!event.target.closest(".video-library-organization-controls")) {
+            closeVideoOrgMenus();
+        }
+    });
+
+    if (window.VideoLibrary && typeof VideoLibrary.getCategories === "function" && videoCategory) {
+        VideoLibrary.getCategories().forEach(category => {
+            const option = document.createElement("option");
+            option.value = category;
+            option.textContent = category;
+            videoCategory.appendChild(option);
+        });
+    }
+
+    refreshVideoOrgControls();
+
+
+    /*
+    -----------------------------------------------------
+     Video top bar: search
+    -----------------------------------------------------
+    */
+
+    const videoSearchGroup =
+        document.getElementById("videoSearchGroup");
+
+    const videoSearchButton =
+        document.getElementById("videoSearchButton");
+
+    const videoSearchBox =
+        document.getElementById("videoSearchBox");
+
+    if (videoSearchButton && videoSearchGroup && videoSearchBox) {
+
+        videoSearchButton.addEventListener("click", () => {
+
+            const open =
+                videoSearchGroup.classList.toggle("searchOpen");
+
+            if (open) {
+                videoSearchBox.focus();
+            }
+            else {
+                videoSearchBox.value = "";
+                if (window.VideoLibrary && typeof VideoLibrary.setFilter === "function") {
+                    VideoLibrary.setFilter("");
+                }
+            }
+
+        });
+
+        videoSearchBox.addEventListener("input", () => {
+
+            if (window.VideoLibrary && typeof VideoLibrary.setFilter === "function") {
+                VideoLibrary.setFilter(videoSearchBox.value);
+            }
+
+        });
+
+    }
+
+
+    /*
+    -----------------------------------------------------
+     Video top bar: settings (reuses SkyReader's panel)
+    -----------------------------------------------------
+    */
+
+    const videoSettingsButton =
+        document.getElementById("videoSettingsButton");
+
+    if (videoSettingsButton) {
+
+        videoSettingsButton.addEventListener("click", () => {
+
+            if (typeof SettingsPanel !== "undefined") {
+                SettingsPanel.toggle();
+            }
+
+        });
+
+    }
+
+
+    /*
+    -----------------------------------------------------
+     Switching between the Reader and Video sections
+    -----------------------------------------------------
+    */
+
+    if (window.SlideshowLibrary && window.SlideshowViewer && window.SlideshowUI) {
+      try {
+        SlideshowLibrary.init();
+        SlideshowViewer.init();
+        SlideshowUI.init();
+
+
+const manifestSlideshows = Manifest.slideshows();
+
+console.log(
+    "[SkyMedia] Manifest slideshows:",
+    manifestSlideshows
+);
+
+console.log(
+    "[SkyMedia] Manifest PDF slideshows:",
+    manifestSlideshows.filter(
+        item => item && item.source === "pdf"
+    )
+);
+
+SlideshowLibrary.load(manifestSlideshows);
+
+        SlideshowLibrary.load(Manifest.slideshows());
+
+        const slideshowSort = document.getElementById("slideshowSort");
+        const slideshowFilter = document.getElementById("slideshowFilter");
+        const slideshowCategory = document.getElementById("slideshowCategory");
+        if (slideshowSort) slideshowSort.value = SlideshowLibrary.getSort();
+        if (slideshowFilter) slideshowFilter.value = SlideshowLibrary.getFilter();
+        if (slideshowCategory) slideshowCategory.value = SlideshowLibrary.getCategory();
+      } catch (error) {
+          console.error("[SkyMedia] Slideshow section startup failed.", error);
+      }
+    }
+
+    if (window.FrontPage) {
+        FrontPage.init();
+    }
+
+    if (window.AppSwitcher) {
+        AppSwitcher.init();
+    }
+
+    if (window.FrontPage && typeof FrontPage.refresh === "function") {
+        FrontPage.refresh();
+    }
+
+    const readerShareButton = document.getElementById("readerShareButton");
+    if (readerShareButton && !readerShareButton.dataset.bound) {
+        readerShareButton.dataset.bound = "true";
+        readerShareButton.addEventListener("click", () => {
+            const book = window.Reader && typeof Reader.book === "function" ? Reader.book() : null;
+            if (book && window.ShareManager) ShareManager.share("reader", book);
+        });
+    }
+
+    window.setTimeout(() => {
+        if (window.ShareManager && typeof ShareManager.openDeepLink === "function") ShareManager.openDeepLink();
+    }, 0);
+
+});
+</script>
+
+
+<!-- =====================================================
+     VIDEO SECTION
+====================================================== -->
+
+<section
+    id="videoSection"
+    class="video-section video-drawer-closed"
+>
+
+<header id="videoTopBar" class="video-top-bar">
+
+<button id="videoNarrowLibraryToggle" class="video-narrow-library-toggle" type="button" title="Open Video Library" aria-label="Open Video Library" aria-expanded="false">
+<svg class="icon"><use href="#icon-screen"></use></svg>
+</button>
+
+<div id="videoSearchGroup" class="video-search-group">
+<button id="videoSearchButton" class="video-icon-button" type="button" title="Search videos" aria-label="Search videos">
+<svg class="icon"><use href="#icon-search"></use></svg>
+</button>
+<input id="videoSearchBox" type="search" placeholder="Search videos..." aria-label="Search videos">
+</div>
+
+<h1 class="video-top-bar-title"></h1>
+
+<div id="videoTopBarRightControls" class="video-top-bar-right-controls">
+<button class="responsive-app-menu-button"
+        type="button"
+        aria-label="Open section menu"
+        aria-expanded="false">
+
+    <svg class="section-menu-radial-icon"
+         viewBox="0 0 24 24"
+         aria-hidden="true">
+        <line x1="12" y1="12" x2="12" y2="3"></line>
+        <line x1="12" y1="12" x2="19.8" y2="7.5"></line>
+        <line x1="12" y1="12" x2="19.8" y2="16.5"></line>
+        <line x1="12" y1="12" x2="12" y2="21"></line>
+        <line x1="12" y1="12" x2="4.2" y2="16.5"></line>
+        <line x1="12" y1="12" x2="4.2" y2="7.5"></line>
+    </svg>
+
+    <span class="responsive-app-current">Videos</span>
+
+    <svg class="section-menu-chevron"
+         viewBox="0 0 24 24"
+         aria-hidden="true">
+        <path d="M7 9l5 5 5-5"></path>
+    </svg>
+
+</button>
+<nav class="responsive-app-menu" aria-label="Media section menu">
+<button type="button" data-app-target="front">Home</button>
+<button type="button" data-app-target="reader">Booklets</button>
+<button type="button" data-app-target="videos">Videos</button>
+<button type="button" data-app-target="slideshow">Exhortations</button>
+</nav>
+<div class="app-switcher" role="tablist" aria-label="Switch media section">
+<button type="button" class="app-switch-button" data-app-target="front" aria-pressed="false" role="tab">Home</button>
+<button type="button" class="app-switch-button" data-app-target="reader" aria-pressed="false" role="tab">Booklets</button>
+<button type="button" class="app-switch-button" data-app-target="video" aria-pressed="false" role="tab">Videos</button>
+<button type="button" class="app-switch-button" data-app-target="slideshow" aria-pressed="false" role="tab">Exhortations</button>
+</div>
+<button id="videoSettingsButton" class="video-icon-button" type="button" title="Settings" aria-label="Settings">
+<svg class="icon"><use href="#icon-settings"></use></svg>
+</button>
+</div>
+
+</header>
+
+<div class="video-workspace">
+
+    <!-- =================================================
+         VIDEO LIBRARY
+    ================================================== -->
+
+
+
+    <aside
+        id="videoLibrary"
+        class="video-library"
+    >
+
+        <header
+    class="video-library-header"
+>
+
+    <h2
+        class="video-library-title"
+    >
+        Rooting
+    </h2>
+
+
+    <div class="video-library-header-right">
+
+        <div class="video-library-organization-controls" aria-label="Video library organization">
+            <button id="videoSortButton" class="video-library-org-button" type="button" title="Sort Videos" aria-label="Sort Videos">⇅</button>
+            <button id="videoFilterButton" class="video-library-org-button" type="button" title="Filter Videos" aria-label="Filter Videos"><svg class="icon"><use href="#icon-filter"></use></svg><span id="videoFilterActive" class="video-library-filter-active" aria-hidden="true"></span></button>
+            <div id="videoSortMenu" class="video-library-org-menu hidden" role="menu">
+                <select id="videoSort" aria-label="Sort videos">
+                    <option value="alphabetical">Alphabetical</option>
+                    <option value="newest">Newest</option>
+                    <option value="oldest">Oldest</option>
+                    <option value="category">Category</option>
+                    <option value="random">Random</option>
+                    <option value="recent">Recently Viewed</option>
+                    <option value="favorites">Favorites</option>
+                </select>
+            </div>
+            <div id="videoFilterMenu" class="video-library-org-menu hidden" role="menu">
+                <select id="videoFilter" aria-label="Filter videos"><option value="all">All videos</option><option value="favorites">Favorites</option><option value="recent">Recently Viewed</option></select>
+                <select id="videoCategory" aria-label="Filter by category"><option value="all">All categories</option></select>
+            </div>
+        </div>
+
+        <div class="video-library-controls">
+
+            <button
+                type="button"
+                class="video-view-button active"
+                data-video-view="grid"
+                title="Grid view"
+                aria-label="Grid view"
+            >
+                <svg class="icon"><use href="#icon-grid"></use></svg>
+            </button>
+
+            <button
+                type="button"
+                class="video-view-button"
+                data-video-view="list"
+                title="List view"
+                aria-label="List view"
+            >
+                <svg class="icon"><use href="#icon-list"></use></svg>
+            </button>
+
+        </div>
+
+
+        <button
+            id="videoLibraryDrawerClose"
+            class="video-library-drawer-close"
+            type="button"
+            title="Close Library"
+            aria-label="Close Library"
+        >
+            <svg class="icon"><use href="#icon-close"></use></svg>
+        </button>
+
+    </div>
+
+</header>
+
+
+        <div
+            id="videoLibraryGrid"
+            class="video-library-grid"
+        ></div>
+
+    </aside>
+
+
+    <!-- =================================================
+     VIDEO VIEWER
+================================================== -->
+
+<main id="videoViewer" class="video-viewer" >
+
+<!-- =================================================
+     VIDEO LANDING
+================================================== -->
+
+<section
+    id="videoLanding"
+    class="video-landing"
+    aria-label="Video library landing"
+>
+
+    <div class="video-landing-hero">
+        <div class="video-landing-hero-icon" aria-hidden="true">
+            <img src="assets/logo.png" alt="" class="video-landing-hero-logo">
+        </div>
+        <div class="video-landing-hero-copy">
+            <h2>Meditation Mornings</h2>
+            <p>in Christ Jesus</p>
+        </div>
+    </div>
+
+    <div class="video-landing-media-row">
+        <section class="video-landing-media-section video-landing-continue-section">
+                      <div id="videoLandingContinue" class="video-landing-circle-row"></div>
+        </section>
+    </div>
+
+    <section class="video-landing-section video-landing-library-section">
+               <div id="videoLandingLibrary" class="video-landing-circle-row"></div>
+    </section>
+
+</section>
+
+
+<!-- =================================================
+     ACTIVE VIDEO
+================================================== -->
+
+
+
+<video
+    id="videoPlayer"
+    class="video-player"
+    controls
+    playsinline
+    webkit-playsinline
+    preload="metadata"
+></video>
+
+<button id="videoViewerShare" class="video-viewer-share" type="button" title="Share video" aria-label="Share video">
+    <svg class="icon"><use href="#icon-share"></use></svg>
+</button>
+
+<button id="videoViewerClose" class="video-viewer-close" type="button" title="Close video" aria-label="Close video">
+    <svg class="icon"><use href="#icon-close"></use></svg>
+</button>
+
+<div id="videoStatusBar" class="video-status-bar">
+<center>
+<span id="videoStatusMessage" class="video-status-message"></span>
+<span id="videoStatusTitle" class="video-status-title"></span>
+<span id="videoIndicator" class="video-status-indicator"></span>
+</center>
+</div>
+</main>
+
+</div>
+
+</section>
+
+
+
+<!-- =====================================================
+     SLIDE SHOW SECTION
+====================================================== -->
+<section id="slideshowSection" class="slideshow-section slideshow-drawer-closed">
+
+<header class="slideshow-top-bar">
+    <div class="slideshow-top-bar-left">
+        <button id="slideshowNarrowLibraryToggle" class="slideshow-narrow-library-toggle" type="button" title="Open Slide Show Library" aria-label="Open Slide Show Library" aria-expanded="false">
+            <svg class="icon"><use href="#icon-screen"></use></svg>
+        </button>
+        <div id="slideshowSearchGroup" class="slideshow-search-group">
+            <button id="slideshowSearchButton" class="slideshow-icon-button" type="button" title="Search slide shows" aria-label="Search slide shows">
+                <svg class="icon"><use href="#icon-search"></use></svg>
+            </button>
+            <input id="slideshowSearchBox" type="search" placeholder="Search slide shows..." aria-label="Search slide shows">
+        </div>
+    </div>
+    <h1 class="slideshow-top-bar-title"></h1>
+    <div class="slideshow-top-bar-right">
+       <button class="responsive-app-menu-button"
+        type="button"
+        aria-label="Open section menu"
+        aria-expanded="false">
+
+    <svg class="section-menu-radial-icon"
+         viewBox="0 0 24 24"
+         aria-hidden="true">
+        <line x1="12" y1="12" x2="12" y2="3"></line>
+        <line x1="12" y1="12" x2="19.8" y2="7.5"></line>
+        <line x1="12" y1="12" x2="19.8" y2="16.5"></line>
+        <line x1="12" y1="12" x2="12" y2="21"></line>
+        <line x1="12" y1="12" x2="4.2" y2="16.5"></line>
+        <line x1="12" y1="12" x2="4.2" y2="7.5"></line>
+    </svg>
+
+    <span class="responsive-app-current">Exhortations</span>
+
+    <svg class="section-menu-chevron"
+         viewBox="0 0 24 24"
+         aria-hidden="true">
+        <path d="M7 9l5 5 5-5"></path>
+    </svg>
+
+</button>
+        <nav class="responsive-app-menu" aria-label="Media section menu">
+            <button type="button" data-app-target="front">Home</button>
+            <button type="button" data-app-target="reader">Booklets</button>
+            <button type="button" data-app-target="video">Videos</button>
+            <button type="button" data-app-target="slideshows">Exhortations</button>
+        </nav>
+        <div class="app-switcher" role="tablist" aria-label="Switch media section">
+            <button type="button" class="app-switch-button" data-app-target="front" aria-pressed="false" role="tab">Home</button>
+            <button type="button" class="app-switch-button" data-app-target="reader" aria-pressed="false" role="tab">Booklets</button>
+            <button type="button" class="app-switch-button" data-app-target="video" aria-pressed="false" role="tab">Videos</button>
+            <button type="button" class="app-switch-button" data-app-target="slideshow" aria-pressed="false" role="tab">Exhortations</button>
+        </div>
+        <button id="slideshowSettingsButton" class="slideshow-icon-button" type="button" title="Settings" aria-label="Settings">
+            <svg class="icon"><use href="#icon-settings"></use></svg>
+        </button>
+    </div>
+</header>
+
+<div class="slideshow-workspace">
+    <aside id="slideshowLibrary" class="slideshow-library">
+        <header class="slideshow-library-header">
+            <h2>Exhortations</h2>
+            <div class="slideshow-library-header-controls">
+                <div class="slideshow-organization-controls">
+                    <button id="slideshowSortButton" class="slideshow-org-button" type="button" title="Sort Slide Shows" aria-label="Sort Slide Shows">⇅</button>
+                    <button id="slideshowFilterButton" class="slideshow-org-button" type="button" title="Filter Slide Shows" aria-label="Filter Slide Shows"><svg class="icon"><use href="#icon-filter"></use></svg></button>
+                    <div id="slideshowSortMenu" class="slideshow-org-menu hidden" role="menu">
+                        <select id="slideshowSort" aria-label="Sort slide shows">
+                            <option value="alphabetical">Alphabetical</option><option value="newest">Newest</option><option value="oldest">Oldest</option><option value="category">Category</option><option value="random">Random</option><option value="recent">Recently Viewed</option><option value="favorites">Favorites</option>
+                        </select>
+                    </div>
+                    <div id="slideshowFilterMenu" class="slideshow-org-menu hidden" role="menu">
+                        <select id="slideshowFilter" aria-label="Filter slide shows"><option value="all">All slide shows</option><option value="favorites">Favorites</option></select>
+                        <select id="slideshowCategory" aria-label="Filter by category"><option value="all">All categories</option></select>
+                    </div>
+                </div>
+                <div class="slideshow-library-view-controls">
+                    <button type="button" class="slideshow-view-button active" data-slideshow-view="grid" title="Grid view" aria-label="Grid view"><svg class="icon"><use href="#icon-grid"></use></svg></button>
+                    <button type="button" class="slideshow-view-button" data-slideshow-view="list" title="List view" aria-label="List view"><svg class="icon"><use href="#icon-list"></use></svg></button>
+                </div>
+                <button id="slideshowLibraryDrawerClose" class="slideshow-library-drawer-close" type="button" title="Close Library" aria-label="Close Library"><svg class="icon"><use href="#icon-close"></use></svg></button>
+            </div>
+        </header>
+        <div id="slideshowLibraryGrid" class="slideshow-library-grid"></div>
+    </aside>
+
+    <main id="slideshowViewer" class="slideshow-viewer">
+        <section id="slideshowLanding" class="slideshow-landing" aria-label="Slide show library landing">
+            <div class="slideshow-landing-hero">
+                <img src="assets/logo.png" alt="" class="slideshow-landing-logo">
+                <div><h2>Meditation Mornings</h2><p>in Christ Jesus</p></div>
+            </div>
+            <div class="slideshow-landing-media-row">
+                <section class="slideshow-landing-section slideshow-landing-continue-section">
+                    
+                    <div id="slideshowLandingRecent" class="slideshow-landing-row"></div>
+                </section>
+            </div>
+            <section class="slideshow-landing-section slideshow-landing-library-section">
+                
+                <div id="slideshowLandingLibrary" class="slideshow-landing-row"></div>
+            </section>
+        </section>
+
+        <div id="slideshowStage" class="slideshow-stage" aria-live="polite"></div>
+        <div id="slideshowPlaybackStatus" class="slideshow-playback-status"></div>
+        <audio id="slideshowAudio" preload="auto"></audio>
+
+        <nav class="slideshow-toolbar slideshow-toolbar-main" aria-label="Slide show navigation">
+            <button id="slideshowPrevious" class="slideshow-control" type="button" title="Previous slide" aria-label="Previous slide"><svg class="icon"><use href="#icon-previous"></use></svg></button>
+
+
+
+            <button id="slideshowRestart" class="slideshow-control" type="button" title="Restart slide show" aria-label="Restart slide show"><svg class="icon"><use href="#icon-restart"></use></svg></button>
+
+
+
+            <button id="slideshowPlay" class="slideshow-control" type="button" title="Pause slide show" aria-label="Pause slide show"><svg class="icon"><use href="#icon-pause"></use></svg></button>
+            <button id="slideshowNext" class="slideshow-control" type="button" title="Next slide" aria-label="Next slide"><svg class="icon"><use href="#icon-next"></use></svg></button>
+        </nav>
+        <nav class="slideshow-toolbar slideshow-toolbar-secondary" aria-label="Slide show display and audio controls">
+            <button id="slideshowShare" class="slideshow-control" type="button" title="Share slide show" aria-label="Share slide show"><svg class="icon"><use href="#icon-share"></use></svg></button>
+<button id="slideshowMute" class="slideshow-control" 
+        type="button"
+        title="Mute audio"
+        aria-label="Mute audio">
+   <svg class="icon">
+        <use href="#icon-volume"></use>
+    </svg>
+</button>
+            <button id="slideshowFullscreen" class="slideshow-control" type="button" title="Focus viewer" aria-label="Focus viewer"><svg class="icon"><use href="#icon-fullscreen"></use></svg></button>
+            <label class="slideshow-audio-mode" title="Audio mode" aria-label="Audio mode">
+                <svg class="icon"><use href="#icon-music"></use></svg>
+                <select id="slideshowAudioMode" aria-label="Audio mode">
+                    <option value="none">None</option>
+                    <option value="original">Original sound</option>
+                    <option value="effects">Page turn effects</option>
+                    <option value="music">Music</option>
+                </select>
+            </label>
+            <button id="slideshowClose" class="slideshow-control" type="button" title="Return to library" aria-label="Return to library"><svg class="icon"><use href="#icon-close"></use></svg></button>
+        </nav>
+        <div class="slideshow-status-bar"><span id="slideshowStatus"></span></div>
+    </main>
+</div>
+</section>
 
 </body>
 </html>

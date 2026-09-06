@@ -21,6 +21,12 @@ window.SettingsPanel=(function(){
               <label class="sr-setting-row"><span>Remember reading position</span><input id="srSettingRemember" type="checkbox"></label>
               <label class="sr-setting-row"><span>Remember zoom</span><input id="srSettingZoom" type="checkbox"></label>
               <label class="sr-setting-row"><span>Page-turn sound</span><input id="srSettingSound" type="checkbox"></label>
+
+<label class="sr-setting-row">
+  <span>Continue media playback in background</span>
+  <input id="srSettingBackgroundMedia" type="checkbox">
+</label>
+
               <label class="sr-setting-row sr-setting-range"><span>Sound volume</span><input id="srSettingVolume" type="range" min="0" max="1" step="0.05"></label>
               <button type="button" id="srFullscreenButton" class="sr-settings-action">Enter fullscreen</button>
             </div>
@@ -51,6 +57,14 @@ window.SettingsPanel=(function(){
             }
             StorageManager.setMuted(!enabled);
         };
+
+        root.querySelector("#srSettingBackgroundMedia").onchange=()=>{
+            if(window.MediaManager){
+                MediaManager.setBackgroundPlayback(
+                    root.querySelector("#srSettingBackgroundMedia").checked
+                );
+            }
+        };
         root.querySelector("#srSettingVolume").oninput=event=>{
             const value=Number(event.target.value);
             if(window.AudioController)AudioController.setVolume(value);
@@ -74,6 +88,11 @@ window.SettingsPanel=(function(){
         el.querySelector("#srSettingZoom").checked=settings.rememberZoom!==false;
         el.querySelector("#srSettingSound").checked=window.AudioController?!AudioController.isMuted():state.muted!==true;
         el.querySelector("#srSettingVolume").value=window.AudioController?AudioController.volume():state.volume;
+
+el.querySelector("#srSettingBackgroundMedia").checked =
+    window.MediaManager
+        ? MediaManager.getBackgroundPlayback()
+        : false;
         el.querySelector("#srFullscreenButton").textContent=(typeof UI!=="undefined"&&UI.isFullscreen&&UI.isFullscreen())?"Exit fullscreen":"Enter fullscreen";
     };
 

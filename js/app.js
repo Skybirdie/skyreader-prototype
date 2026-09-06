@@ -475,6 +475,9 @@ await loadManifest();
 
 await buildLibrary();
 
+/* Front Page is refreshed after all optional media modules have been
+   initialized. It must never be allowed to interrupt core startup. */
+
 initializeFeatureModules();
 
 connectModules();
@@ -668,36 +671,24 @@ async function bootstrap(){
 }
 
 /*-------------------------------------------------------
-  Automatic Startup
+  Startup entry point
+
+  index.html's own DOMContentLoaded handler is the single
+  authoritative boot sequence for the whole app: it awaits
+  App.start() itself, then brings up Video, Slideshow, and
+  the Front Page in a defined order once Reader/Manifest
+  data is ready.
+
+  bootstrap() above is kept available (app.bootstrap) for
+  manual/console use, but is no longer auto-invoked here.
+  It previously also ran on DOMContentLoaded, which meant
+  App.start() — and everything that depends on it, like
+  SlideshowLibrary.load() — ran twice, concurrently,
+  rebuilding library lists out from under the user mid-
+  click.
 -------------------------------------------------------*/
 
-if(
-
-    document.readyState==="loading"
-
-){
-
-    document.addEventListener(
-
-        "DOMContentLoaded",
-
-        bootstrap,
-
-        {
-
-            once:true
-
-        }
-
-    );
-
-}
-
-else{
-
-    bootstrap();
-
-}
+app.bootstrap = bootstrap;
 
 /*-------------------------------------------------------
   Export

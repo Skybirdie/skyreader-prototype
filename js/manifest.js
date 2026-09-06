@@ -2,156 +2,195 @@
 
 /*
 =========================================================
+ SkyMedia Unified Manifest
 
- SkyReader Manifest / Data Boundary
+ Loads ONE content source and publishes normalized collections
+ to Reader, Video Viewer, and Slideshow Viewer.
 
- Responsibilities
+ Source priority:
+   1. Glide contract
+   2. content.json
 
- • Load the current book data source
- • Normalize and validate book records
- • Expose normalized books to the engine
- • Keep the source implementation separate from consumers
-
- The current prototype fallback source is library.json.
- GlideContract is checked first when Glide supplies a contract.
- The engine receives the same normalized book objects regardless
- of which source supplied them.
-
+ The raw source is never exposed directly to feature modules.
 =========================================================
 */
 
-window.Manifest={
+window.Manifest = {
 
-/*-------------------------------------------------------
- Data Source
--------------------------------------------------------*/
+    source: {
+        url: "content.json?v=3.0.0",
 
-source:{
+        async load() {
+            const response = await fetch(this.url, { cache: "no-store" });
 
-    url:"library.json?v=1.1.7",
+            if (!response.ok) {
+                throw new Error("Unable to load content.json");
+            }
 
-    async load(){
-
-        const response=await fetch(this.url,{cache:"no-store"});
-
-        if(!response.ok){
-
-            throw new Error("Unable to load library.json");
-
+            return response.json();
         }
+    },
 
-        return response.json();
+    _data: null,
 
-    }
+    async load() {
+        SkyReader.setLoading(5, "Loading content...");
 
-},
+        try {
+            const rawManifest =
+                GlideContract.available()
+                    ? await GlideContract.load()
+                    : await this.source.load();
 
-/*-------------------------------------------------------
- Internal Normalized Manifest
--------------------------------------------------------*/
+            const manifest =
+                ContentContract.normalizeManifest(rawManifest);
 
-_data:null,
+console.log(
+    "[Manifest] Slideshow-005 after normalization:",
+    manifest.content.find(item => item.id === "slideshow-005")
+);
 
-/*-------------------------------------------------------
- Load
+console.log(
+    "[Manifest] Raw slideshow-005:",
+    Array.isArray(rawManifest?.content)
+        ? rawManifest.content.find(item => item.id === "slideshow-005")
+        : rawManifest?.slideshow?.["slideshow-005"]
+);
 
- Loads from the configured source, then normalizes the data
- before exposing it to the rest of SkyReader.
--------------------------------------------------------*/
 
-async load(){
+            if (!manifest.content.length) {
+                throw new Error("No visible content is available.");
+            }
 
-    SkyReader.setLoading(5,"Loading library...");
+            this._data = manifest;
 
-    try{
+            window.dispatchEvent(new CustomEvent("skymedia:manifest-ready", {
+                detail: { manifest }
+            }));
 
-        const rawManifest=GlideContract.available()
-                ? await GlideContract.load()
-                : await this.source.load();
+            const books = this.content("book");
+            const videos = this.content("video");
+            const slideshows = this.content("slideshow");
 
-        const manifest=this.normalize(rawManifest);
+            SkyReader.library = [...books];
+            SkyReader.filteredLibrary = [...books];
 
-        if(!manifest.books.length){
-            throw new Error("No publications are available in the current library.");
+            const background = rawManifest && typeof rawManifest === "object"
+                ? rawManifest.background
+                : null;
+
+            if (background) {
+                SkyReader.settings.background = background;
+
+                const viewerBackground =
+                    document.getElementById("viewerBackground");
+
+                if (viewerBackground) {
+                    viewerBackground.style.backgroundImage =
+                        `url('${background}')`;
+                }
+            }
+
+            if (manifest.diagnostics.length) {
+                console.info(
+                    "[Manifest] Normalization diagnostics:",
+                    ...manifest.diagnostics
+                );
+            }
+
+            SkyReader.setLoading(
+                20,
+                `Content loaded: ${books.length} books, ${videos.length} videos, ${slideshows.length} slideshows`
+            );
+
+            return manifest;
+
+        } catch (error) {
+            this._data = null;
+            SkyReader.library = [];
+            SkyReader.filteredLibrary = [];
+
+            console.error("[Manifest] Content load failed", error);
+
+            SkyReader.setStatus(
+                error.message || "Unable to load SkyMedia content."
+            );
+
+            if (
+                window.UI &&
+                typeof UI.showError === "function"
+            ) {
+                UI.showError(
+                    error,
+                    "Unable to load SkyMedia content."
+                );
+            }
+
+            throw error;
         }
+    },
 
-        this._data=manifest;
+    all() {
+        return this._data
+            ? [...this._data.content]
+            : [];
+    },
 
-        SkyReader.library=[...manifest.books];
+    content(type) {
+        return this.all().filter(item => item.type === type);
+    },
 
-        SkyReader.filteredLibrary=[...manifest.books];
+    books() {
+        return this.content("book");
+    },
 
-        SkyReader.settings.background=
+    videos() {
+        return this.content("video");
+    },
 
-            manifest.background||
+    slideshows() {
+        return this.content("slideshow");
+    },
 
-            SkyReader.settings.background;
+    diagnostics() {
+        return this._data
+            ? [...this._data.diagnostics]
+            : [];
+    },
 
-        document.getElementById("viewerBackground").style.backgroundImage=
+    frontPageCategories() {
+        return this._data && this._data.frontPage && Array.isArray(this._data.frontPage.categories)
+            ? [...this._data.frontPage.categories]
+            : [];
+    },
 
-            `url('${SkyReader.settings.background}')`;
+    normalize(rawManifest) {
+        return ContentContract.normalizeManifest(rawManifest);
+    },
 
-        SkyReader.setLoading(20,"Library loaded");
+    validate(rawManifest) {
+        return this.normalize(rawManifest);
+    },
 
-        return manifest;
+    /*
+    -------------------------------------------------------
+     Runtime count reconciliation
+    -------------------------------------------------------
 
+     PDF page counts are authoritative only after PDF.js opens
+     the document. This method is deliberately public so the
+     Reader and Slideshow Viewer can correct their in-memory
+     metadata without changing the supplied source.
+    -------------------------------------------------------
+    */
+
+    reconcileBookCount(book, actualCount) {
+        ContentContract.reconcileBookCount(book, actualCount);
+        return book;
+    },
+
+    reconcileSlideshowCount(slideshow, actualCount) {
+        ContentContract.reconcileSlideshowCount(slideshow, actualCount);
+        return slideshow;
     }
-
-    catch(error){
-
-        this._data=null;
-        SkyReader.library=[];
-        SkyReader.filteredLibrary=[];
-        console.error("[Manifest] Library load failed",error);
-        SkyReader.setStatus(error.message||"Unable to load the library.");
-        if(window.UI && typeof UI.showError==="function") UI.showError(error,"Unable to load the SkyReader library.");
-        throw error;
-
-    }
-
-},
-
-/*-------------------------------------------------------
- Books
-
- Returns the normalized book collection.
- Consumers do not need to know which data source supplied it.
--------------------------------------------------------*/
-
-books(){
-
-    return this._data
-
-        ? [...this._data.books]
-
-        : [];
-
-},
-
-/*-------------------------------------------------------
- Normalize
-
- Converts a source payload into the contract expected by the
- SkyReader engine.
--------------------------------------------------------*/
-
-normalize(rawManifest){
-
-    // Both GlideContract and library.json deliberately converge here.
-    // GlideContract owns the one shared Book adapter so neither source
-    // can construct a subtly different object shape.
-    return GlideContract.normalizeManifest(rawManifest);
-
-},
-
-/*-------------------------------------------------------
- Backward-Compatible Validation Entry Point
--------------------------------------------------------*/
-
-validate(manifest){
-
-    return this.normalize(manifest);
-
-}
-
 };
