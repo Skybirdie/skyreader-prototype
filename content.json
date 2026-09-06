@@ -7,14 +7,11 @@
       "title": "Roboto Specimen Book",
       "subtitle": "Sample Magazine",
       "thumbnail": "assets/thumbnails/Roboto_Specimen_Image.jpg",
+      "media": "pdf/Roboto_Specimen_Book.pdf",
+      "audio": "",
+      "author": "",
       "category": "Book Club",
-      "dateAdd": "202609020901",
-      "date": "202609020901",
-      "author": "unknown",
-      "book": {
-        "url": "pdf/Roboto_Specimen_Book.pdf",
-        "pageCount": 11
-      }
+      "date": "202609020901"
     },
     {
       "id": "book-002",
@@ -22,14 +19,11 @@
       "title": "Source",
       "subtitle": "Sample Magazine",
       "thumbnail": "assets/thumbnails/source.jpg",
+      "media": "pdf/Source.pdf",
+      "audio": "",
+      "author": "",
       "category": "Affirmations",
-      "dateAdd": "202609010830",
-      "date": "202609010830",
-      "author": "unknown",
-      "book": {
-        "url": "pdf/Source.pdf",
-        "pageCount": 2
-      }
+      "date": "202609010830"
     },
     {
       "id": "video-001",
@@ -37,14 +31,11 @@
       "title": "The Holy Spirit as Guide",
       "subtitle": "Sample Magazine",
       "thumbnail": "test-content/thumbnails/The Holy Spirit as Guide.png",
-      "category": "Feed My Sheep",
-      "dateAdd": "202609020800",
-      "date": "202609020800",
+      "media": "https://youtu.be/0K3VS8zlet0",
+      "audio": "",
       "author": "Derek Prince",
-      "video": {
-        "url": "https://youtu.be/0K3VS8zlet0",
-        "length": "57:25"
-      }
+      "category": "Feed My Sheep",
+      "date": "202609020800"
     },
     {
       "id": "video-002",
@@ -52,14 +43,11 @@
       "title": "Ministries of the Holy Spirit",
       "subtitle": "Sample Magazine",
       "thumbnail": "test-content/thumbnails/Ministries of the Holy Spirit.png",
-      "category": "Feed My Sheep",
-      "dateAdd": "202609011900",
-      "date": "202609011900",
+      "media": "https://www.youtube.com/watch?v=VumkOJiZV20",
+      "audio": "",
       "author": "Derek Prince",
-      "video": {
-        "url": "https://www.youtube.com/watch?v=VumkOJiZV20",
-        "length": "57:55"
-      }
+      "category": "Feed My Sheep",
+      "date": "202609011900"
     },
     {
       "id": "slideshow-001",
@@ -67,26 +55,16 @@
       "title": "Not trees",
       "subtitle": "Sample Magazine",
       "thumbnail": "assets/thumbnails/khurasan.jpg",
+      "media": [
+        "test-content/slideshows/Brick-Navy-Blue-Color-Palette-1024x691.webp",
+        "test-content/slideshows/Cool-White-Navy-Blue-Color-Palette-1024x691.webp",
+        "test-content/slideshows/Coral-Navy-Blue-Color-Palette-1024x691.webp",
+        "test-content/slideshows/Sage-Green-Navy-Blue-Color-Palette-1024x691.webp"
+      ],
+      "audio": "test-content/audio/freesound_community-harp-motif2-36586.mp3",
+      "author": "",
       "category": "Affirmations",
-      "dateAdd": "202309020902",
-      "date": "202309020902",
-      "author": "unknown",
-      "slideshow": {
-        "source": "images",
-        "slides": [
-          "test-content/slideshows/Brick-Navy-Blue-Color-Palette-1024x691.webp",
-          "test-content/slideshows/Cool-White-Navy-Blue-Color-Palette-1024x691.webp",
-          "test-content/slideshows/Coral-Navy-Blue-Color-Palette-1024x691.webp",
-          "test-content/slideshows/Sage-Green-Navy-Blue-Color-Palette-1024x691.webp"
-        ]
-      },
-      "audio": {
-        "url": "test-content/audio/freesound_community-harp-motif2-36586.mp3",
-        "type": "background",
-        "autoplay": true,
-        "loop": true
-      },
-      "slideCount": 2
+      "date": "202309020902"
     },
     {
       "id": "slideshow-002",
@@ -94,21 +72,11 @@
       "title": "Nature Collection",
       "subtitle": "Sample Magazine",
       "thumbnail": "test-content/thumbnails/shapes.jpg",
+      "media": "test-content/slideshows/shapes.jpg",
+      "audio": "test-content/audio/file_example_MP3_700KB.mp3",
+      "author": "",
       "category": "BYOB",
-      "dateAdd": "202609011200",
-      "date": "202609011200",
-      "author": "unknown",
-      "slideshow": {
-        "source": "pdf",
-        "url": "test-content/slideshows/shapes.jpg"
-      },
-      "audio": {
-        "url": "test-content/audio/file_example_MP3_700KB.mp3",
-        "type": "background",
-        "autoplay": true,
-        "loop": true
-      },
-      "slideCount": 2
+      "date": "202609011200"
     },
     {
       "id": "slideshow-003",
@@ -116,19 +84,15 @@
       "title": "Silent Gallery",
       "subtitle": "Sample Magazine",
       "thumbnail": "test-content/thumbnails/file-sample_150kB.png",
+      "media": [
+        "test-content/slideshows/Pastel-Yellow-Navy-Blue-Color-Palette-1024x691.webp",
+        "test-content/slideshows/Pewter-Navy-Blue-Color-Palette-1024x691.webp",
+        "test-content/slideshows/Sage-Green-Navy-Blue-Color-Palette-1024x691.webp"
+      ],
+      "audio": "",
+      "author": "",
       "category": "Sayings",
-      "dateAdd": "202608301000",
-      "date": "202608301000",
-      "author": "unknown",
-      "slideshow": {
-        "source": "images",
-        "slides": [
-          "test-content/slideshows/Pastel-Yellow-Navy-Blue-Color-Palette-1024x691.webp",
-          "test-content/slideshows/Pewter-Navy-Blue-Color-Palette-1024x691.webp",
-          "test-content/slideshows/Sage-Green-Navy-Blue-Color-Palette-1024x691.webp"
-        ]
-      },
-      "slideCount": 2
+      "date": "202608301000"
     },
     {
       "id": "book-003",
@@ -136,14 +100,11 @@
       "title": "The Morning Reader",
       "subtitle": "Sample Magazine",
       "thumbnail": "test-content/thumbnails/file-sample_150kB.jpg",
+      "media": "test-content/books/file-sample_150kB.pdf",
+      "audio": "",
+      "author": "",
       "category": "General",
-      "dateAdd": "202609020901",
-      "date": "202609020901",
-      "author": "unknown",
-      "book": {
-        "url": "test-content/books/file-sample_150kB.pdf",
-        "pageCount": 2
-      }
+      "date": "202609020901"
     },
     {
       "id": "book-004",
@@ -151,14 +112,11 @@
       "title": "A Walk Through Nature",
       "subtitle": "Sample Magazine",
       "thumbnail": "assets/thumbnails/trees.jpg",
+      "media": "pdf/Trees.pdf",
+      "audio": "",
+      "author": "",
       "category": "Booklet",
-      "dateAdd": "202609010830",
-      "date": "202609010830",
-      "author": "unknown",
-      "book": {
-        "url": "pdf/Trees.pdf",
-        "pageCount": 2
-      }
+      "date": "202609010830"
     },
     {
       "id": "video-003",
@@ -166,14 +124,11 @@
       "title": "Breathing",
       "subtitle": "DESTINY SERIES LESSON FIVE",
       "thumbnail": "test-content/thumbnails/Destiny Series Lesson Five Breathing.png",
-      "category": "Meditation",
-      "dateAdd": "202609020800",
-      "date": "202609020800",
+      "media": "https://youtu.be/XrQXzgo1QNU?list=PLd025Vxj243Ax1bNO3ZhoK191U1yZ2wLo",
+      "audio": "",
       "author": "Kim Clement",
-      "video": {
-        "url": "https://youtu.be/XrQXzgo1QNU?list=PLd025Vxj243Ax1bNO3ZhoK191U1yZ2wLo",
-        "length": "53:34"
-      }
+      "category": "Meditation",
+      "date": "202609020800"
     },
     {
       "id": "video-004",
@@ -181,14 +136,11 @@
       "title": "Dying to Self",
       "subtitle": "Total Surrender to the Holy Spirit",
       "thumbnail": "test-content/thumbnails/Dying to Self-Total Surrender to the Holy Spirit.png",
-      "category": "Testimonies",
-      "dateAdd": "202609011900",
-      "date": "202609011900",
+      "media": "https://youtu.be/ZnWqLkx79nc?list=PLd025Vxj243Ax1bNO3ZhoK191U1yZ2wLo",
+      "audio": "",
       "author": "Kathryn Kuhlman",
-      "video": {
-        "url": "https://youtu.be/ZnWqLkx79nc?list=PLd025Vxj243Ax1bNO3ZhoK191U1yZ2wLo",
-        "length": "51:26"
-      }
+      "category": "Testimonies",
+      "date": "202609011900"
     },
     {
       "id": "slideshow-004",
@@ -196,48 +148,28 @@
       "title": "Morning Reflection",
       "subtitle": "Sample Magazine",
       "thumbnail": "test-content/thumbnails/Cool-White-Navy-Blue-Color-Palette-1024x691.webp",
+      "media": [
+        "test-content/slideshows/Brick-Navy-Blue-Color-Palette-1024x691.webp",
+        "test-content/slideshows/Cool-White-Navy-Blue-Color-Palette-1024x691.webp",
+        "test-content/slideshows/Coral-Navy-Blue-Color-Palette-1024x691.webp",
+        "test-content/slideshows/Sage-Green-Navy-Blue-Color-Palette-1024x691.webp"
+      ],
+      "audio": "test-content/audio/freesound_community-group-talking-29731.mp3",
+      "author": "",
       "category": "Meditation",
-      "dateAdd": "202609020902",
-      "date": "202709020902",
-      "author": "unknown",
-      "slideshow": {
-        "source": "images",
-        "slides": [
-          "test-content/slideshows/Brick-Navy-Blue-Color-Palette-1024x691.webp",
-          "test-content/slideshows/Cool-White-Navy-Blue-Color-Palette-1024x691.webp",
-          "test-content/slideshows/Coral-Navy-Blue-Color-Palette-1024x691.webp",
-          "test-content/slideshows/Sage-Green-Navy-Blue-Color-Palette-1024x691.webp"
-        ]
-      },
-      "audio": {
-        "url": "test-content/audio/freesound_community-group-talking-29731.mp3",
-        "type": "background",
-        "autoplay": true,
-        "loop": true
-      },
-      "slideCount": 2
+      "date": "202609020902"
     },
     {
       "id": "slideshow-005",
       "type": "slideshow",
       "title": "Trees",
       "subtitle": "Sample Magazine",
-      "thumbnail": "unknown",
+      "thumbnail": "",
+      "media": "pdf/Trees.pdf",
+      "audio": "test-content/audio/freesound_community-harp-glissando-down-69334.mp3",
+      "author": "",
       "category": "Affirmations",
-      "dateAdd": "202409011200",
-      "date": "202609030400",
-      "author": "unknown",
-      "slideshow": {
-        "source": "pdf",
-        "url": "pdf/Trees.pdf"
-      },
-      "audio": {
-        "url": "test-content/audio/freesound_community-harp-glissando-down-69334.mp3",
-        "type": "background",
-        "autoplay": true,
-        "loop": true
-      },
-      "slideCount": 2
+      "date": "202609030400"
     },
     {
       "id": "slideshow-006",
@@ -245,34 +177,27 @@
       "title": "Silent Gallery",
       "subtitle": "Sample Magazine",
       "thumbnail": "test-content/thumbnails/file_example_JPG_100kB.jpg",
+      "media": [
+        "test-content/thumbnails/Destiny Series Lesson Five Breathing.png",
+        "test-content/thumbnails/Dying to Self-Total Surrender to the Holy Spirit.png",
+        "test-content/thumbnails/The Holy Spirit as Guide.png"
+      ],
+      "audio": "",
+      "author": "",
       "category": "Book Club",
-      "dateAdd": "202608301000",
-      "date": "202608301000",
-      "author": "unknown",
-      "slideshow": {
-        "source": "images",
-        "slides": [
-          "test-content/thumbnails/Destiny Series Lesson Five Breathing.png",
-          "test-content/thumbnails/Dying to Self-Total Surrender to the Holy Spirit.png",
-          "test-content/thumbnails/The Holy Spirit as Guide.png"
-        ]
-      },
-      "slideCount": 2
+      "date": "202608301000"
     },
     {
       "id": "video-005",
       "type": "video",
       "title": "He sent His Son",
-      "subtitle": "unknown",
+      "subtitle": "",
       "thumbnail": "test-content/thumbnails/Meditation green and white.jpg",
-      "category": "Meditation",
-      "dateAdd": "202609042200",
-      "date": "202609042200",
+      "media": "test-content/videos/meditation-test.mp4",
+      "audio": "",
       "author": "naph",
-      "video": {
-        "url": "test-content/videos/meditation-test.mp4",
-        "length": "3:45"
-      }
+      "category": "Meditation",
+      "date": "202609042200"
     }
   ],
   "frontPage": {
