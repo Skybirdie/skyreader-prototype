@@ -145,7 +145,7 @@ AppSwitcher marks the active section.
 .video-library{
     position:relative;
 
-    z-index:20;
+    z-index:3000;
 
     width:var(--video-library-width);
     flex:0 0 var(--video-library-width);
