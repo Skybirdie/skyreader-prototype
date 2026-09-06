@@ -55,15 +55,17 @@ window.SettingsPanel=(function(){
             if(window.AudioController){
                 if(enabled)AudioController.unmute(); else AudioController.mute();
             }
-            StorageManager.setMuted(!enabled);
-        };
 
-        root.querySelector("#srSettingBackgroundMedia").onchange=()=>{
-            if(window.MediaManager){
-                MediaManager.setBackgroundPlayback(
-                    root.querySelector("#srSettingBackgroundMedia").checked
-                );
-            }
+root.querySelector("#srSettingBackgroundMedia").onchange=()=>{
+    if(window.MediaManager){
+        MediaManager.setBackgroundPlayback(
+            root.querySelector("#srSettingBackgroundMedia").checked
+        );
+    }
+};
+
+
+            StorageManager.setMuted(!enabled);
         };
         root.querySelector("#srSettingVolume").oninput=event=>{
             const value=Number(event.target.value);

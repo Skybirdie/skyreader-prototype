@@ -423,77 +423,29 @@ if (!centerpiece) {
         try {
             syncCategoriesFromManifest();
 
-const assignments = resolveDoors();
+            if (window.FrontMediaRenderer) {
+                FrontMediaRenderer.destroy();
+            }
 
-const center = assignments.center || {
-    category: categories[0] || "Book Club",
-    item: null
-};
+            mediaHost = null;
 
-/*
- * Preserve an actively playing Front Page centerpiece when the
- * user has enabled background media playback and the same item
- * is still assigned to the centerpiece.
- *
- * The Front Page still refreshes normally; we simply preserve the
- * existing centerpiece DOM instead of destroying its media element.
- */
-let preservedCenterDoor = null;
+            stage
+                .querySelectorAll(".front-door")
+                .forEach(n => n.remove());
 
-if (
-    window.FrontMediaRenderer &&
-    typeof FrontMediaRenderer.getCurrent === "function" &&
-    typeof FrontMediaRenderer.getCurrent() === "object"
-) {
-    const currentMedia = FrontMediaRenderer.getCurrent();
+            topWave.innerHTML = "";
+            wave.innerHTML = "";
 
-    const backgroundPlayback =
-        window.MediaManager &&
-        typeof MediaManager.getBackgroundPlayback === "function" &&
-        MediaManager.getBackgroundPlayback();
+            const assignments = resolveDoors();
 
-    if (
-        backgroundPlayback &&
-        currentMedia &&
-        center.item &&
-        String(currentMedia.id) === String(center.item.id)
-    ) {
-        preservedCenterDoor =
-            stage.querySelector(".front-door-center");
-    }
-}
+            const center = assignments.center || {
+                category: categories[0] || "Book Club",
+                item: null
+            };
 
-/*
- * Destroy the existing Front Page media only when it is not being
- * preserved. This retains the existing refresh behavior for all
- * non-playing/non-preserved states.
- */
-if (!preservedCenterDoor && window.FrontMediaRenderer) {
-    FrontMediaRenderer.destroy();
-}
-
-mediaHost = null;
-
-stage
-    .querySelectorAll(".front-door")
-    .forEach(n => {
-        if (n !== preservedCenterDoor) {
-            n.remove();
-        }
-    });
-
-topWave.innerHTML = "";
-wave.innerHTML = "";
-
-if (preservedCenterDoor) {
-    mediaHost =
-        preservedCenterDoor.querySelector("#frontMediaHost");
-} else {
-    const centerDoor =
-        createDoor(center, "center", true);
-
-    stage.appendChild(centerDoor);
-}
+            stage.appendChild(
+                createDoor(center, "center", true)
+            );
 
             const peripheral = assignments.peripheral || [];
 
