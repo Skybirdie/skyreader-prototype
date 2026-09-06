@@ -239,7 +239,8 @@ AppSwitcher marks the active section.
     z-index:101;
     display:flex;
     align-items:center;
-
+    background:rgba(255,255,255,.42);
+    border-radius: 10px;
     gap:4px;
 
     margin-left:auto;
@@ -275,11 +276,13 @@ AppSwitcher marks the active section.
     backdrop-filter:blur(7px);
     box-shadow:0 5px 18px rgba(0,0,0,.16);
     cursor:pointer;
+    text-shadow:0 2px 3px rgba(0,0,0,.55);
+    font-size: 15px;
 }
 
 .video-library-org-button:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(0,0,0,.18)}
 
-.video-library-org-button .icon{width:20px;height:20px;color:#fff}
+.video-library-org-button .icon{width:20px;height:20px;color:#fff;filter:drop-shadow(0 2px 3px rgba(0,0,0,.55));}
 
 .video-library-filter-active{
     display:none;
