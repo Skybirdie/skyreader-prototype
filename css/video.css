@@ -278,7 +278,7 @@ AppSwitcher marks the active section.
     backdrop-filter:blur(7px);
     cursor:pointer;
     text-shadow:0 2px 3px rgba(0,0,0,.55);
-    font-size:clamp(15px,2.5vw,20px);
+    font-size:clamp(15px,3.5vw,22px);
 }
 
 .video-library-org-button:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(0,0,0,.18)}
