@@ -406,11 +406,10 @@ function stopForMediaManager() {
 
         startTransition();
 
-        if(autoAdvance && index===total-1){
-            window.setTimeout(()=>{
-                if(playing)finish();
-            },450);
-        }
+        // Do not finish merely because the slideshow reached the last slide.
+        // next() owns end-of-sequence behavior so an active original/music
+        // track can cause the sequence to wrap back to slide 1 and continue
+        // until that audio naturally ends.
     }
 
     function next(fromTimer=false){
