@@ -112,7 +112,7 @@ html[data-theme="dark"] #frontPage{
     transition:transform .35s ease, filter .35s ease;
 }
 .front-door:hover img,
-.front-door:focus-visible img{transform:scale(1.035);filter:brightness(1.08);}
+.front-door:focus-visible img{transform:scale(1.035);filter:brightness(1.01);}
 
 .front-door::after{
     content:"";
