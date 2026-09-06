@@ -93,7 +93,7 @@ html[data-theme="dark"] #frontPage{
     transition:filter .22s ease, transform .22s ease;
 }
 
-.front-door:hover{filter:brightness(1.20);}
+.front-door:hover{filter:brightness(1.08);}
 .front-door:focus-visible{
     box-shadow:0 0 0 3px var(--front-focus,#fff), 0 0 0 6px color-mix(in srgb,var(--front-door-color,#222) 70%,transparent);
     z-index:90;
@@ -112,7 +112,7 @@ html[data-theme="dark"] #frontPage{
     transition:transform .35s ease, filter .35s ease;
 }
 .front-door:hover img,
-.front-door:focus-visible img{transform:scale(1.035);filter:brightness(1.01);}
+.front-door:focus-visible img{transform:scale(1.025);filter:brightness(1.03);}
 
 .front-door::after{
     content:"";
@@ -693,6 +693,60 @@ html[data-theme="dark"] #frontPage{
     flex:0 0 auto;
 }
 
+
+/* ---------------------------------------------------------
+   Front Page video controls
+
+   Video controls float over the centerpiece so the mute and
+   full-viewer buttons sit at the lower corners of the shape.
+   The play/progress controls remain centered between them.
+   --------------------------------------------------------- */
+.front-media-host[data-media-type="video"] .front-media-controls{
+    position:absolute;
+    left:0;
+    right:0;
+    bottom:clamp(8px,1.2vw,16px);
+    width:auto;
+    height:clamp(30px,3vw,42px);
+    margin:0;
+    z-index:10;
+    pointer-events:none;
+}
+
+.front-media-host[data-media-type="video"]
+.front-media-controls-left{
+    position:absolute;
+    left:clamp(8px,1.2vw,16px);
+    bottom:0;
+    pointer-events:auto;
+}
+
+.front-media-host[data-media-type="video"]
+.front-media-controls-center{
+    position:absolute;
+    left:50%;
+    bottom:0;
+    transform:translateX(-50%);
+    pointer-events:auto;
+}
+
+.front-media-host[data-media-type="video"]
+.front-media-controls-right{
+    position:absolute;
+    right:clamp(8px,1.2vw,16px);
+    bottom:0;
+    pointer-events:auto;
+}
+
+.front-media-host[data-media-type="video"]
+.front-media-content{
+    position:relative;
+}
+
+.front-media-host[data-media-type="video"]
+.front-media-control:hover{
+    filter:brightness(1.05);
+}
 
 /* ---------------------------------------------------------
    Video progress
