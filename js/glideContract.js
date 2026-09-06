@@ -1220,6 +1220,28 @@ window.GlideContract = (function () {
             }
 
 
+
+
+const raw = parseCompressed(compressed);
+
+console.log(
+    "[GlideContract] contractz decoded:",
+    raw
+);
+
+const normalized =
+    normalizeManifest(raw);
+
+console.log(
+    "[GlideContract] contractz normalized:",
+    normalized
+);
+
+return normalized;
+
+
+
+
             return normalized;
 
         } catch (error) {
@@ -1435,7 +1457,7 @@ window.GlideContract = (function () {
 
             try {
 
-                return parse(global);
+                return normalizeManifest(parse(global));
 
             } catch (error) {
 
@@ -1467,9 +1489,9 @@ window.GlideContract = (function () {
 
             try {
 
-                return parseCompressed(
-                    compressed
-                );
+                return normalizeManifest(
+    parseCompressed(compressed)
+);
 
             } catch (error) {
 
@@ -1498,7 +1520,7 @@ window.GlideContract = (function () {
 
             try {
 
-                return parse(query);
+                return normalizeManifest(parse(query));
 
             } catch (error) {
 
