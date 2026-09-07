@@ -302,6 +302,7 @@ AppSwitcher marks the active section.
 
 .video-library-filter-active.active{
     display:block;
+
 }
 
 .video-library-org-menu{
@@ -328,6 +329,7 @@ AppSwitcher marks the active section.
     background:rgba(255,255,255,.08);
     color:#fff;
     font:inherit;
+
 }
 
 .video-library-org-menu select + select{
@@ -375,6 +377,7 @@ AppSwitcher marks the active section.
 .video-view-button.active,
 .video-library-drawer-close:hover{
     background:rgba(255,255,255,.16);
+
 }
 
 
@@ -649,7 +652,7 @@ AppSwitcher marks the active section.
     transform:scale(1.05);
 
     box-shadow:
-        0 0 0 3px rgba(255,255,255,.85),
+        0 0 0 3px #66CDAA,
         0 8px 24px rgba(0,0,0,.4);
 }
 
@@ -834,8 +837,7 @@ AppSwitcher marks the active section.
     width:0;
 
     min-width:0;
-    min-height:0;
-
+    min-height:0; 
     height:93%;
 
     padding-bottom:20px +
