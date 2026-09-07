@@ -20,7 +20,14 @@ window.SlideshowUI=(function(){
         sort?.addEventListener("change",()=>SlideshowLibrary.setSort(sort.value)); filter?.addEventListener("change",()=>SlideshowLibrary.setFilter(filter.value)); cat?.addEventListener("change",()=>SlideshowLibrary.setCategory(cat.value));
         document.getElementById("slideshowSortButton")?.addEventListener("click",()=>toggleMenu("slideshowSortMenu","slideshowFilterMenu"));
         document.getElementById("slideshowFilterButton")?.addEventListener("click",()=>toggleMenu("slideshowFilterMenu","slideshowSortMenu"));
-        document.getElementById("slideshowAudioMode")?.addEventListener("change",e=>SlideshowViewer.setAudioMode(e.target.value));
+        document.getElementById("slideshowAudioMode")?.addEventListener("change",e=>{
+            if(e.target.value==="music"){
+                SlideshowViewer.openMusicPicker();
+            }else{
+                SlideshowViewer.closeMusicPicker();
+                SlideshowViewer.setAudioMode(e.target.value);
+            }
+        });
         document.addEventListener("click",e=>{if(!e.target.closest(".slideshow-organization-controls")){document.getElementById("slideshowSortMenu")?.classList.add("hidden");document.getElementById("slideshowFilterMenu")?.classList.add("hidden");}});
         const searchGroup=document.getElementById("slideshowSearchGroup"), searchButton=document.getElementById("slideshowSearchButton"), searchBox=document.getElementById("slideshowSearchBox");
         searchButton?.addEventListener("click",()=>{const open=searchGroup?.classList.toggle("searchOpen");if(open)searchBox?.focus();else{if(searchBox)searchBox.value="";SlideshowLibrary.setSearch("");}});

@@ -9,6 +9,23 @@ window.SlideshowViewer = (function () {
     const EFFECT_URL = "assets/audio/slide.mp3";
     const EFFECT_FALLBACK_URL = "assets/audio/pageturn.mp3";
     const MUSIC_LIBRARY = [];
+    const MUSIC_MANIFEST_URL = "assets/slideshowMusic/manifest.json";
+    let musicLibraryLoaded = false;
+    let selectedMusicTrack = null;
+    let musicPickerEl = null;
+    let musicPickerOpen = false;
+
+    function titleFromFilename(filename) {
+        const base = String(filename || "")
+            .replace(/\.[^/.]+$/, "")
+            .replace(/[-_]+/g, " ")
+            .trim();
+
+        return base.replace(
+            /\w\S*/g,
+            word => word.charAt(0).toUpperCase() + word.slice(1)
+        ) || filename;
+    }
 
     function setPlaybackChrome(active){
         document.querySelectorAll(".slideshow-toolbar,.slideshow-status-bar,.slideshow-playback-status,.slideshow-viewer-title").forEach(el=>{el.hidden=!active;});
@@ -29,6 +46,24 @@ window.SlideshowViewer = (function () {
             document.documentElement.dataset.slideshowEscapeBound = "true";
             document.addEventListener("keydown", event => {
                 if (event.key !== "Escape") return;
+
+                /* The music picker is a popup living inside the slideshow
+                   viewer. Escape should dismiss whichever is the top-most
+                   layer first. This check has to happen here, in the same
+                   capture-phase listener that closes the whole viewer —
+                   a stopPropagation() added inside the picker's own search
+                   box cannot stop a capture-phase document listener, since
+                   capture runs top-down before the event ever reaches the
+                   search box. Without this check, Escape while the music
+                   picker is open (whether or not its search box has focus)
+                   closes the entire slideshow instead of just the popup. */
+                if (musicPickerOpen) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    closeMusicPicker();
+                    return;
+                }
+
                 if (current) {
                     event.preventDefault();
                     event.stopPropagation();
@@ -46,8 +81,99 @@ window.SlideshowViewer = (function () {
         });
         window.addEventListener("resize", refreshLayout);
         renderLanding();
+        loadMusicLibrary();
         setAudioMode(current?.audio ? "original" : "effects");
         return true;
+    }
+
+
+    /*
+    ---------------------------------------------------
+     Music library
+
+     Reads assets/slideshowMusic/manifest.json — a simple
+     list the user maintains, since a static site has no
+     way to list a folder's contents on its own. Each
+     entry can be either a bare filename:
+
+       "track.mp3"
+
+     or an object with a custom display title:
+
+       { "file": "track.mp3", "title": "My Track" }
+
+     A missing or malformed manifest is not treated as an
+     error — it just leaves the Music option unavailable
+     rather than breaking anything else.
+    ---------------------------------------------------
+    */
+
+    async function loadMusicLibrary() {
+
+        try {
+
+            const response = await fetch(MUSIC_MANIFEST_URL, { cache: "no-store" });
+
+            if (!response.ok) {
+                throw new Error("Music manifest not found: " + response.status);
+            }
+
+            const raw = await response.json();
+
+            if (!Array.isArray(raw)) {
+                throw new Error("Music manifest must be a JSON array.");
+            }
+
+            MUSIC_LIBRARY.length = 0;
+
+            raw.forEach(entry => {
+
+                const file =
+                    typeof entry === "string"
+                        ? entry
+                        : (entry && entry.file) || "";
+
+                if (!file) {
+                    return;
+                }
+
+                const title =
+                    (entry && typeof entry === "object" && entry.title) ||
+                    titleFromFilename(file);
+
+                MUSIC_LIBRARY.push({
+                    file,
+                    title,
+                    url: MUSIC_MANIFEST_URL.replace("manifest.json", "") + file
+                });
+
+            });
+
+        } catch (error) {
+
+            console.warn("[SlideshowViewer] Unable to load music library.", error);
+
+        } finally {
+
+            musicLibraryLoaded = true;
+
+            const select = document.getElementById("slideshowAudioMode");
+
+            if (select) {
+
+                const music = select.querySelector('option[value="music"]');
+
+                if (music) {
+                    music.disabled = !MUSIC_LIBRARY.length;
+                }
+
+            }
+
+            if (musicPickerOpen) {
+                renderMusicPickerList();
+            }
+
+        }
     }
     function renderLanding() {
         const container = document.getElementById("slideshowLandingLibrary"); if (!container) return;
@@ -341,8 +467,8 @@ function stopForMediaManager() {
         audioCompleted=false;
         if(!current)return;
         if(audioMode === "original" && current.audio && audio){ audio.src=current.audio; audio.muted=muted; audio.load(); if(playing)audio.play().catch(()=>{}); }
-        else if(audioMode === "music" && MUSIC_LIBRARY.length){
-            const track=MUSIC_LIBRARY[0];
+        else if(audioMode === "music" && (selectedMusicTrack || MUSIC_LIBRARY.length)){
+            const track=selectedMusicTrack || MUSIC_LIBRARY[0];
             musicAudio=new Audio(track.url);
             musicAudio.loop=false;
             musicAudio.muted=muted;
@@ -361,6 +487,180 @@ function stopForMediaManager() {
         if(select){ const original=select.querySelector('option[value="original"]'); if(original) original.disabled=!current?.audio; const music=select.querySelector('option[value="music"]'); if(music) music.disabled=!MUSIC_LIBRARY.length; }
         startSelectedAudio();
         setStatus(audioMode==="original"?"Original sound":audioMode==="music"?"Music":audioMode==="effects"?"Page turn effects":"No sound");
+    }
+
+
+    /*
+    ---------------------------------------------------
+     Music picker popup
+
+     Shown whenever the user chooses "Music" from the
+     audio-mode dropdown. Lets them search/filter the
+     tracks from the music library and pick one; picking
+     a track is what actually switches audioMode to
+     "music" — selecting the dropdown option alone just
+     opens the picker.
+    ---------------------------------------------------
+    */
+
+    function buildMusicPicker() {
+
+        if (musicPickerEl) {
+            return musicPickerEl;
+        }
+
+        const label = document.querySelector(".slideshow-audio-mode");
+
+        if (!label) {
+            return null;
+        }
+
+        const panel = document.createElement("div");
+        panel.className = "slideshow-music-picker";
+        panel.hidden = true;
+
+        const search = document.createElement("input");
+        search.type = "search";
+        search.className = "slideshow-music-picker-search";
+        search.placeholder = "Search music…";
+        search.setAttribute("aria-label", "Search music");
+        search.addEventListener("input", () => {
+            renderMusicPickerList(search.value);
+        });
+        search.addEventListener("click", e => e.stopPropagation());
+        search.addEventListener("keydown", e => e.stopPropagation());
+
+        const list = document.createElement("div");
+        list.className = "slideshow-music-picker-list";
+
+        panel.append(search, list);
+        label.appendChild(panel);
+
+        musicPickerEl = { panel, search, list };
+
+        return musicPickerEl;
+    }
+
+    function renderMusicPickerList(filter = "") {
+
+        const picker = buildMusicPicker();
+
+        if (!picker) {
+            return;
+        }
+
+        const { list } = picker;
+        list.innerHTML = "";
+
+        const query = filter.trim().toLowerCase();
+
+        const matches = MUSIC_LIBRARY.filter(
+            track => !query || track.title.toLowerCase().includes(query)
+        );
+
+        if (!musicLibraryLoaded) {
+
+            const loading = document.createElement("div");
+            loading.className = "slideshow-music-picker-empty";
+            loading.textContent = "Loading music…";
+            list.appendChild(loading);
+            return;
+        }
+
+        if (!matches.length) {
+
+            const empty = document.createElement("div");
+            empty.className = "slideshow-music-picker-empty";
+            empty.textContent = MUSIC_LIBRARY.length
+                ? "No matches."
+                : "No music files available yet.";
+            list.appendChild(empty);
+            return;
+        }
+
+        matches.forEach(track => {
+
+            const item = document.createElement("button");
+            item.type = "button";
+            item.className = "slideshow-music-picker-item";
+
+            if (selectedMusicTrack && selectedMusicTrack.file === track.file) {
+                item.classList.add("is-selected");
+            }
+
+            item.textContent = track.title;
+
+            item.addEventListener("click", () => {
+                selectedMusicTrack = track;
+                setAudioMode("music");
+                closeMusicPicker();
+            });
+
+            list.appendChild(item);
+
+        });
+    }
+
+    function openMusicPicker() {
+
+        const picker = buildMusicPicker();
+
+        if (!picker) {
+            return;
+        }
+
+        picker.panel.hidden = false;
+        musicPickerOpen = true;
+
+        picker.search.value = "";
+        renderMusicPickerList();
+
+        picker.search.focus();
+
+        if (!document.documentElement.dataset.musicPickerOutsideBound) {
+
+            document.documentElement.dataset.musicPickerOutsideBound = "true";
+
+            document.addEventListener("click", event => {
+
+                if (!musicPickerOpen || !musicPickerEl) {
+                    return;
+                }
+
+                if (
+                    musicPickerEl.panel.contains(event.target) ||
+                    event.target.closest(".slideshow-audio-mode") === document.querySelector(".slideshow-audio-mode")
+                ) {
+                    return;
+                }
+
+                closeMusicPicker();
+
+            });
+
+        }
+    }
+
+    function closeMusicPicker() {
+
+        if (!musicPickerEl) {
+            return;
+        }
+
+        musicPickerEl.panel.hidden = true;
+        musicPickerOpen = false;
+
+        /*
+        Leaving the dropdown showing "Music" without an
+        actual selection is confusing — revert it to
+        whatever mode is genuinely active.
+        */
+
+        const select = document.getElementById("slideshowAudioMode");
+
+        if (select) {
+            select.value = audioMode;
+        }
     }
     async function show(indexToShow,direction=1,autoAdvance=false){
         if(!current||transitionBusy)return;
@@ -686,6 +986,8 @@ return {
     renderLanding,
     setTransition:name=>SlideshowTransitions.set(name),
     setAudioMode,
+    openMusicPicker,
+    closeMusicPicker,
     getCurrent:()=>current,
     getMusicLibrary:()=>[...MUSIC_LIBRARY],
     isPlaying:()=>playing,
