@@ -11,6 +11,40 @@ window.ShareManager = (function () {
         return url.toString();
     }
 
+    function isEmbedded() {
+        try {
+            return window.top !== window.self;
+        } catch (error) {
+            /* Cross-origin frame access can throw; treat that as embedded. */
+            return true;
+        }
+    }
+
+    function cleanUrl(value) {
+        if (value === undefined || value === null) return "";
+
+        let text = String(value).trim();
+        if (!text) return "";
+
+        const match = text.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+        if (match) {
+            text = String(match[2] || match[1] || "").trim();
+        }
+
+        return text;
+    }
+
+    function getGlideUrl(item) {
+        if (!item || typeof item !== "object") return "";
+
+        return cleanUrl(
+            item.glideUrl ||
+            item.raw?.glideUrl ||
+            item.shareUrl ||
+            item.raw?.shareUrl
+        );
+    }
+
     function buildUrl(section, id) {
         const url = new URL(baseUrl());
         url.searchParams.set(SECTION_PARAM, section);
@@ -18,9 +52,36 @@ window.ShareManager = (function () {
         return url.toString();
     }
 
+    function buildShareUrl(section, item) {
+        if (!item || !item.id) return "";
+
+        /*
+         * When SkyMedia is embedded in Glide, prefer the per-item
+         * Glide deep link supplied with the contract. That sends the
+         * recipient to the actual Glide item rather than the host
+         * SkyMedia page.
+         *
+         * Outside Glide, keep the existing SkyMedia host deep link.
+         */
+        /*
+         * A populated Glide row URL is authoritative for sharing this
+         * individual item. Do not gate it on iframe detection: browser
+         * embedding state is not a reliable indicator of where the share
+         * action should point, and the contract already tells us whether
+         * a Glide destination exists.
+         *
+         * If no Glide URL was supplied, preserve the existing SkyMedia
+         * deep-link behavior.
+         */
+        const glideUrl = getGlideUrl(item);
+        if (glideUrl) return glideUrl;
+
+        return buildUrl(section, item.id);
+    }
+
     async function share(section, item) {
         if (!item || !item.id) return false;
-        const url = buildUrl(section, item.id);
+        const url = buildShareUrl(section, item);
         const data = { title: item.title || "SkyReader", text: item.title || "", url };
         try {
             if (navigator.share && window.isSecureContext !== false) {
@@ -86,5 +147,5 @@ window.ShareManager = (function () {
         return false;
     }
 
-    return { buildUrl, share, readTarget, openDeepLink };
+    return { buildUrl, buildShareUrl, share, readTarget, openDeepLink };
 })();
