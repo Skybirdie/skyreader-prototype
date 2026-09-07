@@ -1418,6 +1418,7 @@ html[data-theme="dark"] .video-narrow-library-toggle{
     color:var(--text);
 
     box-shadow:
+        0 0 0 2px #66CDAA,
         0 2px 8px rgba(0,0,0,.14);
 }
 
