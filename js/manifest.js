@@ -131,9 +131,23 @@ console.log(
     },
 
     all() {
-        return this._data
+        const items = this._data
             ? [...this._data.content]
             : [];
+
+        /*
+         * Publishing gate: an item is only ever exposed to any
+         * consumer (Reader/Booklets library, Video library, Slideshow
+         * library, or the Front Page) once it has a valid release
+         * date-time that is on or before right now. This is the one
+         * choke point every section's data flows through, so
+         * filtering here is enough to keep unpublished inventory out
+         * of every library grid and out of the front-door shapes —
+         * no per-section filtering needed.
+         */
+        return window.SkyDate
+            ? items.filter(item => SkyDate.isVisible(item.date))
+            : items;
     },
 
     content(type) {
