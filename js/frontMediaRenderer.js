@@ -365,6 +365,55 @@ function openFull(item){
         }
 
         /*
+         * A legacy/Glide item can occasionally arrive in the video
+         * section with an image URL in media. Do not send an image
+         * URL to <video>: the browser will reject it and the centerpiece
+         * can appear empty. Render image media directly instead.
+         */
+        function isImageMedia(url){
+            const clean=String(url || "")
+                .split("#")[0]
+                .split("?")[0]
+                .toLowerCase();
+
+            return /\.(?:jpg|jpeg|png|webp|gif|avif|bmp|svg)$/.test(clean);
+        }
+
+        if(isImageMedia(videoUrl)){
+            const image=
+                document.createElement("img");
+
+            image.className="front-media-video";
+            image.src=videoUrl;
+            image.alt=item.title || "";
+            image.draggable=false;
+
+            ui.content.appendChild(image);
+
+            ui.status.textContent="";
+
+            addOpenControl(
+                ui.controlsRight,
+                item
+            );
+
+            console.log(
+                "[FrontMediaRenderer] Image media rendered in video centerpiece.",
+                {
+                    id:item?.id,
+                    source:videoUrl
+                }
+            );
+
+            cleanupFn=()=>{
+                image.removeAttribute("src");
+                image.remove();
+            };
+
+            return;
+        }
+
+        /*
          * Normal video files continue to use the native HTML5
          * video element.
          */
