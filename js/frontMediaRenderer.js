@@ -120,9 +120,32 @@ function openFull(item){
         window.setTimeout(()=>{
             try{
                 if(item.section === "reader"){
-                    const viewer = document.getElementById("viewerArea");
-                    if(viewer && !document.fullscreenElement){
-                        viewer.requestFullscreen?.().catch(()=>{});
+                    /*
+                     * Do NOT fullscreen #viewerArea directly. It is an
+                     * inner content-only div: the reader's toolbar,
+                     * status bar, and background all live in sibling
+                     * elements (#toolbar, #statusBar, #viewerBackground).
+                     * Fullscreening #viewerArea alone pulls only that
+                     * div into the browser's top layer — everything
+                     * else (background image, close button, page
+                     * controls) is left outside it and simply isn't
+                     * rendered, and #viewerArea's own transparent
+                     * background reveals the browser's default black
+                     * ::backdrop. That produced a black screen with no
+                     * visible way to exit, and a broken layout once
+                     * fullscreen was dismissed (e.g. via the device
+                     * back button).
+                     *
+                     * The Reader's own real fullscreen path
+                     * (ui.toggleFullscreen) fullscreens the whole
+                     * document instead, which keeps the reader's
+                     * chrome (including the close button) inside the
+                     * fullscreen element. Match that here so book
+                     * playback opened from the Front Page behaves the
+                     * same way as opening it from the Reader itself.
+                     */
+                    if(!document.fullscreenElement){
+                        document.documentElement.requestFullscreen?.().catch(()=>{});
                     }
                 }
                 else if(item.section === "video"){
@@ -1135,8 +1158,41 @@ async function renderSlideshow(item,token){
         ui.controlsCenter.append(prev,next); addOpenControl(ui.controlsRight,item);
         let pdf=null,page=1,busy=false;
         function update(){ui.status.textContent=pdf?`${page} / ${pdf.numPages}`:"Loading…";prev.disabled=!pdf||page<=1;next.disabled=!pdf||page>=pdf.numPages;}
-        async function draw(){if(!pdf||token!==generation)return; busy=true;update(); const p=await pdf.getPage(page); const base=p.getViewport({scale:1}); const maxW=Math.max(80,ui.content.clientWidth-20),maxH=Math.max(80,ui.content.clientHeight-20); const scale=Math.min(maxW/base.width,maxH/base.height); const vp=p.getViewport({scale:Math.max(.1,scale)}); canvas.width=Math.ceil(vp.width);canvas.height=Math.ceil(vp.height);canvas.classList.remove("is-entering");void canvas.offsetWidth; await p.render({canvasContext:canvas.getContext("2d",{alpha:false}),viewport:vp}).promise;canvas.classList.add("is-entering");busy=false;update();}
-        async function go(delta){if(!pdf||busy)return;const target=Math.max(1,Math.min(pdf.numPages,page+delta));if(target===page)return;page=target;await draw();}
+        async function draw(direction=0){
+            if(!pdf||token!==generation)return;
+            busy=true;update();
+            const p=await pdf.getPage(page);
+            const base=p.getViewport({scale:1});
+            const maxW=Math.max(80,ui.content.clientWidth-20),maxH=Math.max(80,ui.content.clientHeight-20);
+            const scale=Math.min(maxW/base.width,maxH/base.height);
+            const vp=p.getViewport({scale:Math.max(.1,scale)});
+            canvas.width=Math.ceil(vp.width);canvas.height=Math.ceil(vp.height);
+            canvas.classList.remove("is-entering","is-entering-next","is-entering-prev");
+            void canvas.offsetWidth;
+            await p.render({canvasContext:canvas.getContext("2d",{alpha:false}),viewport:vp}).promise;
+            /*
+             * Match the Reader's own page-turn treatment: a page-turn
+             * sound plus a transition that visually reflects the
+             * direction of travel, rather than the same flat fade for
+             * both prev and next.
+             */
+            canvas.classList.add(
+                direction>0 ? "is-entering-next" :
+                direction<0 ? "is-entering-prev" :
+                "is-entering"
+            );
+            busy=false;update();
+        }
+        async function go(delta){
+            if(!pdf||busy)return;
+            const target=Math.max(1,Math.min(pdf.numPages,page+delta));
+            if(target===page)return;
+            page=target;
+            if(window.AudioController && typeof AudioController.playPageTurn==="function"){
+                AudioController.playPageTurn();
+            }
+            await draw(delta>0?1:-1);
+        }
         try{
             if(!window.pdfjsLib)throw new Error("PDF.js unavailable");
             const url=item.raw.pdf||item.raw.media||item.raw.url||item.raw.PDF||""; if(!url)throw new Error("PDF URL missing");
