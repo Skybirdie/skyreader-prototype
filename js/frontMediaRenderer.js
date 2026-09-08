@@ -673,6 +673,8 @@ async function renderSlideshow(item,token){
         const canvas=document.createElement("canvas");
         canvas.className="front-media-pdf";
         ui.content.appendChild(canvas);
+        const zoom=window.SkyMediaZoom ? SkyMediaZoom.create(ui.content) : null;
+        if(zoom) zoom.setTarget(canvas);
 
         const prevB=control(
             "previous",
@@ -686,13 +688,13 @@ async function renderSlideshow(item,token){
             "play",
             "Play slideshow",
             ()=>{
-                if(!pdf || busy) return;
+                if(!pdf) return;
 
                 playing=!playing;
                 clear();
 
                 if(playing){
-                    schedule();
+                    if(!busy) schedule();
                     if(audio) audio.play().catch(()=>{});
                 }else if(audio){
                     audio.pause();
@@ -832,6 +834,7 @@ async function renderSlideshow(item,token){
                 }
             }finally{
                 busy=false;
+                if(playing && !timer) schedule();
             }
         }
 
@@ -914,6 +917,7 @@ async function renderSlideshow(item,token){
 
         cleanupFn=()=>{
             clear();
+            zoom?.destroy();
             pdf=null;
             if(audio){
                 audio.pause();
@@ -942,6 +946,8 @@ async function renderSlideshow(item,token){
     img.draggable=false;
 
     ui.content.appendChild(img);
+    const zoom=window.SkyMediaZoom ? SkyMediaZoom.create(ui.content) : null;
+    if(zoom) zoom.setTarget(img);
 
     function clear(){
         if(timer){
@@ -1143,6 +1149,7 @@ async function renderSlideshow(item,token){
 
     cleanupFn=()=>{
         clear();
+        zoom?.destroy();
         if(audio){
             audio.pause();
             audio.currentTime=0;
@@ -1154,6 +1161,8 @@ async function renderSlideshow(item,token){
     async function renderPdf(item,token){
         const ui=shell(item,"reader");
         const canvas=document.createElement("canvas"); canvas.className="front-media-pdf"; ui.content.appendChild(canvas);
+        const zoom=window.SkyMediaZoom ? SkyMediaZoom.create(ui.content) : null;
+        if(zoom) zoom.setTarget(canvas);
         const prev=control("previous","Previous page",()=>go(-1)); const next=control("next","Next page",()=>go(1));
         ui.controlsCenter.append(prev,next); addOpenControl(ui.controlsRight,item);
         let pdf=null,page=1,busy=false;
@@ -1198,7 +1207,7 @@ async function renderSlideshow(item,token){
             const url=item.raw.pdf||item.raw.media||item.raw.url||item.raw.PDF||""; if(!url)throw new Error("PDF URL missing");
             pdf=await pdfjsLib.getDocument({url}).promise; if(token!==generation)return; await draw();
         }catch(e){console.error("[FrontMediaRenderer] PDF preview failed",e);ui.content.innerHTML="";const img=document.createElement("img");img.className="front-media-fallback";img.src=item.thumbnail||"assets/default-thumbnail.png";img.alt=item.title||"";ui.content.appendChild(img);ui.status.textContent="PDF preview unavailable";}
-        cleanupFn=()=>{pdf=null;}; update();
+        cleanupFn=()=>{zoom?.destroy();pdf=null;}; update();
     }
 
 function stopPlayback(){

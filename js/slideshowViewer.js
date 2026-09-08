@@ -1,7 +1,7 @@
 "use strict";
 
 window.SlideshowViewer = (function () {
-    let root, stage, title, status, audio, landing, current = null, index = 0, timer = null, playing = false, muted = false, transitionBusy = false, transitionGeneration = 0;
+    let root, stage, title, status, audio, landing, current = null, index = 0, timer = null, playing = false, muted = false, transitionBusy = false, transitionGeneration = 0, pendingAdvance = false;
     let audioMode = "none";
     let audioCompleted = false;
     let musicAudio = null;
@@ -14,6 +14,7 @@ window.SlideshowViewer = (function () {
     let selectedMusicTrack = null;
     let musicPickerEl = null;
     let musicPickerOpen = false;
+    let zoomController = null;
 
     function titleFromFilename(filename) {
         const base = String(filename || "")
@@ -697,6 +698,8 @@ function stopForMediaManager() {
 
         const old=stage.querySelector(".slideshow-slide");
         const fresh=built.element;
+        const zoomTarget=fresh.querySelector("img,canvas");
+        if(zoomController) zoomController.setTarget(zoomTarget);
 
         const startTransition=()=>{
             if(generation!==transitionGeneration || !current)return;
@@ -711,7 +714,14 @@ function stopForMediaManager() {
                 done:()=>{
                     if(generation!==transitionGeneration || !current)return;
                     transitionBusy=false;
-                    schedule();
+                    if(pendingAdvance){
+                        pendingAdvance=false;
+                        if(playing){
+                            next(true);
+                            return;
+                        }
+                    }
+                    if(playing) schedule();
                 }
             });
         };
@@ -730,6 +740,10 @@ function stopForMediaManager() {
 
     function next(fromTimer=false){
         if(!current)return;
+        if(transitionBusy){
+            if(fromTimer && playing) pendingAdvance=true;
+            return;
+        }
         if(!fromTimer) stopTimer();
         const total=slideCount();
         if(!total)return;
@@ -756,15 +770,27 @@ function stopForMediaManager() {
     }
     function previous(){if(!current)return;if(index>0){playing=false;show(index-1,-1);setStatus("Paused");}}
     function togglePlay(){
-        if(!current)return; playing=!playing;
-        if(playing){setStatus("Playing");schedule();startSelectedAudio();}
-        else{setStatus("Paused");stopTimer();audio?.pause();musicAudio?.pause();}
+        if(!current)return;
+        playing=!playing;
+        if(playing){
+            pendingAdvance=false;
+            setStatus("Playing");
+            startSelectedAudio();
+            if(!transitionBusy) schedule();
+        }else{
+            pendingAdvance=false;
+            setStatus("Paused");
+            stopTimer();
+            audio?.pause();
+            musicAudio?.pause();
+        }
     }
 
 function restart(){
     if(!current) return;
 
     transitionGeneration++;
+    pendingAdvance=false;
 
     console.log("[SlideshowViewer] Restart requested.");
 
@@ -835,6 +861,7 @@ function restart(){
 
 function finish(){
     playing=false;
+    pendingAdvance=false;
     stopTimer();
     audio?.pause();
     musicAudio?.pause();
@@ -868,6 +895,10 @@ if (
             try{ current.pdfDocument.destroy(); }catch(e){}
         }
         if(stage)stage.innerHTML="";
+        if(zoomController){
+            zoomController.destroy();
+            zoomController=null;
+        }
         if(root)root.classList.remove("has-slideshow");
         setPlaybackChrome(false);
         if(landing){
@@ -968,6 +999,13 @@ if (
         landing?.classList.add("hidden");
 
         stage.innerHTML="";
+        if(zoomController){
+            zoomController.destroy();
+            zoomController=null;
+        }
+        if(window.SkyMediaZoom){
+            zoomController=SkyMediaZoom.create(stage);
+        }
         updateTitle();
         updateStatus();
 
