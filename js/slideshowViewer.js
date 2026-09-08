@@ -1,7 +1,7 @@
 "use strict";
 
 window.SlideshowViewer = (function () {
-    let root, stage, title, status, audio, landing, current = null, index = 0, timer = null, playing = false, muted = false, transitionBusy = false;
+    let root, stage, title, status, audio, landing, current = null, index = 0, timer = null, playing = false, muted = false, transitionBusy = false, transitionGeneration = 0;
     let audioMode = "none";
     let audioCompleted = false;
     let musicAudio = null;
@@ -180,12 +180,25 @@ window.SlideshowViewer = (function () {
         container.innerHTML = "";
         const recentContainer = document.getElementById("slideshowLandingRecent");
         if (recentContainer) recentContainer.innerHTML = "";
+        const mediaRow = document.querySelector(".slideshow-landing-media-row");
         const list = window.SlideshowLibrary ? SlideshowLibrary.getDisplayed() : [];
         let recentItem = null;
         try {
             const ids = JSON.parse(localStorage.getItem("skyslideshow-recent") || "[]");
             if (Array.isArray(ids) && ids.length) recentItem = list.find(x => x.id === ids[0]) || null;
         } catch (e) {}
+
+        /*
+         * When there is no recent item, the media row (which holds the
+         * View Again card) has to collapse instead of sitting there as
+         * a fixed-height empty band — otherwise there is a permanent
+         * gap between the hero and the library row below. The library
+         * section's own flex-grow then absorbs the freed space.
+         */
+        if (mediaRow) {
+            mediaRow.classList.toggle("is-empty", !recentItem);
+        }
+
         if (recentContainer && recentItem) {
             const b = document.createElement("button"); b.type="button"; b.className="slideshow-landing-recent-card";
             const img=document.createElement("img");
@@ -664,6 +677,7 @@ function stopForMediaManager() {
     }
     async function show(indexToShow,direction=1,autoAdvance=false){
         if(!current||transitionBusy)return;
+        const generation=transitionGeneration;
 
         const total=slideCount();
         if(!total)return;
@@ -685,6 +699,7 @@ function stopForMediaManager() {
         const fresh=built.element;
 
         const startTransition=()=>{
+            if(generation!==transitionGeneration || !current)return;
             stage.appendChild(fresh);
             transitionBusy=true;
 
@@ -694,6 +709,7 @@ function stopForMediaManager() {
                 newSlide:fresh,
                 direction,
                 done:()=>{
+                    if(generation!==transitionGeneration || !current)return;
                     transitionBusy=false;
                     schedule();
                 }
@@ -714,6 +730,7 @@ function stopForMediaManager() {
 
     function next(fromTimer=false){
         if(!current)return;
+        if(!fromTimer) stopTimer();
         const total=slideCount();
         if(!total)return;
 
@@ -746,6 +763,8 @@ function stopForMediaManager() {
 
 function restart(){
     if(!current) return;
+
+    transitionGeneration++;
 
     console.log("[SlideshowViewer] Restart requested.");
 
@@ -832,6 +851,7 @@ function finish(){
 }
 
     function close(){
+        transitionGeneration++;
         if(document.fullscreenElement && document.fullscreenElement===root){
             document.exitFullscreen?.();
         }

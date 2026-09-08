@@ -8,7 +8,7 @@ window.SlideshowUI=(function(){
         bind("slideshowPrevious",()=>SlideshowViewer.previous());
         bind("slideshowNext",()=>SlideshowViewer.next());
         bind("slideshowPlay",()=>{SlideshowViewer.togglePlay();updatePlay();});
-        bind("slideshowRestart",()=>SlideshowViewer.restart());
+        bind("slideshowRestart",()=>{SlideshowViewer.restart();updatePlay();});
         bind("slideshowMute",()=>{const m=SlideshowViewer.toggleMute();const el=document.getElementById("slideshowMute");if(el){el.title=m?"Unmute audio":"Mute audio";el.setAttribute("aria-label",m?"Unmute audio":"Mute audio");const use=el.querySelector("use");if(use)use.setAttribute("href",m?"#icon-volume-off":"#icon-volume");}});
         bind("slideshowShare",()=>{const item=SlideshowViewer.getCurrent?.(); if(item&&window.ShareManager)ShareManager.share("slideshow",item);});
         bind("slideshowFullscreen",()=>SlideshowViewer.toggleFullscreen());
