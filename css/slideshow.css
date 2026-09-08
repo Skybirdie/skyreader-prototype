@@ -272,9 +272,16 @@ position:relative;    height: fit-content;
 }
 
 
-.slideshow-landing-media-row{flex:0 0 25%;min-height:0;width:100%;display:flex;justify-content:center;overflow:hidden}
+.slideshow-landing-media-row{flex:0 0 25%;min-height:0;width:100%;display:flex;justify-content:center;overflow:hidden;transition:flex-basis .3s ease,height .3s ease,padding .3s ease}
 .slideshow-landing-continue-section{width:100%;padding:10px}
-.slideshow-landing-library-section{flex:1 1 50%; height:100%}
+.slideshow-landing-library-section{flex:1 1 50%; height:100%; transition:flex-basis .3s ease}
+
+/*
+ * No View Again card to show — collapse the media row entirely so
+ * the library section's flex-grow fills the freed space up to the
+ * hero instead of leaving a gap.
+ */
+.slideshow-landing-media-row.is-empty{flex:0 0 0;height:0;padding:0;overflow:hidden}
 
 
 /* =======================================================
@@ -418,11 +425,13 @@ position:relative;    height: fit-content;
   backdrop-filter:blur(7px);
   box-shadow:0 5px 18px rgba(0,0,0,.16);z-index:10}
 
-.slideshow-toolbar-main{bottom:12px;left:50%;transform:translateX(-50%)}
+.slideshow-toolbar-main{bottom:0;left:50%;transform:translateX(-50%)}
 
-.slideshow-toolbar-secondary{top:12px;right:12px}
+.slideshow-toolbar-secondary{top:8px;right:12px;}
 
-.slideshow-control{width:42px;height:42px;flex:0 0 42px;padding:0;border:1px solid color-mix(in srgb,var(--control-text) 22%,transparent);border-radius:50%;background:rgba(255,255,255,.30)!important;color:var(--control-text);backdrop-filter:blur(7px);box-shadow:0 5px 18px rgba(0,0,0,.16);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .25s,transform .25s,box-shadow .25s}
+
+
+.slideshow-control{width:42px;height:42px;flex:0 0 42px;bottom:10px;border:1px solid color-mix(in srgb,var(--control-text) 22%,transparent);border-radius:50%;background:rgba(255,255,255,.30)!important;color:var(--control-text);backdrop-filter:blur(7px);box-shadow:0 5px 18px rgba(0,0,0,.16);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .25s,transform .25s,box-shadow .25s}
 
 .slideshow-control .icon{width:20px;height:20px;color:var(--control-text);stroke:currentColor}
 .slideshow-control:hover{background:rgba(255,255,255,.42)!important;transform:translateY(-2px);box-shadow:0 6px 18px rgba(0,0,0,.18)}
@@ -524,6 +533,12 @@ position:relative;    height: fit-content;
     .slideshow-stage{width:100%;height:auto;aspect-ratio:16/9;min-height:0;max-height:calc(100dvh - var(--slideshow-topbar-height) - 82px)}
     .slideshow-viewer-title{top:10px;max-width:60%;font-size:16px}
     .slideshow-toolbar-main{max-width:calc(100% - 12px);overflow-x:auto}.slideshow-toolbar-secondary{top:8px;right:8px}.slideshow-control{width:34px;height:34px;flex:0 0 34px}
+.slideshow-viewer.has-slideshow .slideshow-stage{
+        height:calc(100% - 104px)!important;
+        max-height:calc(100% - 104px)!important;
+    }
+    .slideshow-viewer.has-slideshow .slideshow-toolbar-main{bottom:6px}
+    .slideshow-viewer.has-slideshow .slideshow-toolbar-secondary{top:6px}
     .slideshow-audio-mode select{max-width:100px}.slideshow-search-group.searchOpen input{width:min(190px,48vw)}
 }
 
@@ -572,13 +587,15 @@ position:relative;    height: fit-content;
 /* Final slide-show playback sizing: use essentially the whole viewer area. */
 .slideshow-viewer.has-slideshow .slideshow-stage{
   width:calc(100% - 16px)!important;
-  height:calc(100% - 16px)!important;
+  height:calc(100% - 116px)!important;
   max-width:calc(100% - 16px)!important;
-  max-height:calc(100% - 16px)!important;
+  max-height:calc(100% - 116px)!important;
   min-width:0!important;
   min-height:0!important;
   aspect-ratio:auto!important;
 }
+.slideshow-viewer.has-slideshow .slideshow-toolbar-main{bottom:8px}
+.slideshow-viewer.has-slideshow .slideshow-toolbar-secondary{top:8px}
 .slideshow-viewer.has-slideshow .slideshow-slide img{
   width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;
 }
