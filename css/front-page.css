@@ -580,7 +580,7 @@ html[data-theme="dark"] #frontPage{
 .front-media-pdf{background:#fff;box-shadow:0 4px 20px rgba(0,0,0,.24);}
 .front-media-fallback{width:100%;height:100%;object-fit:cover;}
 .front-media-slide.is-entering,.front-media-pdf.is-entering{animation:frontMediaEnter .28s ease both;}
-@keyframes frontMediaEnter{from{opacity:.35;transform:translateX(10px)}to{opacity:1;transform:translateX(0)}}
+@keyframes frontMediaEnter{from{opacity:.35}to{opacity:1}}
 
 /*
  * Directional page-turn transition for the book/PDF centerpiece:
@@ -589,8 +589,8 @@ html[data-theme="dark"] #frontPage{
  */
 .front-media-pdf.is-entering-next{animation:frontMediaEnterNext .3s ease both;}
 .front-media-pdf.is-entering-prev{animation:frontMediaEnterPrev .3s ease both;}
-@keyframes frontMediaEnterNext{from{opacity:.3;transform:translateX(18px) rotateY(-6deg)}to{opacity:1;transform:translateX(0) rotateY(0)}}
-@keyframes frontMediaEnterPrev{from{opacity:.3;transform:translateX(-18px) rotateY(6deg)}to{opacity:1;transform:translateX(0) rotateY(0)}}
+@keyframes frontMediaEnterNext{from{opacity:.3}to{opacity:1}}
+@keyframes frontMediaEnterPrev{from{opacity:.3}to{opacity:1}}
 
 
 
@@ -848,4 +848,23 @@ html[data-theme="dark"] #frontPage{
     .front-media-status{
         font-size:10px;
     }
+}
+/* =========================================================
+   MEDIA ZOOM — Front Page centerpiece and fullscreen view
+========================================================= */
+.front-media-content.skymedia-zoom-container{
+    touch-action:none;
+}
+.front-media-content.skymedia-zoom-container .skymedia-zoom-indicator{
+    top:10px;
+    left:10px;
+}
+.front-media-content.skymedia-zoom-container .skymedia-zoom-target{
+    will-change:transform;
+}
+.front-media-content.skymedia-zoom-container.is-zoomed .skymedia-zoom-target{
+    cursor:grab;
+}
+.front-media-content.skymedia-zoom-container.is-zoomed .skymedia-zoom-target:active{
+    cursor:grabbing;
 }
