@@ -571,6 +571,11 @@ engine.open=async function(options={}){
             if(!flipbook || busy || event.button!==0) return;
             if(event.target && event.target.closest && event.target.closest("#toolbar")) return;
 
+            /* Let embedded PDF media receive its own interaction. The
+               annotation layer stops the event before it reaches StPageFlip. */
+            if(event.target && event.target.closest &&
+               event.target.closest(".skyreaderMediaAnnotationLayer")) return;
+
             const collection=flipbook.getPageCollection && flipbook.getPageCollection();
             if(!collection) return;
 

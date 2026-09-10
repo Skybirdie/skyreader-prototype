@@ -188,6 +188,21 @@ function createPageSurface(pageNumber){
 
     surface.appendChild(canvas);
 
+    /* PDF.js media annotation layer. StPageFlip carries this DOM layer with the page. */
+    const annotationLayer=document.createElement("div");
+    annotationLayer.className="annotationLayer skyreaderMediaAnnotationLayer";
+
+    /* Media annotations are interactive content, not page-turn targets.
+       Stop their mouse/touch/pointer events from bubbling into StPageFlip
+       while leaving the native video/button behavior intact. */
+    ["pointerdown","pointerup","mousedown","mouseup","touchstart","touchend","click"].forEach(type=>{
+        annotationLayer.addEventListener(type,event=>{
+            event.stopPropagation();
+        });
+    });
+
+    surface.appendChild(annotationLayer);
+
     /* A clean direct click/tap on the final real PDF page closes the book.
        PDF hyperlinks remain exempt so their normal link behavior is preserved. */
     let pointerStart=null;
@@ -202,6 +217,7 @@ function createPageSurface(pageNumber){
         if(Math.hypot(dx,dy)>8) return;
         if(Number(pageNumber)!==Number(pageCount)) return;
         if(event.target.closest && event.target.closest(".pdfLink")) return;
+        if(event.target.closest && event.target.closest(".skyreaderMediaAnnotationLayer")) return;
         document.dispatchEvent(new CustomEvent("skyreader:last-page-click"));
     },{passive:true});
 
@@ -209,6 +225,8 @@ function createPageSurface(pageNumber){
         element:surface,
         canvas,
         ctx,
+        annotationLayer,
+        annotationRenderer:null,
         rendered:false,
         rendering:false,
         viewport:null
@@ -538,6 +556,7 @@ async function renderPage(pageNumber,visible=false,token=openToken){
         renderedPages.add(pageNumber);
 
         await renderLinks(surface,page,viewport);
+        await renderMediaAnnotations(surface,page,viewport);
 
         if(pageNumber===currentPage){
             currentViewport=viewport;
@@ -600,6 +619,109 @@ async function renderLinks(surface,page,viewport){
     }
 }
 
+/*-------------------------------------------------------
+ PDF media annotations
+
+ PDF.js 5.4.54 adds playback support for embedded media in
+ Screen/RichMedia annotations. Existing Link annotations stay
+ handled by SkyReader's current hyperlink layer.
+-------------------------------------------------------*/
+async function renderMediaAnnotations(surface,page,viewport){
+    if(!surface || !surface.annotationLayer) return;
+
+    const layer=surface.annotationLayer;
+    layer.innerHTML="";
+    surface.annotationRenderer=null;
+
+    const annotations=await page.getAnnotations({intent:"display"});
+    const mediaAnnotations=annotations.filter(annotation=>
+        annotation && (
+            annotation.subtype==="Screen" ||
+            annotation.subtype==="RichMedia" ||
+            annotation.subtype==="Sound" ||
+            annotation.subtype==="Movie"
+        )
+    );
+
+    if(!mediaAnnotations.length) return;
+
+    console.info("[SkyReader] PDF media annotations:", mediaAnnotations);
+
+    /*
+       IMPORTANT:
+       Embedded Screen/RichMedia playback was added to PDF.js after the
+       5.4.x line. The current PDF.js MediaAnnotationElement creates the
+       actual play button and, on click, retrieves the embedded attachment
+       through PDFLinkService.getAttachmentContent().
+
+       Do not create a second diagnostic button here: PDF.js itself owns the
+       interactive media control.
+    */
+    if(!window.pdfjsLib || !pdfjsLib.AnnotationLayer){
+        console.warn("[SkyReader] PDF.js AnnotationLayer unavailable.",mediaAnnotations);
+        return;
+    }
+
+    try{
+        const EventBus=window.PDFEventBus;
+        const eventBus=EventBus ? new EventBus() : null;
+        const linkService=window.PDFLinkService ? new window.PDFLinkService({
+            eventBus,
+            externalLinkTarget:2,
+            externalLinkRel:"noopener noreferrer"
+        }) : null;
+
+        if(!linkService){
+            console.warn("[SkyReader] PDFLinkService unavailable.",mediaAnnotations);
+            return;
+        }
+
+        if(typeof linkService.setDocument==="function"){
+            linkService.setDocument(pdf);
+        }
+
+        const pdfViewport=viewport.clone ? viewport.clone({dontFlip:true}) : viewport;
+
+        const rendererLayer=new pdfjsLib.AnnotationLayer({
+            div:layer,
+            page,
+            viewport:pdfViewport,
+            annotationCanvasMap:new Map(),
+            accessibilityManager:null,
+            annotationEditorUIManager:null,
+            structTreeLayer:null,
+            linkService,
+            annotationStorage:pdf?.annotationStorage || null
+        });
+
+        surface.annotationRenderer=rendererLayer;
+
+        await rendererLayer.render({
+            viewport:pdfViewport,
+            annotations:mediaAnnotations,
+            page,
+            div:layer,
+            linkService,
+            renderForms:false,
+            enableScripting:false
+        });
+
+        const mediaContainer=layer.querySelector(".mediaAnnotation");
+        const playButton=layer.querySelector(".mediaAnnotation .mediaPlayButton");
+
+        if(mediaContainer){
+            console.info("[SkyReader] PDF.js media annotation rendered:",mediaContainer);
+            if(playButton){
+                playButton.title=playButton.title || "Play embedded video";
+                playButton.setAttribute("aria-label",playButton.getAttribute("aria-label") || "Play embedded video");
+            }
+        }else{
+            console.warn("[SkyReader] PDF.js returned no mediaAnnotation element.",mediaAnnotations);
+        }
+    }catch(error){
+        console.error("[SkyReader] PDF media annotation rendering failed:",error,mediaAnnotations);
+    }
+}
 /*-------------------------------------------------------
  Page/cache cleanup
 -------------------------------------------------------*/
