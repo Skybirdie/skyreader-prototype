@@ -1,151 +1,530 @@
 "use strict";
 
 window.ShareManager = (function () {
+
     const SECTION_PARAM = "section";
     const ID_PARAM = "id";
 
+    /*
+    ---------------------------------------------------------
+     Contract parameters that must survive sharing
+    ---------------------------------------------------------
+
+     A Glide-generated SkyMedia URL contains the complete
+     content collection in one of these query parameters.
+
+     C2.2 / current:
+         contractz
+
+     Legacy compatibility:
+         contract
+         books
+
+     The share link must preserve the contract because the
+     recipient may not have the Glide-generated URL that the
+     original viewer was opened with.
+    ---------------------------------------------------------
+    */
+
+    const CONTRACT_PARAMS = [
+        "contractz",
+        "contract",
+        "books"
+    ];
+
+
+    /*
+    ---------------------------------------------------------
+     Build the base URL for a share link
+    ---------------------------------------------------------
+
+     IMPORTANT:
+
+     Do NOT erase the complete query string.
+
+     Preserve the content contract while removing any
+     existing section/id deep-link target. The new target
+     will be added by buildUrl().
+    ---------------------------------------------------------
+    */
+
     function baseUrl() {
-        const url = new URL(window.location.href);
-        url.search = "";
+
+        const url =
+            new URL(window.location.href);
+
+        const preserved = new URLSearchParams();
+
+        for (const name of CONTRACT_PARAMS) {
+
+            const value =
+                url.searchParams.get(name);
+
+            if (
+                value !== null &&
+                value.trim() !== ""
+            ) {
+                preserved.set(
+                    name,
+                    value
+                );
+            }
+        }
+
+        url.search = preserved.toString();
         url.hash = "";
+
         return url.toString();
     }
 
-    function isEmbedded() {
-        try {
-            return window.top !== window.self;
-        } catch (error) {
-            /* Cross-origin frame access can throw; treat that as embedded. */
-            return true;
-        }
-    }
 
-    function cleanUrl(value) {
-        if (value === undefined || value === null) return "";
+    /*
+    ---------------------------------------------------------
+     Build a SkyMedia deep link
+    ---------------------------------------------------------
 
-        let text = String(value).trim();
-        if (!text) return "";
+     Result examples:
 
-        const match = text.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
-        if (match) {
-            text = String(match[2] || match[1] || "").trim();
-        }
+       ?contractz=sr2....&section=reader&id=book-001
 
-        return text;
-    }
+       ?contractz=sr2....&section=video&id=video-001
 
-    function getGlideUrl(item) {
-        if (!item || typeof item !== "object") return "";
+       ?contractz=sr2....&section=slideshow&id=slide-001
 
-        return cleanUrl(
-            item.glideUrl ||
-            item.raw?.glideUrl ||
-            item.shareUrl ||
-            item.raw?.shareUrl
-        );
-    }
+     The contract remains intact.
+    ---------------------------------------------------------
+    */
 
     function buildUrl(section, id) {
-        const url = new URL(baseUrl());
-        url.searchParams.set(SECTION_PARAM, section);
-        url.searchParams.set(ID_PARAM, id);
+
+        if (!section || !id) {
+            return "";
+        }
+
+        const url =
+            new URL(baseUrl());
+
+        url.searchParams.set(
+            SECTION_PARAM,
+            section
+        );
+
+        url.searchParams.set(
+            ID_PARAM,
+            id
+        );
+
         return url.toString();
     }
 
-    function buildShareUrl(section, item) {
-        if (!item || !item.id) return "";
 
-        /*
-         * When SkyMedia is embedded in Glide, prefer the per-item
-         * Glide deep link supplied with the contract. That sends the
-         * recipient to the actual Glide item rather than the host
-         * SkyMedia page.
-         *
-         * Outside Glide, keep the existing SkyMedia host deep link.
-         */
-        /*
-         * A populated Glide row URL is authoritative for sharing this
-         * individual item. Do not gate it on iframe detection: browser
-         * embedding state is not a reliable indicator of where the share
-         * action should point, and the contract already tells us whether
-         * a Glide destination exists.
-         *
-         * If no Glide URL was supplied, preserve the existing SkyMedia
-         * deep-link behavior.
-         */
-        const glideUrl = getGlideUrl(item);
-        if (glideUrl) return glideUrl;
-
-        return buildUrl(section, item.id);
-    }
+    /*
+    ---------------------------------------------------------
+     Share
+    ---------------------------------------------------------
+    */
 
     async function share(section, item) {
-        if (!item || !item.id) return false;
-        const url = buildShareUrl(section, item);
-        const data = { title: item.title || "SkyReader", text: item.title || "", url };
+
+        if (
+            !item ||
+            !item.id
+        ) {
+            return false;
+        }
+
+        const url =
+            buildUrl(
+                section,
+                item.id
+            );
+
+        if (!url) {
+            return false;
+        }
+
+        const data = {
+            title:
+                item.title ||
+                "SkyReader",
+
+            text:
+                item.title ||
+                "",
+
+            url
+        };
+
+
+        /*
+        -----------------------------------------------------
+         Native Web Share
+        -----------------------------------------------------
+        */
+
         try {
-            if (navigator.share && window.isSecureContext !== false) {
-                await navigator.share(data);
+
+            if (
+                navigator.share &&
+                window.isSecureContext !== false
+            ) {
+
+                await navigator.share(
+                    data
+                );
+
                 return true;
             }
+
         } catch (error) {
-            if (error && error.name === "AbortError") return false;
+
+            /*
+             User cancelled the native share dialog.
+            */
+
+            if (
+                error &&
+                error.name === "AbortError"
+            ) {
+                return false;
+            }
         }
+
+
+        /*
+        -----------------------------------------------------
+         Clipboard fallback
+        -----------------------------------------------------
+        */
+
         try {
-            await navigator.clipboard.writeText(url);
-            announce("Link copied to clipboard.");
+
+            await navigator.clipboard.writeText(
+                url
+            );
+
+            announce(
+                "Link copied to clipboard."
+            );
+
             return true;
+
         } catch (error) {
-            window.prompt("Copy this link:", url);
+
+            /*
+             Final fallback for browsers that do not
+             provide clipboard access.
+            */
+
+            window.prompt(
+                "Copy this link:",
+                url
+            );
+
             return false;
         }
     }
 
+
+    /*
+    ---------------------------------------------------------
+     Small share notification
+    ---------------------------------------------------------
+    */
+
     function announce(message) {
-        let el = document.getElementById("skyShareNotice");
+
+        let el =
+            document.getElementById(
+                "skyShareNotice"
+            );
+
         if (!el) {
-            el = document.createElement("div");
-            el.id = "skyShareNotice";
-            el.setAttribute("role", "status");
-            el.style.cssText = "position:fixed;left:50%;bottom:56px;transform:translateX(-50%);z-index:10000;padding:8px 14px;border-radius:8px;background:rgba(0,0,0,.8);color:#fff;font-size:13px;pointer-events:none;";
-            document.body.appendChild(el);
+
+            el =
+                document.createElement(
+                    "div"
+                );
+
+            el.id =
+                "skyShareNotice";
+
+            el.setAttribute(
+                "role",
+                "status"
+            );
+
+            el.style.cssText =
+                "position:fixed;" +
+                "left:50%;" +
+                "bottom:56px;" +
+                "transform:translateX(-50%);" +
+                "z-index:10000;" +
+                "padding:8px 14px;" +
+                "border-radius:8px;" +
+                "background:rgba(0,0,0,.8);" +
+                "color:#fff;" +
+                "font-size:13px;" +
+                "pointer-events:none;";
+
+            document.body.appendChild(
+                el
+            );
         }
-        el.textContent = message;
-        clearTimeout(el._timer);
-        el._timer = setTimeout(() => el.remove(), 1800);
+
+        el.textContent =
+            message;
+
+        clearTimeout(
+            el._timer
+        );
+
+        el._timer =
+            setTimeout(
+                () => el.remove(),
+                1800
+            );
     }
+
+
+    /*
+    ---------------------------------------------------------
+     Read deep-link target
+    ---------------------------------------------------------
+    */
 
     function readTarget() {
-        const params = new URLSearchParams(window.location.search);
-        const section = params.get(SECTION_PARAM);
-        const id = params.get(ID_PARAM);
-        return section && id ? { section, id } : null;
+
+        const params =
+            new URLSearchParams(
+                window.location.search
+            );
+
+        const section =
+            params.get(
+                SECTION_PARAM
+            );
+
+        const id =
+            params.get(
+                ID_PARAM
+            );
+
+        return (
+            section &&
+            id
+        )
+            ? {
+                section,
+                id
+            }
+            : null;
     }
 
-    async function openDeepLink() {
-        const target = readTarget();
-        if (!target) return false;
-        if (!window.AppSwitcher) return false;
 
-        if (target.section === "video" && window.VideoLibrary) {
-            const item = VideoLibrary.getVideos?.().find(x => x.id === target.id);
-            if (item) { AppSwitcher.show("video"); VideoViewer.openVideo(item); return true; }
+    /*
+    ---------------------------------------------------------
+     Open deep link
+    ---------------------------------------------------------
+
+     This runs AFTER the normal SkyMedia startup.
+
+     Therefore Manifest has already loaded the Glide
+     contract and all section libraries have already been
+     populated.
+
+     The deep link simply identifies which already-loaded
+     item should be opened.
+    ---------------------------------------------------------
+    */
+
+    async function openDeepLink() {
+
+        const target =
+            readTarget();
+
+        if (!target) {
+            return false;
         }
-        if (target.section === "slideshow" && window.SlideshowLibrary) {
-            const item = SlideshowLibrary.getSlideshows?.().find(x => x.id === target.id);
-            if (item) { AppSwitcher.show("slideshow"); SlideshowViewer.open(item); return true; }
+
+        if (!window.AppSwitcher) {
+            return false;
         }
-        if (target.section === "reader" && window.Library) {
-            const books = (window.SkyReader && Array.isArray(SkyReader.library) ? SkyReader.library : []) || [];
-            const item = books.find(x => x.id === target.id);
-            if (item && window.SRNavigation && typeof SRNavigation.openMagazine === "function") {
-                AppSwitcher.show("reader");
-                await SRNavigation.openMagazine(item);
+
+
+        /*
+        -----------------------------------------------------
+         VIDEO
+        -----------------------------------------------------
+        */
+
+        if (
+            target.section === "video" &&
+            window.VideoLibrary
+        ) {
+
+            const videos =
+                typeof VideoLibrary.getVideos ===
+                    "function"
+
+                    ? VideoLibrary.getVideos()
+
+                    : [];
+
+            const item =
+                Array.isArray(videos)
+                    ? videos.find(
+                        x =>
+                            x &&
+                            x.id === target.id
+                    )
+                    : null;
+
+            if (item) {
+
+                AppSwitcher.show(
+                    "video"
+                );
+
+                if (
+                    window.VideoViewer &&
+                    typeof VideoViewer.openVideo ===
+                        "function"
+                ) {
+
+                    VideoViewer.openVideo(
+                        item
+                    );
+
+                    return true;
+                }
+            }
+        }
+
+
+        /*
+        -----------------------------------------------------
+         SLIDESHOW
+        -----------------------------------------------------
+        */
+
+        if (
+            target.section === "slideshow" &&
+            window.SlideshowLibrary
+        ) {
+
+            const slideshows =
+                typeof SlideshowLibrary.getSlideshows ===
+                    "function"
+
+                    ? SlideshowLibrary.getSlideshows()
+
+                    : [];
+
+            const item =
+                Array.isArray(slideshows)
+                    ? slideshows.find(
+                        x =>
+                            x &&
+                            x.id === target.id
+                    )
+                    : null;
+
+            if (item) {
+
+                AppSwitcher.show(
+                    "slideshow"
+                );
+
+                if (
+                    window.SlideshowViewer &&
+                    typeof SlideshowViewer.open ===
+                        "function"
+                ) {
+
+                    await SlideshowViewer.open(
+                        item
+                    );
+
+                    return true;
+                }
+            }
+        }
+
+
+        /*
+        -----------------------------------------------------
+         READER
+        -----------------------------------------------------
+        */
+
+        if (
+            target.section === "reader" &&
+            window.SkyReader
+        ) {
+
+            const books =
+                Array.isArray(
+                    SkyReader.library
+                )
+                    ? SkyReader.library
+                    : [];
+
+            const item =
+                books.find(
+                    x =>
+                        x &&
+                        x.id === target.id
+                );
+
+            if (
+                item &&
+                window.SRNavigation &&
+                typeof SRNavigation.openMagazine ===
+                    "function"
+            ) {
+
+                AppSwitcher.show(
+                    "reader"
+                );
+
+                await SRNavigation.openMagazine(
+                    item
+                );
+
                 return true;
             }
         }
+
+
+        /*
+        -----------------------------------------------------
+         Target not found
+        -----------------------------------------------------
+        */
+
+        console.warn(
+            "[ShareManager] Deep-link target not found:",
+            target
+        );
+
         return false;
     }
 
-    return { buildUrl, buildShareUrl, share, readTarget, openDeepLink };
+
+    /*
+    ---------------------------------------------------------
+     Public API
+    ---------------------------------------------------------
+    */
+
+    return {
+
+        buildUrl,
+        share,
+        readTarget,
+        openDeepLink
+
+    };
+
 })();
