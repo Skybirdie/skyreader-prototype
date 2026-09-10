@@ -22,13 +22,22 @@
 <link rel="icon" href="/favicon.ico" type="image/x-icon">
 <link rel="stylesheet" href="css/style.css">
 <link rel="stylesheet" href="css/reader.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.3.289/pdf_viewer.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pdfjs-dist@6.3.289/web/annotation_layer_builder.css">
 <link rel="stylesheet" href="css/library.css">
 <link rel="stylesheet" href="css/video.css">
 <link rel="stylesheet" href="css/slideshow.css">
 <link rel="stylesheet" href="css/front-page.css?v=wave3">
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script>if(window.pdfjsLib){pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";}</script>
+<script type="module">
+import * as pdfjsLibModule from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.3.289/pdf.min.mjs";
+import { EventBus, PDFLinkService } from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.3.289/pdf_viewer.mjs";
+pdfjsLibModule.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.3.289/pdf.worker.min.mjs";
+window.pdfjsLib=pdfjsLibModule;
+window.PDFLinkService=PDFLinkService;
+window.PDFEventBus=EventBus;
+window.dispatchEvent(new Event("skyreader-pdfjs-ready"));
+</script>
 <script src="page-flip.browser.js"></script>
 
 
