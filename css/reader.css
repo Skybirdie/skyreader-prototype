@@ -1175,3 +1175,28 @@ font-style:italic;
 #viewerArea .skyreader-zoomed{cursor:grab;}
 #viewerArea .skyreader-zoomed.skyreader-panning{cursor:grabbing;}
 #viewerArea .skyreader-zoomed *{touch-action:none;}
+
+/* PDF.js media annotation layer */
+.sky180Page .skyreaderMediaAnnotationLayer{position:absolute;inset:0;width:100%;height:100%;z-index:20;overflow:hidden;pointer-events:auto;}
+.sky180Page .skyreaderMediaAnnotationLayer .annotationLayer{position:absolute;inset:0;}
+.sky180Page .skyreaderMediaAnnotationLayer video.mediaContent,.sky180Page .skyreaderMediaAnnotationLayer audio.mediaContent{max-width:100%;max-height:100%;}
+
+
+/* PDF.js embedded media */
+.sky180Page .skyreaderMediaAnnotationLayer .mediaAnnotation{
+  position:absolute;
+  inset:0;
+  overflow:hidden;
+  cursor:pointer;
+}
+.sky180Page .skyreaderMediaAnnotationLayer .mediaAnnotation .mediaPlayButton{
+  cursor:pointer;
+}
+.sky180Page .skyreaderMediaAnnotationLayer .mediaAnnotation .mediaContent{
+  width:100%;
+  height:100%;
+  max-width:100%;
+  max-height:100%;
+  display:block;
+  object-fit:contain;
+}
