@@ -897,19 +897,13 @@ navigation.attach=function(){
 
     );
 
-    document.addEventListener(
-
-        "wheel",
-
-        onWheel,
-
-        {
-
-            passive:true
-
-        }
-
-    );
+    /* Page-turn wheel input must be captured before StPageFlip can consume
+     * wheel events in its curl/edge region. The handler itself already
+     * limits requests to #viewerArea and ignores Ctrl+wheel. */
+    const wheelViewer=document.getElementById("viewerArea");
+    if(wheelViewer){
+        wheelViewer.addEventListener("wheel",onWheel,{passive:true,capture:true});
+    }
 
     /* Dedicated mobile single-page swipe path.  StPageFlip mouse/touch
      * input is disabled in single-page mode so there is exactly one owner
@@ -938,13 +932,10 @@ navigation.detach=function(){
 
     );
 
-    document.removeEventListener(
-
-        "wheel",
-
-        onWheel
-
-    );
+    const wheelViewer=document.getElementById("viewerArea");
+    if(wheelViewer){
+        wheelViewer.removeEventListener("wheel",onWheel,true);
+    }
 
     const viewer=document.getElementById("viewerBackground");
     if(viewer){

@@ -356,7 +356,7 @@ engine.open=async function(options={}){
             autoSize:true,
             mobileScrollSupport:true,
             swipeDistance:30,
-            clickEventForward:false,
+            clickEventForward:true,
             /* Mobile uses the dedicated horizontal single-page swipe path in
              * SRNavigation. Desktop retains StPageFlip mouse interactions. */
             useMouseEvents:!singlePageMode
@@ -424,6 +424,19 @@ engine.open=async function(options={}){
     flipbook.on("changeState",event=>{
         const state=event.data;
         busy=state!=="read";
+
+        /* Embedded PDF videos belong to the page being viewed. As soon as
+         * StPageFlip begins a page turn, pause any media currently playing
+         * so audio/video cannot continue from a page that is no longer open. */
+        if(state==="flipping" || state==="user_fold" || state==="fold_corner"){
+            if(flipHost){
+                flipHost.querySelectorAll(".skyreaderMediaAnnotationLayer video.mediaContent").forEach(video=>{
+                    try{
+                        video.pause();
+                    }catch(error){}
+                });
+            }
+        }
 
         /*
          * Keep custom lighting strictly scoped to the live turn. This avoids
@@ -559,49 +572,11 @@ engine.open=async function(options={}){
     });
 
     /*
-     * StPageFlip's built-in mouse click/drag path is useful in the normal
-     * book, but its edge-page click can expose the page underneath the cover
-     * (or the final page) before our synthetic masking classes are applied.
-     * Intercept only those two boundary clicks and send them through the same
-     * guarded engine methods used by the toolbar. All other mouse interaction
-     * remains owned by StPageFlip.
+     * StPageFlip owns normal mouse/touch click, drag, and curl interaction.
+     * Do not intercept mousedown here: doing so prevents StPageFlip from
+     * establishing its own drag/curl gesture. Embedded media is isolated at
+     * the annotation layer in Renderer instead.
      */
-    if(!singlePageMode && !twoPageDocumentMode){
-        flipHost.addEventListener("mousedown",event=>{
-            if(!flipbook || busy || event.button!==0) return;
-            if(event.target && event.target.closest && event.target.closest("#toolbar")) return;
-
-            /* Let embedded PDF media receive its own interaction. The
-               annotation layer stops the event before it reaches StPageFlip. */
-            if(event.target && event.target.closest &&
-               event.target.closest(".skyreaderMediaAnnotationLayer")) return;
-
-            const collection=flipbook.getPageCollection && flipbook.getPageCollection();
-            if(!collection) return;
-
-            const spreadIndex=collection.getCurrentSpreadIndex();
-            const spreads=collection.getSpread();
-            const lastIndex=spreads.length-1;
-            const rect=flipHost.getBoundingClientRect();
-            const x=event.clientX-rect.left;
-            const mid=rect.width/2;
-
-            const isOpeningReverse=spreadIndex===1 && x<mid;
-            const isFinalForward=spreadIndex===lastIndex-1 && x>mid;
-
-            if(isOpeningReverse || isFinalForward){
-                event.preventDefault();
-                event.stopPropagation();
-                event.stopImmediatePropagation();
-
-                if(isOpeningReverse){
-                    engine.previous();
-                }else{
-                    engine.next();
-                }
-            }
-        },true);
-    }
 
     try{
         flipbook.loadFromHTML(options.pages);

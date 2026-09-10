@@ -195,9 +195,16 @@ function createPageSurface(pageNumber){
     /* Media annotations are interactive content, not page-turn targets.
        Stop their mouse/touch/pointer events from bubbling into StPageFlip
        while leaving the native video/button behavior intact. */
+    /* The annotation layer itself must NOT become a page-sized mouse shield.
+       Its empty area belongs to StPageFlip, including the curl/drag zone.
+       Only the actual media annotation and its controls are interactive. */
     ["pointerdown","pointerup","mousedown","mouseup","touchstart","touchend","click"].forEach(type=>{
         annotationLayer.addEventListener(type,event=>{
-            event.stopPropagation();
+            const target=event.target;
+            if(target && target.closest &&
+               target.closest(".mediaAnnotation")){
+                event.stopPropagation();
+            }
         });
     });
 
@@ -715,6 +722,132 @@ async function renderMediaAnnotations(surface,page,viewport){
                 playButton.title=playButton.title || "Play embedded video";
                 playButton.setAttribute("aria-label",playButton.getAttribute("aria-label") || "Play embedded video");
             }
+
+            /*
+             * Keep playback controls inside the SkyReader viewer instead of
+             * relying on browser-native video menus, which can open outside
+             * the viewer/under browser chrome at small viewport sizes.
+             * PDF.js creates the actual <video> only after its play button is
+             * pressed, so watch the media annotation for that element.
+             */
+            const installMediaControls=()=>{
+                const video=mediaContainer.querySelector("video.mediaContent");
+                if(!video || video.dataset.skyreaderControlsInstalled==="1") return;
+
+                video.dataset.skyreaderControlsInstalled="1";
+                video.controls=false;
+                video.setAttribute("playsinline","");
+                video.setAttribute("webkit-playsinline","");
+
+                const controls=document.createElement("div");
+                controls.className="skyreaderMediaControls";
+                controls.setAttribute("role","group");
+                controls.setAttribute("aria-label","Video controls");
+
+                const playPause=document.createElement("button");
+                playPause.type="button";
+                playPause.className="skyreaderMediaControl skyreaderMediaPlayPause";
+
+                const restart=document.createElement("button");
+                restart.type="button";
+                restart.className="skyreaderMediaControl skyreaderMediaRestart";
+                restart.textContent="↻";
+                restart.title="Restart video";
+                restart.setAttribute("aria-label","Restart video");
+
+                const mute=document.createElement("button");
+                mute.type="button";
+                mute.className="skyreaderMediaControl skyreaderMediaMute";
+
+                const fullscreen=document.createElement("button");
+                fullscreen.type="button";
+                fullscreen.className="skyreaderMediaControl skyreaderMediaFullscreen";
+                fullscreen.textContent="⛶";
+                fullscreen.title="Fullscreen video";
+                fullscreen.setAttribute("aria-label","Fullscreen video");
+
+                controls.append(playPause,restart,mute,fullscreen);
+                mediaContainer.appendChild(controls);
+
+                let controlsTimer=null;
+                const showControls=()=>{
+                    controls.classList.add("skyreaderMediaControlsVisible");
+                    if(controlsTimer) clearTimeout(controlsTimer);
+                    controlsTimer=setTimeout(()=>{
+                        controls.classList.remove("skyreaderMediaControlsVisible");
+                    },10000);
+                };
+                const keepControlsVisible=()=>showControls();
+
+                ["pointerenter","pointermove","pointerdown","pointerup","touchstart","touchend","click"].forEach(type=>{
+                    mediaContainer.addEventListener(type,keepControlsVisible,{passive:true});
+                });
+
+                const update=()=>{
+                    const playing=!video.paused && !video.ended;
+                    playPause.textContent=playing ? "❚❚" : (video.ended ? "↻" : "▶");
+                    playPause.title=video.ended ? "Replay video" : (playing ? "Pause video" : "Play video");
+                    playPause.setAttribute("aria-label",playPause.title);
+                    mute.textContent=video.muted ? "🔇" : "🔊";
+                    mute.title=video.muted ? "Unmute video" : "Mute video";
+                    mute.setAttribute("aria-label",mute.title);
+                };
+
+                const stopTurn=event=>{
+                    event.preventDefault();
+                    event.stopPropagation();
+                };
+                ["pointerdown","pointerup","mousedown","mouseup","touchstart","touchend","click"].forEach(type=>
+                    controls.addEventListener(type,stopTurn)
+                );
+
+                playPause.addEventListener("click",()=>{
+                    if(video.ended){
+                        video.currentTime=0;
+                        video.play().catch(()=>{});
+                    }else if(video.paused){
+                        video.play().catch(()=>{});
+                    }else{
+                        video.pause();
+                    }
+                });
+
+                restart.addEventListener("click",()=>{
+                    video.currentTime=0;
+                    video.play().catch(()=>{});
+                });
+
+                mute.addEventListener("click",()=>{
+                    video.muted=!video.muted;
+                    update();
+                });
+
+                fullscreen.addEventListener("click",()=>{
+                    const request=video.requestFullscreen || video.webkitRequestFullscreen;
+                    if(typeof request==="function") request.call(video);
+                });
+
+                video.addEventListener("play",()=>{ update(); showControls(); });
+                video.addEventListener("pause",()=>{ update(); showControls(); });
+                video.addEventListener("ended",()=>{ update(); showControls(); });
+                video.addEventListener("volumechange",()=>{ update(); showControls(); });
+                video.addEventListener("click",()=>{
+                    if(video.paused || video.ended){
+                        if(video.ended) video.currentTime=0;
+                        video.play().catch(()=>{});
+                    }else{
+                        video.pause();
+                    }
+                });
+
+                update();
+                showControls();
+            };
+
+            installMediaControls();
+            const mediaObserver=new MutationObserver(installMediaControls);
+            mediaObserver.observe(mediaContainer,{childList:true,subtree:true});
+            mediaContainer._skyreaderMediaObserver=mediaObserver;
         }else{
             console.warn("[SkyReader] PDF.js returned no mediaAnnotation element.",mediaAnnotations);
         }
