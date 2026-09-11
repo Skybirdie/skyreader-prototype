@@ -186,9 +186,13 @@ error
 reader.open=async function(book,startPage=null){
     if(!book)return false;
 
-    /* Same-book requests share the active transaction. */
-    if(openingPromise && openingBookId===book.id){
-        return openingPromise;
+    /* A reader can have only one asynchronous document opening at a time.
+       Same-book requests share it; a different book is rejected until the
+       current transaction settles. This prevents a second click from
+       tearing down the first PDF/PageFlip initialization. */
+    if(openingPromise){
+        if(openingBookId===book.id) return openingPromise;
+        return false;
     }
 
     const generation=++openGeneration;
@@ -368,12 +372,28 @@ return currentBook!==null;
 
 reader.close=function(options={playSound:true}){
 
+/*
+ * Reader.close() is an explicit document-close action.  This is where a
+ * Front Page fullscreen launch must leave fullscreen; reaching the last
+ * page itself never calls Reader.close().
+ */
+if(document.fullscreenElement){
+    document.exitFullscreen?.().catch?.(()=>{});
+}
+window.__skyFrontPageFullscreenLaunch = false;
+
 if(typeof clearBookmarkOverlay==="function"){
     clearBookmarkOverlay();
 }
 
 
 openGeneration++;
+
+/* Cancel the public single-flight slot immediately.  The old async
+   transaction will observe the generation change and quietly terminate;
+   clearing the slot here allows a legitimate new click to start at once. */
+openingPromise=null;
+openingBookId=null;
 
 if(!currentBook){
 

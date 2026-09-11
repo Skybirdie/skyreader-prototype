@@ -338,6 +338,14 @@ renderer.open=async function(book,options={}){
     progress(5,"Opening document");
 
     try{
+        /* pdf.js loads asynchronously from a CDN module (see index.html).
+           On a cold start it may not be ready yet when the very first
+           click comes in; wait for it instead of throwing and forcing a
+           second attempt. */
+        if(window.pdfjsReady) await window.pdfjsReady;
+        if(token!==openToken || presentation!==presentationToken) return;
+        if(typeof pdfjsLib==="undefined") throw new Error("PDF engine failed to load");
+
         const pdfUrl=await resolvePdfUrl(book.pdf);
         progress(8,"Loading PDF");
 
@@ -797,11 +805,28 @@ async function renderMediaAnnotations(surface,page,viewport){
                     event.preventDefault();
                     event.stopPropagation();
                 };
-                ["pointerdown","pointerup","mousedown","mouseup","touchstart","touchend","click"].forEach(type=>
-                    controls.addEventListener(type,stopTurn)
+                ["pointerdown","pointerup","pointercancel","mousedown","mouseup","touchstart","touchmove","touchend","click"].forEach(type=>
+                    controls.addEventListener(type,stopTurn,{passive:false})
                 );
 
-                playPause.addEventListener("click",()=>{
+                /* Mobile browsers are more reliable when the action is
+                   handled from pointer/touch release as well as click. */
+                const bindControlAction=(button,action)=>{
+                    let fired=false;
+                    const run=event=>{
+                        event.preventDefault();
+                        event.stopPropagation();
+                        if(fired) return;
+                        fired=true;
+                        action();
+                        window.setTimeout(()=>{fired=false;},350);
+                    };
+                    button.addEventListener("pointerup",run,{passive:false});
+                    button.addEventListener("touchend",run,{passive:false});
+                    button.addEventListener("click",run,{passive:false});
+                };
+
+                bindControlAction(playPause,()=>{
                     if(video.ended){
                         video.currentTime=0;
                         video.play().catch(()=>{});
@@ -812,17 +837,17 @@ async function renderMediaAnnotations(surface,page,viewport){
                     }
                 });
 
-                restart.addEventListener("click",()=>{
+                bindControlAction(restart,()=>{
                     video.currentTime=0;
                     video.play().catch(()=>{});
                 });
 
-                mute.addEventListener("click",()=>{
+                bindControlAction(mute,()=>{
                     video.muted=!video.muted;
                     update();
                 });
 
-                fullscreen.addEventListener("click",()=>{
+                bindControlAction(fullscreen,()=>{
                     const request=video.requestFullscreen || video.webkitRequestFullscreen;
                     if(typeof request==="function") request.call(video);
                 });
