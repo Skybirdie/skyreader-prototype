@@ -10,6 +10,7 @@ window.SlideshowLibrary = (function () {
     let searchQuery = "";
     let selectedId = null;
     let gridElement = null;
+    let selectionPromise = null;
 
     function init(options = {}) {
         gridElement = options.gridElement || document.getElementById("slideshowLibraryGrid");
@@ -19,12 +20,6 @@ window.SlideshowLibrary = (function () {
 
     function load(payload) {
     slideshows = window.SlideshowContract ? SlideshowContract.parse(payload) : [];
-
-    console.log("[SlideshowLibrary] Loaded items:", slideshows);
-    console.log(
-        "[SlideshowLibrary] PDF items:",
-        slideshows.filter(item => item && item.source === "pdf")
-    );
 
     apply();
     if (window.SlideshowViewer) SlideshowViewer.renderLanding();
@@ -107,7 +102,23 @@ media.appendChild(img);
         displaySlideshows.forEach(item => gridElement.appendChild(card(item)));
         refreshSelection();
     }
-    function select(id) { const item = slideshows.find(x => x.id === id); if (!item) return; selectedId = id; refreshSelection(); if (window.SlideshowViewer) SlideshowViewer.open(item); }
+    function select(id) {
+        const item = slideshows.find(x => x.id === id);
+        if (!item || !window.SlideshowViewer) return false;
+
+        /* Keep the visual selection synchronous, but single-flight the
+           asynchronous viewer open so rapid/cold-start clicks cannot launch
+           competing PDF.js loads. */
+        if (selectionPromise) return false;
+
+        selectedId = id;
+        refreshSelection();
+
+        selectionPromise = Promise.resolve(SlideshowViewer.open(item))
+            .finally(() => { selectionPromise = null; });
+
+        return selectionPromise;
+    }
     function refreshSelection() { if (!gridElement) return; gridElement.querySelectorAll("[data-slideshow-id]").forEach(x => x.classList.toggle("selected", x.dataset.slideshowId === selectedId)); }
     function setView(view) { if (view !== "grid" && view !== "list") return; currentView = view; render(); }
     function setSort(mode) { if (window.SlideshowSorter && !SlideshowSorter.available().includes(mode)) return; sortMode = mode; apply(); }

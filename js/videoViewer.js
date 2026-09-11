@@ -133,7 +133,15 @@ function init(options = {}) {
 
     videoElement.addEventListener(
         "ended",
-        () => setStatusMessage("Finished")
+        () => {
+            /*
+             * Reaching the final frame is NOT a close action.  In a
+             * Front Page fullscreen launch the final frame must remain
+             * visible until the user explicitly closes the video (Close
+             * button or Escape).  closeVideo() owns fullscreen exit.
+             */
+            setStatusMessage("Finished");
+        }
     );
 
     videoElement.addEventListener(
@@ -1035,6 +1043,11 @@ loadVideoPlayer(video);
 */
 
 function closeVideo() {
+
+    if (document.fullscreenElement) {
+        document.exitFullscreen?.().catch?.(()=>{});
+    }
+    window.__skyFrontPageFullscreenLaunch = false;
 
     if (!videoElement) {
         return;

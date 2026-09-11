@@ -77,10 +77,29 @@ window.AudioController=(function(){
     audio.stopAll=function(){sounds.forEach(pool=>pool.stop());};
     audio.pauseAll=function(){sounds.forEach(pool=>pool.players.forEach(p=>p.pause()));};
     audio.resumeAll=function(){};
-    audio.setVolume=function(v){masterVolume=Math.max(0,Math.min(1,v));sounds.forEach(pool=>pool.setVolume(masterVolume));};
+    audio.setVolume=function(v){
+        masterVolume=Math.max(0,Math.min(1,v));
+        sounds.forEach(pool=>pool.setVolume(masterVolume));
+        if(masterVolume===0){
+            muted=true;
+        }
+        emit("volumechange",{volume:masterVolume,muted});
+    };
     audio.volume=function(){return masterVolume;};
-    audio.mute=function(){muted=true;audio.stopAll();};
-    audio.unmute=function(){muted=false;};
+
+    /* Keep app-owned HTML media aligned with the app mute state. A web page
+       cannot reliably read the phone's physical silent/ringer switch, so the
+       browser/OS remains authoritative for that hardware mute. */
+    audio.syncMediaMute=function(){
+        const state=muted || masterVolume===0;
+        document.querySelectorAll("audio,video").forEach(el=>{
+            if(el.dataset.skyAppMuteSync === "false") return;
+            el.muted=state || !!el.muted;
+        });
+        return state;
+    };
+    audio.mute=function(){muted=true;audio.stopAll();audio.syncMediaMute?.();};
+    audio.unmute=function(){muted=false;audio.syncMediaMute?.();};
     audio.toggleMute=function(){muted=!muted;if(muted)audio.stopAll();return muted;};
     audio.isMuted=function(){return muted;};
     audio.on=function(event,fn){if(!listeners.has(event))listeners.set(event,[]);listeners.get(event).push(fn);};

@@ -16,6 +16,12 @@ window.SlideshowViewer = (function () {
     let musicPickerOpen = false;
     let zoomController = null;
 
+    // Opening transaction state.  These must live at viewer scope so the
+    // library and viewer share one authoritative single-flight lifecycle.
+    let openingPromise = null;
+    let openingItemId = null;
+    let openGeneration = 0;
+
     function titleFromFilename(filename) {
         const base = String(filename || "")
             .replace(/\.[^/.]+$/, "")
@@ -43,6 +49,7 @@ window.SlideshowViewer = (function () {
         landing = document.getElementById("slideshowLanding");
         if (!stage) return false;
         setPlaybackChrome(false);
+
         if (!document.documentElement.dataset.slideshowEscapeBound) {
             document.documentElement.dataset.slideshowEscapeBound = "true";
             document.addEventListener("keydown", event => {
@@ -75,8 +82,10 @@ window.SlideshowViewer = (function () {
         audio?.addEventListener("ended", () => {
             if (audioMode === "original" && current?.audio) {
                 audioCompleted = true;
-                // Do not restart the audio. The slideshow may continue
-                // through the remaining slides until it reaches the end.
+                /* The selected audio is the lifetime of the looping cycle.
+                   Once it ends, stop wrapping back to slide 1. If the last
+                   slide is already visible, finish there; fullscreen remains
+                   active until the user explicitly closes the item. */
                 if (playing && slideCount() && index >= slideCount() - 1) finish();
             }
         });
@@ -488,6 +497,9 @@ function stopForMediaManager() {
             musicAudio.muted=muted;
             musicAudio.addEventListener("ended",()=>{
                 audioCompleted=true;
+                /* Let the slideshow finish naturally on the final slide, but
+                   never treat audio completion as a request to close or leave
+                   fullscreen. */
                 if(playing && slideCount() && index >= slideCount() - 1) finish();
             });
             if(playing)musicAudio.play().catch(()=>{});
@@ -765,7 +777,20 @@ function stopForMediaManager() {
             if(audioMode==="effects") playSound(EFFECT_URL);
             show(0,1,fromTimer);
         }else if(playing){
+            /*
+             * Automatic playback reaching the final slide is not a close
+             * action.  Remain on the final slide (and, when applicable,
+             * remain fullscreen).  An explicit NEXT at the end is handled
+             * separately below and is the user's close/leave action.
+             */
             finish();
+        }else if(!fromTimer){
+            /*
+             * NEXT while already on the final slide is an explicit request
+             * to leave the slideshow.  close() exits browser fullscreen and
+             * performs the normal viewer cleanup.
+             */
+            close();
         }
     }
     function previous(){if(!current)return;if(index>0){playing=false;show(index-1,-1);setStatus("Paused");}}
@@ -860,6 +885,11 @@ function restart(){
 }
 
 function finish(){
+    /*
+     * Reaching the final slide naturally is not a close action.  Keep the
+     * final slide visible and preserve fullscreen until the user explicitly
+     * presses NEXT, Close, or Escape.
+     */
     playing=false;
     pendingAdvance=false;
     stopTimer();
@@ -878,10 +908,17 @@ function finish(){
 }
 
     function close(){
+        /* Invalidate any in-flight PDF/image opening before tearing down the
+           visible viewer.  A late PDF.js promise must never resurrect the
+           slideshow after Close/Escape. */
+        openGeneration++;
+        openingPromise=null;
+        openingItemId=null;
         transitionGeneration++;
-        if(document.fullscreenElement && document.fullscreenElement===root){
-            document.exitFullscreen?.();
+        if(document.fullscreenElement){
+            document.exitFullscreen?.().catch?.(()=>{});
         }
+        window.__skyFrontPageFullscreenLaunch = false;
 stopAllMedia();
 
 if (
@@ -919,115 +956,119 @@ if (
 
 async function open(item) {
 
-    if (!item) return;
+    if (!item) return false;
 
-/*
--------------------------------------------------------
- Claim global media ownership BEFORE assigning the new
- slideshow to `current`. MediaManager.claim() stops the
- previous owner first. Doing this after `current = item`
- would allow the cleanup callback to erase the new item.
--------------------------------------------------------
-*/
+    /*
+     * Single-flight opening.  The library owns selection, but the viewer
+     * owns the asynchronous load.  Never allow a second click to start a
+     * competing PDF.js/Page render while the first load is unresolved.
+     */
+    if (openingPromise) {
+        if (openingItemId === item.id) return openingPromise;
+        return false;
+    }
 
-if (
-    window.MediaManager &&
-    typeof MediaManager.claim === "function"
-) {
+    const generation = ++openGeneration;
+    openingItemId = item.id;
 
-    MediaManager.claim(
-        "slideshow",
-        stopForMediaManager
-    );
-
-}
-
-    current = item;
-    index = 0;
-    playing = true;
-    stopTimer();
-
-    // existing PDF/image opening code continues...
-
-        /*
-         * PDF slide shows are opened lazily. PDF.js gives us the authoritative
-         * page count; any supplied slideCount is retained as declaredSlideCount
-         * and then corrected in memory.
-         */
-        if(item.source==="pdf" || item.pdfUrl){
-            if(typeof pdfjsLib==="undefined"){
-                setStatus("PDF support is unavailable");
-                current=null;
-                return;
+    let transaction;
+    transaction = (async()=>{
+        try {
+            if (
+                window.MediaManager &&
+                typeof MediaManager.claim === "function"
+            ) {
+                MediaManager.claim("slideshow", stopForMediaManager);
             }
 
-            try{
+            current = item;
+            index = 0;
+            playing = true;
+            stopTimer();
+
+            if(item.source==="pdf" || item.pdfUrl){
+                /* pdf.js loads asynchronously from a CDN module (see
+                   index.html). Wait for it on a cold start instead of
+                   failing this attempt and only succeeding on the next
+                   click once the module has finished loading. */
+                if(window.pdfjsReady) await window.pdfjsReady;
+                if(generation!==openGeneration || current!==item) return false;
+                if(typeof pdfjsLib==="undefined") throw new Error("PDF support is unavailable");
+
                 const task=pdfjsLib.getDocument({
                     url:item.pdfUrl,
                     enableXfa:false,
                     useSystemFonts:true
                 });
 
-                current.pdfDocument=await task.promise;
-                current.pdfPageCount=current.pdfDocument.numPages;
-
-                if(window.Manifest &&
-                   typeof Manifest.reconcileSlideshowCount==="function"){
-                    Manifest.reconcileSlideshowCount(
-                        current,
-                        current.pdfPageCount
-                    );
-                }else{
-                    current.slideCount=current.pdfPageCount;
+                const loadedPdf=await task.promise;
+                if(generation!==openGeneration || current!==item) {
+                    try{ loadedPdf.destroy?.(); }catch(e){}
+                    return false;
                 }
-            }catch(error){
-                console.error("[SlideshowViewer] Unable to open PDF slideshow.",error);
-                setStatus("Unable to open PDF slide show");
-                current=null;
-                return;
+
+                current.pdfDocument=loadedPdf;
+                current.pdfPageCount=loadedPdf.numPages;
+
+                if(window.Manifest && typeof Manifest.reconcileSlideshowCount==="function")
+                    Manifest.reconcileSlideshowCount(current,current.pdfPageCount);
+                else
+                    current.slideCount=current.pdfPageCount;
+            }
+
+            if(generation!==openGeneration || current!==item) return false;
+
+            const total=slideCount();
+            if(!total) throw new Error("Slideshow contains no slides.");
+
+            root.classList.add("has-slideshow");
+            setPlaybackChrome(true);
+            landing?.classList.add("hidden");
+            stage.innerHTML="";
+            if(zoomController){ zoomController.destroy(); zoomController=null; }
+            if(window.SkyMediaZoom) zoomController=SkyMediaZoom.create(stage);
+            updateTitle();
+            updateStatus();
+            setAudioMode(item.audio ? "original" : "none");
+
+            await show(0);
+            if(generation!==openGeneration || current!==item) return false;
+
+            try{
+                const key="skyslideshow-recent";
+                const ids=JSON.parse(localStorage.getItem(key)||"[]");
+                const nextIds=[item.id,...(Array.isArray(ids)?ids:[]).filter(id=>id!==item.id)].slice(0,10);
+                localStorage.setItem(key,JSON.stringify(nextIds));
+            }catch(e){}
+
+            renderLanding();
+            refreshLayout();
+            return true;
+        } catch(error) {
+            if(generation===openGeneration) {
+                console.error("[SlideshowViewer] Unable to open slideshow.",error);
+                try{ stopAllMedia(); }catch(e){}
+                if(current===item) {
+                    current=null;
+                    if(root) root.classList.remove("has-slideshow");
+                    setPlaybackChrome(false);
+                }
+                if(window.MediaManager && typeof MediaManager.release==="function")
+                    MediaManager.release("slideshow");
+                setStatus("Unable to open slide show");
+            }
+            return false;
+        } finally {
+            if(openingPromise===transaction) {
+                openingPromise=null;
+                openingItemId=null;
             }
         }
+    })();
 
-        const total=slideCount();
-        if(!total){
-            current=null;
-            return;
-        }
-
-        root.classList.add("has-slideshow");
-        setPlaybackChrome(true);
-        landing?.classList.add("hidden");
-
-        stage.innerHTML="";
-        if(zoomController){
-            zoomController.destroy();
-            zoomController=null;
-        }
-        if(window.SkyMediaZoom){
-            zoomController=SkyMediaZoom.create(stage);
-        }
-        updateTitle();
-        updateStatus();
-
-        setAudioMode(item.audio ? "original" : "none");
-
-        await show(0);
-
-        try{
-            const key="skyslideshow-recent";
-            const ids=JSON.parse(localStorage.getItem(key)||"[]");
-            const nextIds=[
-                item.id,
-                ...(Array.isArray(ids)?ids:[]).filter(id=>id!==item.id)
-            ].slice(0,10);
-
-            localStorage.setItem(key,JSON.stringify(nextIds));
-        }catch(e){}
-
-        renderLanding();
-        refreshLayout();
-    }
-
+    openingPromise=transaction;
+    return transaction;
+}
 
 
 

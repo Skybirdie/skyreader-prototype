@@ -1206,8 +1206,8 @@ font-style:italic;
 .sky180Page .skyreaderMediaAnnotationLayer .mediaAnnotation .skyreaderMediaControls{
   position:absolute;
   left:50%;
-  top:calc(100% + 8px);
-  bottom:auto;
+  top:auto;
+  bottom:-45px;
   transform:translateX(-50%) translateY(-4px);
   z-index:40;
   display:flex;
@@ -1218,12 +1218,15 @@ font-style:italic;
   box-sizing:border-box;
   border:1px solid color-mix(in srgb,var(--line) 75%,transparent);
   border-radius:10px;
-  background:color-mix(in srgb,var(--panel) 68%,transparent);
+  background:transparent;
   color:var(--text);
   box-shadow:0 6px 18px rgba(0,0,0,.16);
   backdrop-filter:blur(10px);
   -webkit-backdrop-filter:blur(10px);
   pointer-events:auto;
+  touch-action:manipulation;
+  -webkit-user-select:none;
+  user-select:none;
   opacity:0;
   visibility:hidden;
   transition:opacity .18s ease,transform .18s ease,visibility .18s ease;
@@ -1243,7 +1246,7 @@ font-style:italic;
   justify-content:center;
   border:1px solid color-mix(in srgb,var(--line) 85%,transparent);
   border-radius:7px;
-  background:color-mix(in srgb,var(--panel) 62%,transparent);
+  background:transparent;
   color:var(--text);
   font:600 15px/1 sans-serif;
   cursor:pointer;
@@ -1255,7 +1258,8 @@ font-style:italic;
 }
 @media(max-width:480px){
   .sky180Page .skyreaderMediaAnnotationLayer .mediaAnnotation .skyreaderMediaControls{
-    top:calc(100% + 6px);
+    top:auto;
+    bottom:6px;
     gap:4px;
     padding:4px 5px;
   }
