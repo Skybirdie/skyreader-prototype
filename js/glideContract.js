@@ -1121,6 +1121,7 @@ window.GlideContract = (function () {
             extractContent(rawManifest);
 
         const normalized = [];
+        const diagnostics = [];
 
         for (
             let i = 0;
@@ -1141,6 +1142,18 @@ window.GlideContract = (function () {
             }
         }
 
+        /*
+         ID COLLISION FALLBACK -- see the matching comment in
+         js/contentContract.js. Kept identical here so this
+         adapter stays correct on its own if it is ever wired
+         back into the load path.
+        */
+
+        dedupeContentIds(
+            normalized,
+            diagnostics
+        );
+
         return {
             version: cleanString(rawManifest && rawManifest.version),
             content: normalized,
@@ -1148,8 +1161,57 @@ window.GlideContract = (function () {
                 ? { ...rawManifest.frontPage, categories: Array.isArray(rawManifest.frontPage.categories) ? [...rawManifest.frontPage.categories] : [] }
                 : { categories: [] },
             background: cleanString(rawManifest && rawManifest.background),
-            diagnostics: []
+            diagnostics: diagnostics
         };
+    }
+
+
+    /* =====================================================
+       ID COLLISION FALLBACK
+    ===================================================== */
+
+    function dedupeContentIds(content, diagnostics) {
+
+        const seen = new Map();
+
+        for (
+            let i = 0;
+            i < content.length;
+            i++
+        ) {
+
+            const item = content[i];
+            const originalId = item.id;
+            const timesSeen = seen.get(originalId) || 0;
+
+            if (timesSeen > 0) {
+
+                let newId =
+                    `${originalId}-dup${timesSeen + 1}`;
+
+                while (seen.has(newId)) {
+                    newId = `${newId}-x`;
+                }
+
+                const message =
+                    `[GlideContract] Duplicate id "${originalId}" found on "${item.title || item.type}" ` +
+                    `(item ${i + 1}) -- reassigned to "${newId}" so it is not confused with the earlier item ` +
+                    `using that id.`;
+
+                console.warn(message);
+
+                diagnostics.push(message);
+
+                item.id = newId;
+
+                seen.set(newId, 1);
+            }
+
+            seen.set(
+                originalId,
+                timesSeen + 1
+            );
+        }
     }
 
 
