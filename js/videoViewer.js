@@ -266,6 +266,11 @@ function renderLanding() {
         ".video-landing-continue-section"
     );
 
+    const mediaRow =
+    landingElement.querySelector(
+        ".video-landing-media-row"
+    );
+
 
     if (continueContainer) {
         continueContainer.innerHTML = "";
@@ -275,6 +280,17 @@ function renderLanding() {
     if (continueSection) {
     continueSection.classList.add("is-empty");
 }
+
+    /*
+     * The media row itself (not just the card inside it) has to
+     * collapse when there is no Watch Again card, or its fixed
+     * 25% height leaves a blank gap between the hero and the
+     * library row below. Toggled alongside continueSection so
+     * both stay in sync.
+     */
+    if (mediaRow) {
+        mediaRow.classList.add("is-empty");
+    }
 
     if (libraryContainer) {
         libraryContainer.innerHTML = "";
@@ -351,6 +367,10 @@ function renderLanding() {
     continueSection.classList.remove(
         "is-empty"
     );
+
+    if (mediaRow) {
+        mediaRow.classList.remove("is-empty");
+    }
 
 }
 
