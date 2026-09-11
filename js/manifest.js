@@ -18,7 +18,7 @@
 window.Manifest = {
 
     source: {
-        url: "content.json?v=3.0.0",
+        url: "content.json?v=3.0.1",
 
         async load() {
             const response = await fetch(this.url, { cache: "no-store" });
@@ -145,9 +145,24 @@ console.log(
          * of every library grid and out of the front-door shapes —
          * no per-section filtering needed.
          */
-        return window.SkyDate
-            ? items.filter(item => SkyDate.isVisible(item.date))
-            : items;
+        /*
+         * Fail closed if the date-visibility utility is unavailable.
+         * Publishing is a safety boundary: absence of the gate must
+         * never mean "everything is visible."
+         */
+        if (
+            !window.SkyDate ||
+            typeof SkyDate.isVisible !== "function"
+        ) {
+            console.warn(
+                "[Manifest] SkyDate visibility gate unavailable; returning no content."
+            );
+            return [];
+        }
+
+        return items.filter(item =>
+            SkyDate.isVisible(item.date)
+        );
     },
 
     content(type) {
