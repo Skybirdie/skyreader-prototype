@@ -614,21 +614,13 @@ function toYouTubeEmbedUrl(value) {
 
 
             /*
-             Legacy dateAdd compatibility.
-
-             New Glide data should use date.
+             dateAdd (upload provenance) is intentionally never used
+             to substitute for a missing "date" (the publish/release
+             gate) -- see librarySorter.js, slideshowSorter.js, and
+             videoSorter.js, which document the same separation. An
+             item with no valid date has not been scheduled for
+             release and must stay invisible per SkyDate.isVisible().
             */
-
-            if (
-                !item.date &&
-                raw.dateAdd
-            ) {
-
-                item.date =
-                    normalizeDate(
-                        raw.dateAdd
-                    );
-            }
 
 
             /*

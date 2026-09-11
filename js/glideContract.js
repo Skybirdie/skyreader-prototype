@@ -893,20 +893,18 @@ window.GlideContract = (function () {
              LEGACY COMPATIBILITY METADATA
              ------------------------------------------------
 
-             Keep useful old fields available internally
-             without requiring them in the new contract.
+             dateAdd (upload provenance) must never stand in for date
+             (the publish/release gate) -- see librarySorter.js,
+             slideshowSorter.js, and videoSorter.js, which all
+             deliberately keep the two separate for the same reason.
+             An item with no valid "date" has not been scheduled for
+             release yet and must stay invisible per SkyDate.isVisible()
+             (dateVisibility.js) -- silently substituting dateAdd here
+             defeats that gate entirely, since dateAdd is always today
+             or earlier by definition. If genuinely old legacy content
+             needs to be visible with no explicit release date, its
+             "date" should be set directly rather than inferred here.
             */
-
-            if (
-                raw.dateAdd !== undefined &&
-                !normalized.date
-            ) {
-
-                normalized.date =
-                    normalizeDate(
-                        raw.dateAdd
-                    );
-            }
 
 
             /*
