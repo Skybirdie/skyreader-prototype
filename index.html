@@ -29,6 +29,29 @@
 <link rel="stylesheet" href="css/slideshow.css">
 <link rel="stylesheet" href="css/front-page.css?v=wave3">
 
+<script>
+/*
+ * pdf.js loads from the CDN as an ES module below. Module scripts are
+ * always deferred until after the document has parsed, which means every
+ * classic <script src="js/...js"> further down (Renderer, SlideshowViewer,
+ * FrontMediaRenderer, etc.) finishes loading and can start reacting to
+ * clicks BEFORE window.pdfjsLib actually exists.
+ *
+ * window.pdfjsReady is the single readiness gate every PDF-opening code
+ * path awaits before touching pdfjsLib, so the first click always works
+ * instead of failing silently and only succeeding on a second attempt
+ * once the module has finished loading.
+ */
+window.pdfjsReady = new Promise(function (resolve) {
+    if (window.pdfjsLib) {
+        resolve();
+        return;
+    }
+    window.addEventListener("skyreader-pdfjs-ready", function () {
+        resolve();
+    }, { once: true });
+});
+</script>
 <script type="module">
 import * as pdfjsLibModule from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.3.289/pdf.min.mjs";
 import { EventBus, PDFLinkService } from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.3.289/pdf_viewer.mjs";
@@ -522,10 +545,10 @@ stroke-linecap="round"/>
 <script src="js/librarySorter.js?v=1.2.0"></script>
 <script src="js/library.js"></script>
 <script src="js/animation.js"></script>
-<script src="js/audio.js"></script>
+<script src="js/audio.js?v=2.1.0"></script>
 <script src="js/pdfengine.js"></script>
 <script src="js/sky180flipengine.js"></script>
-<script src="js/renderer.js"></script>
+<script src="js/renderer.js?v=3.2.0"></script>
 <script src="js/reader.js"></script>
 <script src="js/navigation.js"></script>
 <script src="js/bookmarkPanel.js"></script>
@@ -546,10 +569,10 @@ stroke-linecap="round"/>
 <script src="js/slideshowTransitions.js"></script>
 <script src="js/slideshowLibrary.js"></script>
 <script src="js/zoomController.js"></script>
-<script src="js/slideshowViewer.js"></script>
+<script src="js/slideshowViewer.js?v=4.4.0"></script>
 <script src="js/slideshowUI.js"></script>
-<script src="js/frontMediaRenderer.js"></script>
-<script src="js/frontPage.js?v=4.2.0"></script>
+<script src="js/frontMediaRenderer.js?v=4.2.0"></script>
+<script src="js/frontPage.js?v=4.3.0"></script>
 <script src="js/appSwitcher.js"></script>
 <script src="js/responsiveAppMenu.js"></script>
 
@@ -848,21 +871,7 @@ document
 
 const manifestSlideshows = Manifest.slideshows();
 
-console.log(
-    "[SkyMedia] Manifest slideshows:",
-    manifestSlideshows
-);
-
-console.log(
-    "[SkyMedia] Manifest PDF slideshows:",
-    manifestSlideshows.filter(
-        item => item && item.source === "pdf"
-    )
-);
-
 SlideshowLibrary.load(manifestSlideshows);
-
-        SlideshowLibrary.load(Manifest.slideshows());
 
         const slideshowSort = document.getElementById("slideshowSort");
         const slideshowFilter = document.getElementById("slideshowFilter");
