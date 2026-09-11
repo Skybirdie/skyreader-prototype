@@ -595,6 +595,26 @@ if (preservedCenterDoor) {
         }
     });
 
+    /*
+     * A page restored from the browser's back/forward cache ("bfcache")
+     * does not re-run app boot - it resurrects the exact in-memory state
+     * that existed before the user navigated away, which is precisely the
+     * stale-inventory symptom this refresh was written to prevent. Treat
+     * that restore the same as navigating back to the Front Page.
+     */
+    window.addEventListener("pageshow", (event) => {
+        if (
+            event.persisted &&
+            window.AppSwitcher &&
+            typeof AppSwitcher.current === "function" &&
+            AppSwitcher.current() === "front" &&
+            window.Manifest &&
+            typeof Manifest.refresh === "function"
+        ) {
+            Manifest.refresh().then(() => render());
+        }
+    });
+
     return {
         version: VERSION,
         init,

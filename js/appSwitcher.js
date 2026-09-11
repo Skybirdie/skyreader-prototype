@@ -179,7 +179,31 @@ function show(id, options = {}) {
 
         requestAnimationFrame(() => {
             if (id === "front" && window.FrontPage && typeof FrontPage.refresh === "function") {
+
+                /* Render immediately from whatever is already cached so
+                   navigating to the Front Page never shows a blank/stale
+                   flash while the network round-trip below is in flight. */
                 FrontPage.refresh();
+
+                /*
+                -------------------------------------------------------
+                 Re-fetch content.json every time the Front Page becomes
+                 active, so any newly-added inventory (and each door's
+                 "newest per category" pick) is reflected immediately
+                 instead of waiting on the browser's cache to expire.
+
+                 Re-render only if the user is still on the Front Page
+                 once the fetch resolves - they may have already
+                 navigated elsewhere by then.
+                -------------------------------------------------------
+                */
+                if (window.Manifest && typeof Manifest.refresh === "function") {
+                    Manifest.refresh().then(() => {
+                        if (current === "front") {
+                            FrontPage.refresh();
+                        }
+                    });
+                }
             }
             window.dispatchEvent(new Event("resize"));
         });
