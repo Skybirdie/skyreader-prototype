@@ -18,7 +18,7 @@
 window.Manifest = {
 
     source: {
-        url: "content.json?v=3.0.1",
+        url: "content.json?v=3.0.0",
 
         async load() {
             const response = await fetch(this.url, { cache: "no-store" });
@@ -32,7 +32,6 @@ window.Manifest = {
     },
 
     _data: null,
-    _refreshPromise: null,
 
     async load() {
         SkyReader.setLoading(5, "Loading content...");
@@ -45,6 +44,19 @@ window.Manifest = {
 
             const manifest =
                 ContentContract.normalizeManifest(rawManifest);
+
+console.log(
+    "[Manifest] Slideshow-005 after normalization:",
+    manifest.content.find(item => item.id === "slideshow-005")
+);
+
+console.log(
+    "[Manifest] Raw slideshow-005:",
+    Array.isArray(rawManifest?.content)
+        ? rawManifest.content.find(item => item.id === "slideshow-005")
+        : rawManifest?.slideshow?.["slideshow-005"]
+);
+
 
             if (!manifest.content.length) {
                 throw new Error("No visible content is available.");
@@ -118,87 +130,6 @@ window.Manifest = {
         }
     },
 
-    /*
-    -------------------------------------------------------
-     Front Page refresh
-
-     Re-fetches content.json (bypassing any browser cache, same as
-     the initial load) and replaces the published manifest in place.
-     This exists so the Front Page can pick up brand-new inventory
-     without a full page reload, and without disturbing anything
-     that lives outside Manifest._data - theme, volume, favorites,
-     and bookmarks are all stored separately and are never touched
-     here.
-
-     Unlike load(), a failed refresh does NOT clear existing content:
-     a transient network hiccup should not blank out an already
-     working Front Page. Concurrent calls are coalesced into the
-     single in-flight fetch.
-    -------------------------------------------------------
-    */
-
-    async refresh() {
-        if (this._refreshPromise) {
-            return this._refreshPromise;
-        }
-
-        this._refreshPromise = (async () => {
-            try {
-                const rawManifest =
-                    GlideContract.available()
-                        ? await GlideContract.load()
-                        : await this.source.load();
-
-                const manifest =
-                    ContentContract.normalizeManifest(rawManifest);
-
-                if (!manifest.content.length) {
-                    throw new Error("No visible content is available.");
-                }
-
-                this._data = manifest;
-
-                const books = this.content("book");
-                SkyReader.library = [...books];
-                SkyReader.filteredLibrary = [...books];
-
-                const background = rawManifest && typeof rawManifest === "object"
-                    ? rawManifest.background
-                    : null;
-
-                if (background) {
-                    SkyReader.settings.background = background;
-
-                    const viewerBackground =
-                        document.getElementById("viewerBackground");
-
-                    if (viewerBackground) {
-                        viewerBackground.style.backgroundImage =
-                            `url('${background}')`;
-                    }
-                }
-
-                window.dispatchEvent(new CustomEvent("skymedia:manifest-ready", {
-                    detail: { manifest }
-                }));
-
-                return manifest;
-
-            } catch (error) {
-                console.warn(
-                    "[Manifest] Refresh failed; keeping existing content.",
-                    error
-                );
-                return null;
-
-            } finally {
-                this._refreshPromise = null;
-            }
-        })();
-
-        return this._refreshPromise;
-    },
-
     all() {
         const items = this._data
             ? [...this._data.content]
@@ -214,24 +145,9 @@ window.Manifest = {
          * of every library grid and out of the front-door shapes —
          * no per-section filtering needed.
          */
-        /*
-         * Fail closed if the date-visibility utility is unavailable.
-         * Publishing is a safety boundary: absence of the gate must
-         * never mean "everything is visible."
-         */
-        if (
-            !window.SkyDate ||
-            typeof SkyDate.isVisible !== "function"
-        ) {
-            console.warn(
-                "[Manifest] SkyDate visibility gate unavailable; returning no content."
-            );
-            return [];
-        }
-
-        return items.filter(item =>
-            SkyDate.isVisible(item.date)
-        );
+        return window.SkyDate
+            ? items.filter(item => SkyDate.isVisible(item.date))
+            : items;
     },
 
     content(type) {

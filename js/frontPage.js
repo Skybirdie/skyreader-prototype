@@ -12,7 +12,6 @@
    fallback when that configuration is absent.
    ========================================================= */
 window.FrontPage = (function () {
-    const VERSION = "4.2.0";
     const DEFAULT_CATEGORIES = [
         "Book Club",
         "Affirmations",
@@ -139,55 +138,56 @@ window.FrontPage = (function () {
 
     function collectItems() {
         /*
-         * The Front Page must use the normalized Manifest, but it must not
-         * depend on Manifest.all() having already performed its publishing
-         * filter.  We deliberately read the normalized content and perform
-         * the release-date test here because the Front Page has a different
-         * selection rule: newest RELEASED item in each configured category.
-         *
-         * A valid manifest item is therefore never rejected merely because
-         * the date utility is unavailable.  In that exceptional case we use
-         * the contract's 12-digit date key directly and fail closed only for
-         * an invalid/missing date.
+         * The unified Manifest is the primary source.  Importantly, an
+         * empty Manifest is NOT treated as a valid empty result while the
+         * application is still booting: the section libraries may already
+         * contain the normalized data in that situation.  We therefore use
+         * the libraries as a compatibility fallback only when Manifest.all()
+         * is empty.
          */
-        if (
-            !window.Manifest ||
-            !Manifest._data ||
-            !Array.isArray(Manifest._data.content)
-        ) {
-            return [];
+        let items = [];
+
+        if (window.Manifest && typeof Manifest.all === "function") {
+            const manifestItems = Manifest.all();
+
+            if (Array.isArray(manifestItems) && manifestItems.length) {
+                items = manifestItems
+                    .map(item => normalizeItem(
+                        item,
+                        item.type === "book" ? "reader" : item.type
+                    ))
+                    .filter(Boolean);
+            }
         }
 
-        const now = window.SkyDate && typeof SkyDate.nowKey === "function"
-            ? SkyDate.nowKey()
-            : (() => {
-                const d = new Date();
-                const p = n => String(n).padStart(2, "0");
-                return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}${p(d.getHours())}${p(d.getMinutes())}`;
-            })();
+        if (!items.length) {
+            if (window.SkyReader && Array.isArray(SkyReader.library)) {
+                SkyReader.library.forEach(i => {
+                    const n = normalizeItem(i, "reader");
+                    if (n) items.push(n);
+                });
+            }
 
-        function releaseKey(value) {
-            const digits = String(value ?? "").trim().replace(/[^0-9]/g, "");
-            if (/^\d{8}$/.test(digits)) return digits + "0000";
-            if (/^\d{12}$/.test(digits)) return digits;
-            return "";
+            if (window.VideoLibrary && typeof VideoLibrary.getVideos === "function") {
+                VideoLibrary.getVideos().forEach(i => {
+                    const n = normalizeItem(i, "video");
+                    if (n) items.push(n);
+                });
+            }
+
+            if (window.SlideshowLibrary &&
+                typeof SlideshowLibrary.getSlideshows === "function") {
+
+                SlideshowLibrary.getSlideshows().forEach(i => {
+                    const n = normalizeItem(i, "slideshow");
+                    if (n) items.push(n);
+                });
+            }
         }
 
-        return Manifest._data.content
-            .filter(item => {
-                if (!item || typeof item !== "object") return false;
-
-                const date = releaseKey(item.date);
-                if (!date) return false;
-
-                /* The contract's date field is the sole publication gate. */
-                return date <= now;
-            })
-            .map(item => normalizeItem(
-                item,
-                item.type === "book" ? "reader" : item.type
-            ))
-            .filter(Boolean);
+        return items.filter(item =>
+            !window.SkyDate || SkyDate.isVisible(item.date)
+        );
     }
 
     function newest(items) {
@@ -595,28 +595,7 @@ if (preservedCenterDoor) {
         }
     });
 
-    /*
-     * A page restored from the browser's back/forward cache ("bfcache")
-     * does not re-run app boot - it resurrects the exact in-memory state
-     * that existed before the user navigated away, which is precisely the
-     * stale-inventory symptom this refresh was written to prevent. Treat
-     * that restore the same as navigating back to the Front Page.
-     */
-    window.addEventListener("pageshow", (event) => {
-        if (
-            event.persisted &&
-            window.AppSwitcher &&
-            typeof AppSwitcher.current === "function" &&
-            AppSwitcher.current() === "front" &&
-            window.Manifest &&
-            typeof Manifest.refresh === "function"
-        ) {
-            Manifest.refresh().then(() => render());
-        }
-    });
-
     return {
-        version: VERSION,
         init,
         refresh,
         render,

@@ -94,83 +94,82 @@ window.FrontMediaRenderer = (function(){
 function openFull(item){
     if(!item || !item.id) return;
 
-    /*
-     * IMPORTANT: requestFullscreen() must be made directly from the
-     * user's click/tap.  The previous implementation waited for
-     * AppSwitcher + requestAnimationFrame + setTimeout(100), which loses
-     * the browser's transient user activation.  That creates an
-     * intermittent open/close/fail-on-first-attempt race, especially on
-     * mobile browsers.
-     *
-     * Enter fullscreen first, synchronously from this click, then switch
-     * the application and open the item.  The fullscreen element remains
-     * in the DOM while the destination viewer is populated.
-     */
     try{
-        window.__skyFrontPageFullscreenLaunch = true;
-
-        if(item.section === "reader"){
-            const readerRoot = document.getElementById("app") || document.documentElement;
-            if(!document.fullscreenElement && readerRoot.requestFullscreen){
-                const request = readerRoot.requestFullscreen();
-                if(request && typeof request.catch === "function"){
-                    request.catch(()=>{
-                        window.__skyFrontPageFullscreenLaunch = false;
-                    });
-                }
-            }
-        }
-        else if(item.section === "video"){
-            const video = document.getElementById("videoPlayer");
-            if(video && !document.fullscreenElement && video.requestFullscreen){
-                const request = video.requestFullscreen();
-                if(request && typeof request.catch === "function"){
-                    request.catch(()=>{
-                        window.__skyFrontPageFullscreenLaunch = false;
-                    });
-                }
-            }
-        }
-        else if(item.section === "slideshow"){
-            const viewer = document.getElementById("slideshowViewer");
-            if(viewer && !document.fullscreenElement && viewer.requestFullscreen){
-                const request = viewer.requestFullscreen();
-                if(request && typeof request.catch === "function"){
-                    request.catch(()=>{
-                        window.__skyFrontPageFullscreenLaunch = false;
-                    });
-                }
-            }
-        }
-
         if(window.AppSwitcher){
             AppSwitcher.show(item.section);
         }
 
         requestAnimationFrame(()=>{
+    try{
+        if(item.section === "reader" &&
+           window.Library &&
+           typeof Library.open === "function"){
+            Library.open(item.id);
+        }
+        else if(item.section === "video" &&
+                window.VideoLibrary &&
+                typeof VideoLibrary.select === "function"){
+            VideoLibrary.select(item.id);
+        }
+        else if(item.section === "slideshow" &&
+                window.SlideshowLibrary &&
+                typeof SlideshowLibrary.select === "function"){
+            SlideshowLibrary.select(item.id);
+        }
+
+        window.setTimeout(()=>{
             try{
-                if(item.section === "reader" &&
-                   window.Library &&
-                   typeof Library.open === "function"){
-                    Library.open(item.id);
+                if(item.section === "reader"){
+                    /*
+                     * Do NOT fullscreen #viewerArea directly. It is an
+                     * inner content-only div: the reader's toolbar,
+                     * status bar, and background all live in sibling
+                     * elements (#toolbar, #statusBar, #viewerBackground).
+                     * Fullscreening #viewerArea alone pulls only that
+                     * div into the browser's top layer — everything
+                     * else (background image, close button, page
+                     * controls) is left outside it and simply isn't
+                     * rendered, and #viewerArea's own transparent
+                     * background reveals the browser's default black
+                     * ::backdrop. That produced a black screen with no
+                     * visible way to exit, and a broken layout once
+                     * fullscreen was dismissed (e.g. via the device
+                     * back button).
+                     *
+                     * The Reader's own real fullscreen path
+                     * (ui.toggleFullscreen) fullscreens the whole
+                     * document instead, which keeps the reader's
+                     * chrome (including the close button) inside the
+                     * fullscreen element. Match that here so book
+                     * playback opened from the Front Page behaves the
+                     * same way as opening it from the Reader itself.
+                     */
+                    if(!document.fullscreenElement){
+                        document.documentElement.requestFullscreen?.().catch(()=>{});
+                    }
                 }
-                else if(item.section === "video" &&
-                        window.VideoLibrary &&
-                        typeof VideoLibrary.select === "function"){
-                    VideoLibrary.select(item.id);
+                else if(item.section === "video"){
+                    const video = document.getElementById("videoPlayer");
+                    if(video && !document.fullscreenElement){
+                        video.requestFullscreen?.().catch(()=>{});
+                    }
                 }
-                else if(item.section === "slideshow" &&
-                        window.SlideshowLibrary &&
-                        typeof SlideshowLibrary.select === "function"){
-                    SlideshowLibrary.select(item.id);
+                else if(item.section === "slideshow"){
+                    const viewer = document.getElementById("slideshowViewer");
+                    if(viewer && !document.fullscreenElement){
+                        viewer.requestFullscreen?.().catch(()=>{});
+                    }
                 }
             }catch(error){
-                console.error("[FrontMediaRenderer] Unable to open full viewer.", error);
-                window.__skyFrontPageFullscreenLaunch = false;
+                console.error("[FrontMediaRenderer] Unable to enter fullscreen.", error);
             }
-        });
+        }, 100);
     }catch(error){
-        window.__skyFrontPageFullscreenLaunch = false;
+        console.error("[FrontMediaRenderer] Unable to open full viewer.", error);
+    }
+});
+
+    }catch(error){
         console.error("[FrontMediaRenderer] Unable to switch to full viewer.", error);
     }
 }
@@ -878,10 +877,7 @@ async function renderSlideshow(item,token){
         }
 
         try{
-            const pdfjsAvailable = window.waitForPdfjs ? await window.waitForPdfjs() : true;
-            if(token!==generation) return;
-
-            if(!pdfjsAvailable || !window.pdfjsLib){
+            if(!window.pdfjsLib){
                 throw new Error("PDF.js unavailable");
             }
 
@@ -1168,26 +1164,6 @@ async function renderSlideshow(item,token){
         const zoom=window.SkyMediaZoom ? SkyMediaZoom.create(ui.content) : null;
         if(zoom) zoom.setTarget(canvas);
         const prev=control("previous","Previous page",()=>go(-1)); const next=control("next","Next page",()=>go(1));
-
-        const muteB=control(
-            "volume",
-            "Mute book sounds",
-            button=>{
-                if(!window.AudioController) return;
-                const muted=AudioController.toggleMute();
-                button.innerHTML="";
-                button.appendChild(icon(muted?"volume-off":"volume"));
-                button.title=muted?"Unmute book sounds":"Mute book sounds";
-                button.setAttribute("aria-label",button.title);
-            }
-        );
-        const initiallyMuted=!!(window.AudioController && typeof AudioController.isMuted==="function" && AudioController.isMuted());
-        muteB.innerHTML="";
-        muteB.appendChild(icon(initiallyMuted?"volume-off":"volume"));
-        muteB.title=initiallyMuted?"Unmute book sounds":"Mute book sounds";
-        muteB.setAttribute("aria-label",muteB.title);
-
-        ui.controlsLeft.append(muteB);
         ui.controlsCenter.append(prev,next); addOpenControl(ui.controlsRight,item);
         let pdf=null,page=1,busy=false;
         function update(){ui.status.textContent=pdf?`${page} / ${pdf.numPages}`:"Loading…";prev.disabled=!pdf||page<=1;next.disabled=!pdf||page>=pdf.numPages;}
@@ -1227,9 +1203,7 @@ async function renderSlideshow(item,token){
             await draw(delta>0?1:-1);
         }
         try{
-            const pdfjsAvailable = window.waitForPdfjs ? await window.waitForPdfjs() : true;
-            if(token!==generation) return;
-            if(!pdfjsAvailable || !window.pdfjsLib)throw new Error("PDF.js unavailable");
+            if(!window.pdfjsLib)throw new Error("PDF.js unavailable");
             const url=item.raw.pdf||item.raw.media||item.raw.url||item.raw.PDF||""; if(!url)throw new Error("PDF URL missing");
             pdf=await pdfjsLib.getDocument({url}).promise; if(token!==generation)return; await draw();
         }catch(e){console.error("[FrontMediaRenderer] PDF preview failed",e);ui.content.innerHTML="";const img=document.createElement("img");img.className="front-media-fallback";img.src=item.thumbnail||"assets/default-thumbnail.png";img.alt=item.title||"";ui.content.appendChild(img);ui.status.textContent="PDF preview unavailable";}

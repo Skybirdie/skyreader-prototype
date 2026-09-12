@@ -179,60 +179,8 @@ function show(id, options = {}) {
 
         requestAnimationFrame(() => {
             if (id === "front" && window.FrontPage && typeof FrontPage.refresh === "function") {
-
-                /* Render immediately from whatever is already cached so
-                   navigating to the Front Page never shows a blank/stale
-                   flash while the network round-trip below is in flight. */
                 FrontPage.refresh();
-
-                /*
-                -------------------------------------------------------
-                 Re-fetch content.json every time the Front Page becomes
-                 active, so any newly-added inventory (and each door's
-                 "newest per category" pick) is reflected immediately
-                 instead of waiting on the browser's cache to expire.
-
-                 Re-render only if the user is still on the Front Page
-                 once the fetch resolves - they may have already
-                 navigated elsewhere by then.
-                -------------------------------------------------------
-                */
-                if (window.Manifest && typeof Manifest.refresh === "function") {
-                    Manifest.refresh().then(() => {
-                        if (current === "front") {
-                            FrontPage.refresh();
-                        }
-                    });
-                }
             }
-
-            /*
-            -------------------------------------------------------
-             The Slideshow library grid is built (and the "alphabetical"
-             sort applied) as soon as content loads at boot, well before
-             the user has ever navigated to this section - so it's laid
-             out while its images have no real width/height yet (still
-             mid-decode) and the section itself may still be hidden.
-
-             CSS multi-column layout (used here for the masonry packing)
-             balances column heights from whatever box sizes exist at
-             that moment; when a card's image hadn't finished decoding
-             yet, that card got balanced in at a collapsed, text-only
-             height and never grew back to size afterwards even once the
-             image loaded - it just sat there looking blank/missing.
-
-             Re-rendering the grid here, now that the section is
-             genuinely visible and every image has almost certainly
-             already loaded, forces the browser to redo that column
-             balance against real box sizes. This only rebuilds the
-             existing (already-sorted/filtered) list - it doesn't
-             refetch or reorder anything.
-            -------------------------------------------------------
-            */
-            if (id === "slideshow" && window.SlideshowLibrary && typeof SlideshowLibrary.render === "function") {
-                SlideshowLibrary.render();
-            }
-
             window.dispatchEvent(new Event("resize"));
         });
 

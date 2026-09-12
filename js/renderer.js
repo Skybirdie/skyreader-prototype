@@ -338,16 +338,6 @@ renderer.open=async function(book,options={}){
     progress(5,"Opening document");
 
     try{
-        /* pdf.js loads asynchronously from a CDN module (see index.html).
-           On a cold start it may not be ready yet when the very first
-           click comes in; wait for it (bounded, so a genuinely offline
-           or blocked connection falls through to the error handling
-           below instead of hanging forever) instead of throwing and
-           forcing a second attempt. */
-        const pdfjsAvailable = window.waitForPdfjs ? await window.waitForPdfjs() : true;
-        if(token!==openToken || presentation!==presentationToken) return;
-        if(!pdfjsAvailable || typeof pdfjsLib==="undefined") throw new Error("PDF engine failed to load");
-
         const pdfUrl=await resolvePdfUrl(book.pdf);
         progress(8,"Loading PDF");
 
@@ -807,28 +797,11 @@ async function renderMediaAnnotations(surface,page,viewport){
                     event.preventDefault();
                     event.stopPropagation();
                 };
-                ["pointerdown","pointerup","pointercancel","mousedown","mouseup","touchstart","touchmove","touchend","click"].forEach(type=>
-                    controls.addEventListener(type,stopTurn,{passive:false})
+                ["pointerdown","pointerup","mousedown","mouseup","touchstart","touchend","click"].forEach(type=>
+                    controls.addEventListener(type,stopTurn)
                 );
 
-                /* Mobile browsers are more reliable when the action is
-                   handled from pointer/touch release as well as click. */
-                const bindControlAction=(button,action)=>{
-                    let fired=false;
-                    const run=event=>{
-                        event.preventDefault();
-                        event.stopPropagation();
-                        if(fired) return;
-                        fired=true;
-                        action();
-                        window.setTimeout(()=>{fired=false;},350);
-                    };
-                    button.addEventListener("pointerup",run,{passive:false});
-                    button.addEventListener("touchend",run,{passive:false});
-                    button.addEventListener("click",run,{passive:false});
-                };
-
-                bindControlAction(playPause,()=>{
+                playPause.addEventListener("click",()=>{
                     if(video.ended){
                         video.currentTime=0;
                         video.play().catch(()=>{});
@@ -839,17 +812,17 @@ async function renderMediaAnnotations(surface,page,viewport){
                     }
                 });
 
-                bindControlAction(restart,()=>{
+                restart.addEventListener("click",()=>{
                     video.currentTime=0;
                     video.play().catch(()=>{});
                 });
 
-                bindControlAction(mute,()=>{
+                mute.addEventListener("click",()=>{
                     video.muted=!video.muted;
                     update();
                 });
 
-                bindControlAction(fullscreen,()=>{
+                fullscreen.addEventListener("click",()=>{
                     const request=video.requestFullscreen || video.webkitRequestFullscreen;
                     if(typeof request==="function") request.call(video);
                 });

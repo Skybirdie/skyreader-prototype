@@ -133,15 +133,7 @@ function init(options = {}) {
 
     videoElement.addEventListener(
         "ended",
-        () => {
-            /*
-             * Reaching the final frame is NOT a close action.  In a
-             * Front Page fullscreen launch the final frame must remain
-             * visible until the user explicitly closes the video (Close
-             * button or Escape).  closeVideo() owns fullscreen exit.
-             */
-            setStatusMessage("Finished");
-        }
+        () => setStatusMessage("Finished")
     );
 
     videoElement.addEventListener(
@@ -416,17 +408,8 @@ function createWatchAgainCard(video) {
     thumbnail.loading =
         "lazy";
 
-    const fallbackThumbnail =
-        "assets/default-thumbnail.png";
-
     thumbnail.src =
-        video.thumbnail || fallbackThumbnail;
-
-    thumbnail.addEventListener("error", () => {
-        if (thumbnail.dataset.fallbackApplied === "true") return;
-        thumbnail.dataset.fallbackApplied = "true";
-        thumbnail.src = fallbackThumbnail;
-    });
+        video.thumbnail || "";
 
     thumbnail.alt =
         video.title || "";
@@ -1052,11 +1035,6 @@ loadVideoPlayer(video);
 */
 
 function closeVideo() {
-
-    if (document.fullscreenElement) {
-        document.exitFullscreen?.().catch?.(()=>{});
-    }
-    window.__skyFrontPageFullscreenLaunch = false;
 
     if (!videoElement) {
         return;
