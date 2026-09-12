@@ -83,7 +83,11 @@ transform:translateY(-2px)
     position:relative;z-index:20;
     width:var(--slideshow-library-width);flex:0 0 var(--slideshow-library-width);box-sizing:border-box;
     height:100%;min-width:0;min-height:0;
-    display:flex;flex-direction:column;overflow-x:hidden;overflow-y:auto;
+    /* overflow-x:auto (not hidden) is a deliberate safety net, matching
+       the Reader section's #libraryContent: if the masonry column-balance
+       above ever comes out fractionally wrong, a card becomes reachable
+       via horizontal scroll instead of being silently clipped/lost. */
+    display:flex;flex-direction:column;overflow-x:auto;overflow-y:auto;
     background:transparent;color:var(--text);scrollbar-width:thin;
     scrollbar-color:rgba(255,255,255,.42) transparent;
     transition:transform .28s cubic-bezier(.25,.8,.25,1),visibility 0s linear 0s;
@@ -96,7 +100,7 @@ transform:translateY(-2px)
     flex:0 0 48px;min-height:48px;width:100%;display:flex;align-items:center;gap:8px;
     padding:8px 12px;position:relative; z-index:100;
 }
-.slideshow-library-header h2{margin:0;min-width:0;flex:1;color:var(--text);font-size:clamp(20px,4vw,30px);line-height:1;font-weight:700;text-shadow: 0 2px 3px rgba(0, 0, 0, .55);}
+.slideshow-library-header h2{margin:0;min-width:0;flex:1;color:var(--text);font-size:clamp(20px,4vw,30px);line-height:1.2;font-weight:700;text-shadow: 0 1px 4px rgba(0, 0, 0, .65);}
 .slideshow-library-header-controls{display:flex;align-items:center;gap:4px;z-index:101;background: rgba(255, 255, 255, .42);border-radius: 10px;}
 .slideshow-organization-controls,.slideshow-library-view-controls{display:flex;align-items:center;gap:2px;position:relative;}
 .slideshow-org-button,.slideshow-view-button,.slideshow-library-drawer-close{
