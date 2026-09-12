@@ -133,10 +133,48 @@ window.ShareManager = (function () {
             return false;
         }
 
+        /*
+         If the content contract contains the Glide row/deep-link
+         supplied by P3, use that URL directly. This is the preferred
+         user-facing share link because it is short and opens Glide.
+
+         If P3 is unavailable, detect whether this SkyMedia instance
+         was launched from Glide. A Glide Web Embed is identified by
+         either the Glide referrer or a Glide-origin contract URL.
+         When that context is confirmed, use the core Glide URL as the
+         safe fallback. Otherwise retain the direct SkyMedia deep link.
+        */
+
+        const glideUrl =
+            typeof item.glideUrl === "string"
+                ? item.glideUrl.trim()
+                : "";
+
+        const referrer =
+            String(document.referrer || "").toLowerCase();
+
+        const currentSearch =
+            String(window.location.search || "").toLowerCase();
+
+        const runningThroughGlide =
+            referrer.includes("meditationmornings.glide.page") ||
+            referrer.includes("glide.page") ||
+            referrer.includes("go.glideapps.com") ||
+            currentSearch.includes("contractz=") &&
+            (referrer.includes("glide") || referrer.includes("glideapps"));
+
+        const CORE_GLIDE_URL =
+            "https://meditationmornings.glide.page/";
+
         const url =
-            buildUrl(
-                section,
-                item.id
+            glideUrl ||
+            (
+                runningThroughGlide
+                    ? CORE_GLIDE_URL
+                    : buildUrl(
+                        section,
+                        item.id
+                    )
             );
 
         if (!url) {
