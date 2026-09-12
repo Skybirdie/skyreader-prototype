@@ -15,6 +15,8 @@
 =========================================================
 */
 
+const SKYMEDIA_MANIFEST_CACHE_KEY = "skymedia-manifest-cache-v2";
+
 window.Manifest = {
 
     source: {
@@ -37,26 +39,19 @@ window.Manifest = {
     _refreshPromise: null,
 
     async load() {
-        SkyReader.setLoading(5, "Loading content...");
-
-        try {
-            const rawManifest =
-                GlideContract.available()
-                    ? await GlideContract.load()
-                    : await this.source.load();
-
-            const manifest =
-                ContentContract.normalizeManifest(rawManifest);
-
-            if (!manifest.content.length) {
-                throw new Error("No visible content is available.");
+        /*
+         * Startup uses the last successful normalized manifest as a fast
+         * bootstrap snapshot, then ALWAYS revalidates the live source in the
+         * background. This prevents a slow network request from blocking the
+         * initial Front Page while preserving the requirement that new data
+         * is processed whenever the app is loaded.
+         */
+        const install = (manifest, rawManifest = null) => {
+            if (!manifest || !Array.isArray(manifest.content) || !manifest.content.length) {
+                return false;
             }
 
             this._data = manifest;
-
-            window.dispatchEvent(new CustomEvent("skymedia:manifest-ready", {
-                detail: { manifest }
-            }));
 
             const books = this.content("book");
             const videos = this.content("video");
@@ -67,19 +62,54 @@ window.Manifest = {
 
             const background = rawManifest && typeof rawManifest === "object"
                 ? rawManifest.background
-                : null;
+                : (manifest.background || null);
 
             if (background) {
                 SkyReader.settings.background = background;
-
-                const viewerBackground =
-                    document.getElementById("viewerBackground");
-
+                const viewerBackground = document.getElementById("viewerBackground");
                 if (viewerBackground) {
-                    viewerBackground.style.backgroundImage =
-                        `url('${background}')`;
+                    viewerBackground.style.backgroundImage = `url('${background}')`;
                 }
             }
+
+            window.dispatchEvent(new CustomEvent("skymedia:manifest-ready", {
+                detail: { manifest }
+            }));
+
+            return true;
+        };
+
+        const readCache = () => {
+            try {
+                const cached = JSON.parse(localStorage.getItem(SKYMEDIA_MANIFEST_CACHE_KEY) || "null");
+                return cached && Array.isArray(cached.content) ? cached : null;
+            } catch (error) {
+                return null;
+            }
+        };
+
+        const writeCache = manifest => {
+            try {
+                localStorage.setItem(SKYMEDIA_MANIFEST_CACHE_KEY, JSON.stringify(manifest));
+            } catch (error) {
+                /* Storage/quota/privacy restrictions are not fatal. */
+            }
+        };
+
+        const fetchFresh = async () => {
+            const rawManifest =
+                GlideContract.available()
+                    ? await GlideContract.load()
+                    : await this.source.load();
+
+            const manifest = ContentContract.normalizeManifest(rawManifest);
+
+            if (!manifest.content.length) {
+                throw new Error("No visible content is available.");
+            }
+
+            install(manifest, rawManifest);
+            writeCache(manifest);
 
             if (manifest.diagnostics.length) {
                 console.info(
@@ -90,11 +120,34 @@ window.Manifest = {
 
             SkyReader.setLoading(
                 20,
-                `Content loaded: ${books.length} books, ${videos.length} videos, ${slideshows.length} slideshows`
+                `Content loaded: ${this.books().length} books, ${this.videos().length} videos, ${this.slideshows().length} slideshows`
             );
 
             return manifest;
+        };
 
+        const cachedManifest = readCache();
+
+        if (cachedManifest && install(cachedManifest)) {
+            SkyReader.setLoading(20, "Refreshing content…");
+
+            /* Fresh content is mandatory, but it is not on the critical
+               rendering path. Reuse the normal coalesced refresh path so a
+               simultaneous Front Page navigation cannot start a second fetch. */
+            this.refresh({ destination: "front" }).catch(error => {
+                console.warn(
+                    "[Manifest] Background refresh failed; keeping cached content.",
+                    error
+                );
+            });
+
+            return this._data;
+        }
+
+        SkyReader.setLoading(5, "Loading content...");
+
+        try {
+            return await fetchFresh();
         } catch (error) {
             this._data = null;
             SkyReader.library = [];
@@ -106,14 +159,8 @@ window.Manifest = {
                 error.message || "Unable to load SkyMedia content."
             );
 
-            if (
-                window.UI &&
-                typeof UI.showError === "function"
-            ) {
-                UI.showError(
-                    error,
-                    "Unable to load SkyMedia content."
-                );
+            if (window.UI && typeof UI.showError === "function") {
+                UI.showError(error, "Unable to load SkyMedia content.");
             }
 
             throw error;
@@ -161,6 +208,15 @@ window.Manifest = {
                 }
 
                 this._data = manifest;
+
+                try {
+                    localStorage.setItem(
+                        SKYMEDIA_MANIFEST_CACHE_KEY,
+                        JSON.stringify(manifest)
+                    );
+                } catch (error) {
+                    /* Cache failure is never allowed to affect live content. */
+                }
 
                 const books = this.content("book");
                 SkyReader.library = [...books];
