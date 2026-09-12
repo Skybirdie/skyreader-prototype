@@ -120,6 +120,26 @@ window.ShareManager = (function () {
 
     /*
     ---------------------------------------------------------
+     Build the public Glide viewer share URL
+    ---------------------------------------------------------
+    */
+    function buildGlideShareUrl(section, id) {
+
+        if (!section || !id) return "";
+
+        const url = new URL(
+            "https://meditationmornings.glide.page/dl/media"
+        );
+
+        url.searchParams.set(SECTION_PARAM, section);
+        url.searchParams.set(ID_PARAM, id);
+
+        return url.toString();
+    }
+
+
+    /*
+    ---------------------------------------------------------
      Share
     ---------------------------------------------------------
     */
@@ -134,48 +154,11 @@ window.ShareManager = (function () {
         }
 
         /*
-         If the content contract contains the Glide row/deep-link
-         supplied by P3, use that URL directly. This is the preferred
-         user-facing share link because it is short and opens Glide.
-
-         If P3 is unavailable, detect whether this SkyMedia instance
-         was launched from Glide. A Glide Web Embed is identified by
-         either the Glide referrer or a Glide-origin contract URL.
-         When that context is confirmed, use the core Glide URL as the
-         safe fallback. Otherwise retain the direct SkyMedia deep link.
+         Build the public Glide viewer URL. Do not use P3 inventory
+         URLs here: the recipient must land on /dl/media, with the
+         section and item id carried as query parameters.
         */
-
-        const glideUrl =
-            typeof item.glideUrl === "string"
-                ? item.glideUrl.trim()
-                : "";
-
-        const referrer =
-            String(document.referrer || "").toLowerCase();
-
-        const currentSearch =
-            String(window.location.search || "").toLowerCase();
-
-        const runningThroughGlide =
-            referrer.includes("meditationmornings.glide.page") ||
-            referrer.includes("glide.page") ||
-            referrer.includes("go.glideapps.com") ||
-            currentSearch.includes("contractz=") &&
-            (referrer.includes("glide") || referrer.includes("glideapps"));
-
-        const CORE_GLIDE_URL =
-            "https://meditationmornings.glide.page/";
-
-        const url =
-            glideUrl ||
-            (
-                runningThroughGlide
-                    ? CORE_GLIDE_URL
-                    : buildUrl(
-                        section,
-                        item.id
-                    )
-            );
+        const url = buildGlideShareUrl(section, item.id);
 
         if (!url) {
             return false;
@@ -559,6 +542,7 @@ window.ShareManager = (function () {
     return {
 
         buildUrl,
+        buildGlideShareUrl,
         share,
         readTarget,
         openDeepLink
