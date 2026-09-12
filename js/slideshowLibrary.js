@@ -106,13 +106,15 @@ media.appendChild(img);
         const item = slideshows.find(x => x.id === id);
         if (!item || !window.SlideshowViewer) return false;
 
-        /* The viewer owns the opening transaction.  Do not let a library-
-           level stale promise make the cards permanently unresponsive. */
+        /* Keep the visual selection synchronous, but single-flight the
+           asynchronous viewer open so rapid/cold-start clicks cannot launch
+           competing PDF.js loads. */
+        if (selectionPromise) return false;
+
         selectedId = id;
         refreshSelection();
 
-        const result = SlideshowViewer.open(item);
-        selectionPromise = Promise.resolve(result)
+        selectionPromise = Promise.resolve(SlideshowViewer.open(item))
             .finally(() => { selectionPromise = null; });
 
         return selectionPromise;
