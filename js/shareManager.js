@@ -343,19 +343,23 @@ window.ShareManager = (function () {
     }
 
 
-    /*
+        /*
     ---------------------------------------------------------
      Open deep link
     ---------------------------------------------------------
 
-     This runs AFTER the normal SkyMedia startup.
+     Deep-link parameters are:
 
-     Therefore Manifest has already loaded the Glide
-     contract and all section libraries have already been
-     populated.
+         ?section=reader&id=BOOK_ID
+         ?section=video&id=VIDEO_ID
+         ?section=slideshow&id=SLIDESHOW_ID
 
-     The deep link simply identifies which already-loaded
-     item should be opened.
+     Manifest is the authoritative normalized content source.
+     The deep link therefore does NOT depend on the individual
+     section library having independently reconstructed the item.
+
+     A valid deep link takes priority over the normal Front
+     Page landing state.
     ---------------------------------------------------------
     */
 
@@ -368,108 +372,120 @@ window.ShareManager = (function () {
             return false;
         }
 
-        if (!window.AppSwitcher) {
+
+        /*
+        -----------------------------------------------------
+         Normalize section names
+        -----------------------------------------------------
+        */
+
+        const section =
+            String(target.section)
+                .trim()
+                .toLowerCase();
+
+        const id =
+            String(target.id)
+                .trim();
+
+
+        if (!id) {
             return false;
         }
 
 
         /*
         -----------------------------------------------------
-         VIDEO
+         Manifest must be available
         -----------------------------------------------------
         */
 
         if (
-            target.section === "video" &&
-            window.VideoLibrary
+            !window.Manifest ||
+            typeof Manifest.content !== "function"
         ) {
 
-            const videos =
-                typeof VideoLibrary.getVideos ===
-                    "function"
-
-                    ? VideoLibrary.getVideos()
-
-                    : [];
-
-            const item =
-                Array.isArray(videos)
-                    ? videos.find(
-                        x =>
-                            x &&
-                            x.id === target.id
-                    )
-                    : null;
-
-            if (item) {
-
-                AppSwitcher.show(
-                    "video"
-                );
-
-                if (
-                    window.VideoViewer &&
-                    typeof VideoViewer.openVideo ===
-                        "function"
-                ) {
-
-                    VideoViewer.openVideo(
-                        item
-                    );
-
-                    return true;
+            console.warn(
+                "[ShareManager] Manifest unavailable for deep link:",
+                {
+                    section,
+                    id
                 }
-            }
+            );
+
+            return false;
         }
 
 
         /*
         -----------------------------------------------------
-         SLIDESHOW
+         Convert routing name to Manifest content type
+        -----------------------------------------------------
+
+         Reader is the application name.
+         Manifest calls that content type "book".
+        */
+
+        const manifestType =
+            section === "reader"
+                ? "book"
+                : section;
+
+
+        if (
+            manifestType !== "book" &&
+            manifestType !== "video" &&
+            manifestType !== "slideshow"
+        ) {
+
+            console.warn(
+                "[ShareManager] Unknown deep-link section:",
+                section
+            );
+
+            return false;
+        }
+
+
+        /*
+        -----------------------------------------------------
+         Find the exact item in the unified Manifest
         -----------------------------------------------------
         */
 
-        if (
-            target.section === "slideshow" &&
-            window.SlideshowLibrary
-        ) {
+        const collection =
+            Manifest.content(
+                manifestType
+            );
 
-            const slideshows =
-                typeof SlideshowLibrary.getSlideshows ===
-                    "function"
+        const item =
+            Array.isArray(collection)
+                ? collection.find(
+                    entry =>
+                        entry &&
+                        String(entry.id) === id
+                )
+                : null;
 
-                    ? SlideshowLibrary.getSlideshows()
 
-                    : [];
+        if (!item) {
 
-            const item =
-                Array.isArray(slideshows)
-                    ? slideshows.find(
-                        x =>
-                            x &&
-                            x.id === target.id
-                    )
-                    : null;
-
-            if (item) {
-
-                AppSwitcher.show(
-                    "slideshow"
-                );
-
-                if (
-                    window.SlideshowViewer &&
-                    typeof SlideshowViewer.open ===
-                        "function"
-                ) {
-
-                    await SlideshowViewer.open(
-                        item
-                    );
-
-                    return true;
+            console.warn(
+                "[ShareManager] Deep-link target not found in Manifest:",
+                {
+                    section,
+                    id,
+                    manifestType,
+                    availableIds:
+                        Array.isArray(collection)
+                            ? collection.map(
+                                entry => entry && entry.id
+                            )
+                            : []
                 }
-            }
+            );
+
+            return false;
         }
 
 
@@ -479,55 +495,131 @@ window.ShareManager = (function () {
         -----------------------------------------------------
         */
 
-        if (
-            target.section === "reader" &&
-            window.SkyReader
-        ) {
-
-            const books =
-                Array.isArray(
-                    SkyReader.library
-                )
-                    ? SkyReader.library
-                    : [];
-
-            const item =
-                books.find(
-                    x =>
-                        x &&
-                        x.id === target.id
-                );
+        if (manifestType === "book") {
 
             if (
-                item &&
-                window.SRNavigation &&
-                typeof SRNavigation.openMagazine ===
+                !window.AppSwitcher ||
+                typeof AppSwitcher.show !== "function"
+            ) {
+                console.warn(
+                    "[ShareManager] AppSwitcher unavailable for reader deep link."
+                );
+
+                return false;
+            }
+
+            if (
+                !window.SRNavigation ||
+                typeof SRNavigation.openMagazine !==
                     "function"
             ) {
-
-                AppSwitcher.show(
-                    "reader"
+                console.warn(
+                    "[ShareManager] Reader navigation unavailable."
                 );
 
-                await SRNavigation.openMagazine(
-                    item
-                );
-
-                return true;
+                return false;
             }
+
+
+            AppSwitcher.show(
+                "reader"
+            );
+
+            await SRNavigation.openMagazine(
+                item
+            );
+
+            return true;
         }
 
 
         /*
         -----------------------------------------------------
-         Target not found
+         VIDEO
         -----------------------------------------------------
         */
 
-        console.warn(
-            "[ShareManager] Deep-link target not found:",
-            target
-        );
+        if (manifestType === "video") {
+
+            if (
+                !window.AppSwitcher ||
+                typeof AppSwitcher.show !== "function"
+            ) {
+                console.warn(
+                    "[ShareManager] AppSwitcher unavailable for video deep link."
+                );
+
+                return false;
+            }
+
+            if (
+                !window.VideoViewer ||
+                typeof VideoViewer.openVideo !==
+                    "function"
+            ) {
+                console.warn(
+                    "[ShareManager] VideoViewer.openVideo unavailable."
+                );
+
+                return false;
+            }
+
+
+            AppSwitcher.show(
+                "video"
+            );
+
+            VideoViewer.openVideo(
+                item
+            );
+
+            return true;
+        }
+
+
+        /*
+        -----------------------------------------------------
+         SLIDESHOW
+        -----------------------------------------------------
+        */
+
+        if (manifestType === "slideshow") {
+
+            if (
+                !window.AppSwitcher ||
+                typeof AppSwitcher.show !== "function"
+            ) {
+                console.warn(
+                    "[ShareManager] AppSwitcher unavailable for slideshow deep link."
+                );
+
+                return false;
+            }
+
+            if (
+                !window.SlideshowViewer ||
+                typeof SlideshowViewer.open !==
+                    "function"
+            ) {
+                console.warn(
+                    "[ShareManager] SlideshowViewer.open unavailable."
+                );
+
+                return false;
+            }
+
+
+            AppSwitcher.show(
+                "slideshow"
+            );
+
+            await SlideshowViewer.open(
+                item
+            );
+
+            return true;
+        }
+
 
         return false;
     }
