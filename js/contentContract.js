@@ -612,22 +612,6 @@ function toYouTubeEmbedUrl(value) {
                     )
             };
 
-            /*
-             Preserve the Glide deep-link supplied by the C2.2
-             generator.  It is intentionally kept outside the
-             authoritative media fields because it is used only
-             when creating a user-facing share link.
-            */
-
-            const glideUrl =
-                markdownUrl(
-                    raw.glideUrl
-                );
-
-            if (glideUrl) {
-                item.glideUrl = glideUrl;
-            }
-
 
             /*
              dateAdd (upload provenance) is intentionally never used
