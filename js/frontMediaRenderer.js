@@ -878,10 +878,10 @@ async function renderSlideshow(item,token){
         }
 
         try{
-            if(window.pdfjsReady) await window.pdfjsReady;
+            const pdfjsAvailable = window.waitForPdfjs ? await window.waitForPdfjs() : true;
             if(token!==generation) return;
 
-            if(!window.pdfjsLib){
+            if(!pdfjsAvailable || !window.pdfjsLib){
                 throw new Error("PDF.js unavailable");
             }
 
@@ -1227,9 +1227,9 @@ async function renderSlideshow(item,token){
             await draw(delta>0?1:-1);
         }
         try{
-            if(window.pdfjsReady) await window.pdfjsReady;
+            const pdfjsAvailable = window.waitForPdfjs ? await window.waitForPdfjs() : true;
             if(token!==generation) return;
-            if(!window.pdfjsLib)throw new Error("PDF.js unavailable");
+            if(!pdfjsAvailable || !window.pdfjsLib)throw new Error("PDF.js unavailable");
             const url=item.raw.pdf||item.raw.media||item.raw.url||item.raw.PDF||""; if(!url)throw new Error("PDF URL missing");
             pdf=await pdfjsLib.getDocument({url}).promise; if(token!==generation)return; await draw();
         }catch(e){console.error("[FrontMediaRenderer] PDF preview failed",e);ui.content.innerHTML="";const img=document.createElement("img");img.className="front-media-fallback";img.src=item.thumbnail||"assets/default-thumbnail.png";img.alt=item.title||"";ui.content.appendChild(img);ui.status.textContent="PDF preview unavailable";}

@@ -51,6 +51,30 @@ window.pdfjsReady = new Promise(function (resolve) {
         resolve();
     }, { once: true });
 });
+
+/*
+ * window.pdfjsReady above never times out - which is right for a cold
+ * start where the module is simply a beat behind, but wrong if the CDN
+ * request never completes at all (no network, a blocked/offline mobile
+ * connection, a corporate filter, etc). Without a bound, every caller
+ * would wait on it forever: a PDF book/slideshow would never open, and
+ * the Front Page centerpiece preview would sit on "Loading..." forever
+ * with nothing ever rendered.
+ *
+ * window.waitForPdfjs(timeoutMs) gives every caller a bounded wait that
+ * resolves to true/false and never hangs, so they can fall back to
+ * their existing "PDF engine unavailable" handling instead of hanging.
+ */
+window.waitForPdfjs = function (timeoutMs) {
+    timeoutMs = timeoutMs || 8000;
+    if (window.pdfjsLib) return Promise.resolve(true);
+    return Promise.race([
+        window.pdfjsReady.then(function () { return true; }),
+        new Promise(function (resolve) {
+            setTimeout(function () { resolve(false); }, timeoutMs);
+        })
+    ]);
+};
 </script>
 <script type="module">
 import * as pdfjsLibModule from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.3.289/pdf.min.mjs";

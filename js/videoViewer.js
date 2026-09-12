@@ -416,8 +416,17 @@ function createWatchAgainCard(video) {
     thumbnail.loading =
         "lazy";
 
+    const fallbackThumbnail =
+        "assets/default-thumbnail.png";
+
     thumbnail.src =
-        video.thumbnail || "";
+        video.thumbnail || fallbackThumbnail;
+
+    thumbnail.addEventListener("error", () => {
+        if (thumbnail.dataset.fallbackApplied === "true") return;
+        thumbnail.dataset.fallbackApplied = "true";
+        thumbnail.src = fallbackThumbnail;
+    });
 
     thumbnail.alt =
         video.title || "";

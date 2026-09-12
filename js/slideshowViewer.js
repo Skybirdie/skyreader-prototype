@@ -990,10 +990,12 @@ async function open(item) {
                 /* pdf.js loads asynchronously from a CDN module (see
                    index.html). Wait for it on a cold start instead of
                    failing this attempt and only succeeding on the next
-                   click once the module has finished loading. */
-                if(window.pdfjsReady) await window.pdfjsReady;
+                   click once the module has finished loading - bounded,
+                   so a genuinely offline/blocked connection still falls
+                   through to the error handling below. */
+                const pdfjsAvailable = window.waitForPdfjs ? await window.waitForPdfjs() : true;
                 if(generation!==openGeneration || current!==item) return false;
-                if(typeof pdfjsLib==="undefined") throw new Error("PDF support is unavailable");
+                if(!pdfjsAvailable || typeof pdfjsLib==="undefined") throw new Error("PDF support is unavailable");
 
                 const task=pdfjsLib.getDocument({
                     url:item.pdfUrl,

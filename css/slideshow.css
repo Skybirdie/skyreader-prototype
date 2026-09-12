@@ -117,11 +117,31 @@ transform:translateY(-2px)
 .slideshow-org-menu select{width:100%;min-height:32px;padding:5px 8px;border:1px solid rgba(255,255,255,.15);border-radius:7px;background:rgba(255,255,255,.08);color:#fff;font:inherit}
 .slideshow-org-menu option{background:#222;color:#fff}
 
+/*
+ * True masonry packing (thumbnails of varying shapes/sizes sitting
+ * snugly next to each other, same technique already used for the
+ * Reader section's grid view / #shelfView) needs a real CSS multi-column
+ * layout - a plain 2-column CSS Grid always keeps a strict row grid, so
+ * every card in a row sits as tall as the tallest card in that row,
+ * which is the "hangs at the top with gaps underneath" effect that
+ * wasn't wanted here.
+ *
+ * The count-loss bug fixed earlier wasn't caused by column-count itself;
+ * it was caused by this element being a flex:1 1 auto child stretched to
+ * fill its (fixed-height) parent, which fed the column-balancing
+ * algorithm a definite-but-too-short height and made it fragment
+ * overflow into extra, off-screen columns. Giving the grid its own
+ * intrinsic height (flex:0 1 auto, i.e. no grow) instead of stretching
+ * lets multi-column size its columns from the real (full) content
+ * height, so nothing needs a hidden extra column - the parent's normal
+ * overflow-y:auto scrollbar reveals everything instead.
+ */
 .slideshow-library-grid{
-    grid-auto-rows: auto;
-    column-count: 2;
-    column-gap: 10px;
-position:relative;flex:1 1 auto;width:100%;min-width:0;min-height:0;padding:2px 10px 30px;display:block;grid-template-columns:1fr,1fr;gap:10px;align-content:start
+    display:block;
+    column-count:2;
+    column-gap:10px;
+    height:auto;
+position:relative;flex:0 1 auto;width:100%;min-width:0;min-height:0;padding:2px 10px 30px;align-content:start
 }
 
 

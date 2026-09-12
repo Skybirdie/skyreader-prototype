@@ -340,11 +340,13 @@ renderer.open=async function(book,options={}){
     try{
         /* pdf.js loads asynchronously from a CDN module (see index.html).
            On a cold start it may not be ready yet when the very first
-           click comes in; wait for it instead of throwing and forcing a
-           second attempt. */
-        if(window.pdfjsReady) await window.pdfjsReady;
+           click comes in; wait for it (bounded, so a genuinely offline
+           or blocked connection falls through to the error handling
+           below instead of hanging forever) instead of throwing and
+           forcing a second attempt. */
+        const pdfjsAvailable = window.waitForPdfjs ? await window.waitForPdfjs() : true;
         if(token!==openToken || presentation!==presentationToken) return;
-        if(typeof pdfjsLib==="undefined") throw new Error("PDF engine failed to load");
+        if(!pdfjsAvailable || typeof pdfjsLib==="undefined") throw new Error("PDF engine failed to load");
 
         const pdfUrl=await resolvePdfUrl(book.pdf);
         progress(8,"Loading PDF");

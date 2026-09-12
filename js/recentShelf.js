@@ -100,11 +100,17 @@ function createCard(book,entry){
 
     thumbnail.loading="lazy";
 
+    const fallbackThumbnail="assets/default-thumbnail.png";
+
     thumbnail.src=
-
         book.thumbnail ||
+        fallbackThumbnail;
 
-        "";
+    thumbnail.addEventListener("error",()=>{
+        if(thumbnail.dataset.fallbackApplied==="true") return;
+        thumbnail.dataset.fallbackApplied="true";
+        thumbnail.src=fallbackThumbnail;
+    });
 
     thumbnail.alt=
 
