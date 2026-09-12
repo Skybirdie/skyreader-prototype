@@ -99,6 +99,7 @@ function show(id, options = {}) {
     */
 
     if (
+        id !== current &&
         window.MediaManager &&
         typeof MediaManager.sectionChanged === "function"
     ) {
@@ -177,32 +178,31 @@ function show(id, options = {}) {
         instead of adding a second refresh code path.
         */
 
-        requestAnimationFrame(() => {
+        requestAnimationFrame(async () => {
             if (id === "front" && window.FrontPage && typeof FrontPage.refresh === "function") {
-
-                /* Render immediately from whatever is already cached so
-                   navigating to the Front Page never shows a blank/stale
-                   flash while the network round-trip below is in flight. */
-                FrontPage.refresh();
-
-                /*
-                -------------------------------------------------------
-                 Re-fetch content.json every time the Front Page becomes
-                 active, so any newly-added inventory (and each door's
-                 "newest per category" pick) is reflected immediately
-                 instead of waiting on the browser's cache to expire.
-
-                 Re-render only if the user is still on the Front Page
-                 once the fetch resolves - they may have already
-                 navigated elsewhere by then.
-                -------------------------------------------------------
-                */
+                /* Clear the Front Page presentation immediately, then replace
+                   it only after a fresh manifest has been obtained. */
+                FrontPage.refresh({ clear: true, loading: true });
                 if (window.Manifest && typeof Manifest.refresh === "function") {
-                    Manifest.refresh().then(() => {
-                        if (current === "front") {
-                            FrontPage.refresh();
-                        }
-                    });
+                    const manifest = await Manifest.refresh({ destination: "front" });
+                    if (current === "front") {
+                        FrontPage.refresh();
+                    }
+                } else {
+                    FrontPage.refresh();
+                }
+            } else if (id === "slideshow" && window.Manifest && typeof Manifest.refresh === "function") {
+                /* A section navigation is also a data boundary. Reload the
+                   normalized collection before accepting a slideshow click,
+                   so new/future content is not trapped in the startup snapshot. */
+                await Manifest.refresh({ destination: "slideshow" });
+                if (current === "slideshow" && window.SlideshowLibrary) {
+                    SlideshowLibrary.load(Manifest.slideshows());
+                }
+            } else if (id === "video" && window.Manifest && typeof Manifest.refresh === "function") {
+                await Manifest.refresh({ destination: "video" });
+                if (current === "video" && window.VideoLibrary) {
+                    VideoLibrary.load(Manifest.videos());
                 }
             }
             window.dispatchEvent(new Event("resize"));

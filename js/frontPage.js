@@ -582,10 +582,34 @@ if (preservedCenterDoor) {
         return true;
     }
 
-    function refresh() {
-        return initialized
-            ? (syncCategoriesFromManifest(), render(), true)
-            : init();
+    function refresh(options = {}) {
+        if (!initialized) return init();
+
+        /*
+         * Front Page refresh is presentation-only.  It rebuilds the seven
+         * doors from the authoritative Manifest content and never touches
+         * settings, favorites, bookmarks, reading history, or volume.
+         *
+         * clear=true is used by navigation when a completely fresh Front
+         * Page is requested.  This prevents an old inventory selection from
+         * remaining visible while the authoritative manifest refresh is in
+         * flight.  Manifest.refresh() subsequently supplies the new content
+         * and the manifest-ready handler renders it again.
+         */
+        if (options && options.clear === true) {
+            syncCategoriesFromManifest();
+            if (stage) stage.innerHTML = "";
+            if (mediaHost) mediaHost.innerHTML = "";
+
+            /* During a navigation refresh, leave the presentation empty until
+               Manifest.refresh() installs the new normalized inventory. This
+               prevents the old centerpiece from flashing back into view. */
+            if (options.loading === true) return true;
+        }
+
+        syncCategoriesFromManifest();
+        render();
+        return true;
     }
 
     /* Re-render whenever the unified content source finishes loading. */
@@ -611,7 +635,7 @@ if (preservedCenterDoor) {
             window.Manifest &&
             typeof Manifest.refresh === "function"
         ) {
-            Manifest.refresh().then(() => render());
+            Manifest.refresh({ destination: "front" }).then(() => render());
         }
     });
 

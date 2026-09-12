@@ -21,7 +21,9 @@ window.Manifest = {
         url: "content.json?v=3.0.1",
 
         async load() {
-            const response = await fetch(this.url, { cache: "no-store" });
+            const separator = this.url.includes("?") ? "&" : "?";
+            const freshUrl = `${this.url}${separator}_=${Date.now()}`;
+            const response = await fetch(freshUrl, { cache: "no-store" });
 
             if (!response.ok) {
                 throw new Error("Unable to load content.json");
@@ -137,10 +139,12 @@ window.Manifest = {
     -------------------------------------------------------
     */
 
-    async refresh() {
+    async refresh(options = {}) {
         if (this._refreshPromise) {
             return this._refreshPromise;
         }
+
+        const destination = String(options.destination || "").trim().toLowerCase();
 
         this._refreshPromise = (async () => {
             try {
@@ -178,8 +182,17 @@ window.Manifest = {
                     }
                 }
 
+                /* Keep the currently visible destination's library synchronized
+                   with the newly normalized manifest. Front Page consumes Manifest
+                   directly; Video/Slideshow need their own rendered collections. */
+                if (destination === "slideshow" && window.SlideshowLibrary) {
+                    SlideshowLibrary.load(this.slideshows());
+                } else if (destination === "video" && window.VideoLibrary) {
+                    VideoLibrary.load(this.videos());
+                }
+
                 window.dispatchEvent(new CustomEvent("skymedia:manifest-ready", {
-                    detail: { manifest }
+                    detail: { manifest, destination }
                 }));
 
                 return manifest;

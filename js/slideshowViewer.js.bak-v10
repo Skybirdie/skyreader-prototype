@@ -317,18 +317,7 @@ img.addEventListener("error", () => {
             el.appendChild(cap);
         }
 
-        const ready = new Promise((resolve, reject) => {
-            if (img.complete) {
-                if (img.naturalWidth > 0) resolve(img);
-                else reject(new Error(`Unable to load slideshow image: ${slide.image}`));
-                return;
-            }
-
-            img.addEventListener("load", () => resolve(img), { once: true });
-            img.addEventListener("error", () => reject(new Error(`Unable to load slideshow image: ${slide.image}`)), { once: true });
-        });
-
-        return {element:el,ready};
+        return {element:el,ready:Promise.resolve(img)};
     }
 
     async function buildPdfSlide(pageNumber){
@@ -700,27 +689,23 @@ function stopForMediaManager() {
         }
     }
     async function show(indexToShow,direction=1,autoAdvance=false){
-        if(!current || transitionBusy) return false;
+        if(!current||transitionBusy)return;
         const generation=transitionGeneration;
 
         const total=slideCount();
-        if(!total) return false;
+        if(!total)return;
 
         index=Math.max(0,Math.min(indexToShow,total-1));
         updateStatus();
 
         let built;
+
         try{
             built=await buildSlide(index);
-            if(generation!==transitionGeneration || !current) return false;
-            if(built.ready) await built.ready;
-            if(generation!==transitionGeneration || !current) return false;
         }catch(error){
-            if(generation===transitionGeneration && current){
-                setStatus("Unable to render slide");
-                console.error("[SlideshowViewer] Slide render failed.",error);
-            }
-            return false;
+            setStatus("Unable to render slide");
+            console.error("[SlideshowViewer] Slide render failed.",error);
+            return;
         }
 
         const old=stage.querySelector(".slideshow-slide");
@@ -728,56 +713,41 @@ function stopForMediaManager() {
         const zoomTarget=fresh.querySelector("img,canvas");
         if(zoomController) zoomController.setTarget(zoomTarget);
 
-        return await new Promise(resolve=>{
-            const startTransition=()=>{
-                if(generation!==transitionGeneration || !current){
-                    resolve(false);
-                    return;
-                }
+        const startTransition=()=>{
+            if(generation!==transitionGeneration || !current)return;
+            stage.appendChild(fresh);
+            transitionBusy=true;
 
-                stage.appendChild(fresh);
-                transitionBusy=true;
-
-                let settled=false;
-                const done=()=>{
-                    if(settled) return;
-                    settled=true;
-                    if(generation!==transitionGeneration || !current){
-                        transitionBusy=false;
-                        resolve(false);
-                        return;
-                    }
-
+            SlideshowTransitions.run({
+                stage,
+                oldSlide:old,
+                newSlide:fresh,
+                direction,
+                done:()=>{
+                    if(generation!==transitionGeneration || !current)return;
                     transitionBusy=false;
                     if(pendingAdvance){
                         pendingAdvance=false;
                         if(playing){
                             next(true);
+                            return;
                         }
-                    }else if(playing){
-                        schedule();
                     }
-                    resolve(true);
-                };
-
-                try{
-                    SlideshowTransitions.run({
-                        stage,
-                        oldSlide:old,
-                        newSlide:fresh,
-                        direction,
-                        done
-                    });
-                }catch(error){
-                    transitionBusy=false;
-                    if(fresh.parentNode===stage) fresh.remove();
-                    console.error("[SlideshowViewer] Slide transition failed.",error);
-                    resolve(false);
+                    if(playing) schedule();
                 }
-            };
+            });
+        };
 
-            startTransition();
-        });
+        if(built.ready){
+            try{ await built.ready; }catch(e){}
+        }
+
+        startTransition();
+
+        // Do not finish merely because the slideshow reached the last slide.
+        // next() owns end-of-sequence behavior so an active original/music
+        // track can cause the sequence to wrap back to slide 1 and continue
+        // until that audio naturally ends.
     }
 
     function next(fromTimer=false){
@@ -806,15 +776,21 @@ function stopForMediaManager() {
         if(audioIsDrivingPlayback){
             if(audioMode==="effects") playSound(EFFECT_URL);
             show(0,1,fromTimer);
-        }else{
+        }else if(playing){
             /*
-             * The final slide is a hard stopping point.  Nothing inside the
-             * slideshow playback engine is permitted to close the item.
-             * This applies both to timer-driven playback and to a manual
-             * NEXT at the end.  The user may explicitly use Close, Escape,
-             * Restart, Play, Previous, or another available control.
+             * Automatic playback reaching the final slide is not a close
+             * action.  Remain on the final slide (and, when applicable,
+             * remain fullscreen).  An explicit NEXT at the end is handled
+             * separately below and is the user's close/leave action.
              */
             finish();
+        }else if(!fromTimer){
+            /*
+             * NEXT while already on the final slide is an explicit request
+             * to leave the slideshow.  close() exits browser fullscreen and
+             * performs the normal viewer cleanup.
+             */
+            close();
         }
     }
     function previous(){if(!current)return;if(index>0){playing=false;show(index-1,-1);setStatus("Paused");}}
@@ -983,38 +959,17 @@ async function open(item) {
     if (!item) return false;
 
     /*
-     * A single opening transaction owns the entire load/render lifecycle.
-     * Repeated clicks on the same item share that transaction.  A click on
-     * a different item is a deliberate user request, so invalidate the
-     * previous transaction and start the requested item instead of leaving
-     * the library apparently dead behind a stale promise.
+     * Single-flight opening.  The library owns selection, but the viewer
+     * owns the asynchronous load.  Never allow a second click to start a
+     * competing PDF.js/Page render while the first load is unresolved.
      */
     if (openingPromise) {
-        if (String(openingItemId) === String(item.id)) return openingPromise;
-
-        openGeneration++;
-        transitionGeneration++;
-        stopAllMedia();
-
-        if (current?.pdfDocument && typeof current.pdfDocument.destroy === "function") {
-            try { current.pdfDocument.destroy(); } catch (e) {}
-        }
-        if (stage) stage.innerHTML = "";
-        current = null;
-        index = 0;
-        transitionBusy = false;
-        pendingAdvance = false;
-        if (zoomController) {
-            try { zoomController.destroy(); } catch (e) {}
-            zoomController = null;
-        }
+        if (openingItemId === item.id) return openingPromise;
+        return false;
     }
 
     const generation = ++openGeneration;
-    const transactionGeneration = ++transitionGeneration;
     openingItemId = item.id;
-    transitionBusy = false;
-    pendingAdvance = false;
 
     let transaction;
     transaction = (async()=>{
@@ -1030,8 +985,6 @@ async function open(item) {
             index = 0;
             playing = true;
             stopTimer();
-            transitionBusy = false;
-            pendingAdvance = false;
 
             if(item.source==="pdf" || item.pdfUrl){
                 /* pdf.js loads asynchronously from a CDN module (see
@@ -1078,12 +1031,8 @@ async function open(item) {
             updateStatus();
             setAudioMode(item.audio ? "original" : "none");
 
-            const firstSlideReady = await show(0);
-            if(!firstSlideReady) {
-                if(generation!==openGeneration || current!==item) return false;
-                throw new Error("Initial slideshow slide could not be rendered.");
-            }
-            if(generation!==openGeneration || current!==item || transactionGeneration!==transitionGeneration) return false;
+            await show(0);
+            if(generation!==openGeneration || current!==item) return false;
 
             try{
                 const key="skyslideshow-recent";
