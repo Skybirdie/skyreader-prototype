@@ -498,3 +498,704 @@ async function handleKVTrace(
   env
 ) {
   const url =
+    new URL(request.url);
+
+  const key =
+    url.searchParams.get("k");
+
+  const suppliedPayload =
+    url.searchParams.get("contractz");
+
+  const section =
+    url.searchParams.get("section");
+
+  const id =
+    url.searchParams.get("id");
+
+  const lines = [];
+
+  lines.push(
+    "SkyMedia KV TRACE"
+  );
+
+  lines.push(
+    "================="
+  );
+
+  lines.push("");
+
+  lines.push(
+    "Request pathname: " +
+      url.pathname
+  );
+
+  lines.push(
+    "Request method: " +
+      request.method
+  );
+
+  lines.push("");
+
+  lines.push(
+    "Key supplied: " +
+      (key || "(none)")
+  );
+
+  lines.push(
+    "Key length: " +
+      (key ? key.length : 0)
+  );
+
+  lines.push(
+    "Key valid: " +
+      isValidKey(key || "")
+  );
+
+  lines.push("");
+
+  lines.push(
+    "Section: " +
+      (section || "(none)")
+  );
+
+  lines.push(
+    "Item id: " +
+      (id || "(none)")
+  );
+
+  lines.push("");
+
+  lines.push(
+    "Contract supplied in URL: " +
+      (suppliedPayload
+        ? "YES"
+        : "NO")
+  );
+
+  if (suppliedPayload) {
+    lines.push(
+      "Contract length: " +
+        suppliedPayload.length
+    );
+
+    lines.push(
+      "Contract prefix: " +
+        suppliedPayload.slice(0, 20)
+    );
+
+    lines.push(
+      "Contract valid: " +
+        isValidPayload(
+          suppliedPayload
+        )
+    );
+
+    lines.push(
+      "Calculated KV key from contract: " +
+        makeKey(
+          suppliedPayload
+        )
+    );
+  }
+
+  lines.push("");
+
+  if (!isValidKey(key || "")) {
+
+    lines.push(
+      "RESULT: INVALID KEY"
+    );
+
+    return new Response(
+      lines.join("\n"),
+      {
+        status: 400,
+        headers: textHeaders()
+      }
+    );
+  }
+
+  const normalizedKey =
+    key.toUpperCase();
+
+  lines.push(
+    "Normalized KV key: " +
+      normalizedKey
+  );
+
+  lines.push("");
+
+  let payload = null;
+
+  try {
+
+    payload =
+      await env.MEDIA_KV.get(
+        normalizedKey
+      );
+
+    lines.push(
+      "MEDIA_KV.get(): completed"
+    );
+
+  } catch (error) {
+
+    lines.push(
+      "MEDIA_KV.get(): ERROR"
+    );
+
+    lines.push(
+      "Error: " +
+        String(error)
+    );
+
+    return new Response(
+      lines.join("\n"),
+      {
+        status: 500,
+        headers: textHeaders()
+      }
+    );
+  }
+
+  lines.push("");
+
+  lines.push(
+    "KV value found: " +
+      (payload
+        ? "YES"
+        : "NO")
+  );
+
+  if (payload) {
+
+    lines.push(
+      "KV payload length: " +
+        payload.length
+    );
+
+    lines.push(
+      "KV payload prefix: " +
+        payload.slice(0, 20)
+    );
+
+    lines.push(
+      "KV payload valid: " +
+        isValidPayload(payload)
+    );
+
+    const calculatedKey =
+      makeKey(payload);
+
+    lines.push(
+      "Calculated key from KV payload: " +
+        calculatedKey
+    );
+
+    lines.push(
+      "Key matches supplied key: " +
+        (
+          calculatedKey ===
+          normalizedKey
+        )
+    );
+
+    if (suppliedPayload) {
+
+      lines.push(
+        "KV payload equals URL payload: " +
+          (
+            payload ===
+            suppliedPayload
+          )
+      );
+    }
+
+    lines.push("");
+
+    lines.push(
+      "RESULT: KV CONTRACT RETRIEVED"
+    );
+
+  } else {
+
+    lines.push("");
+
+    lines.push(
+      "RESULT: KV CONTRACT NOT FOUND"
+    );
+
+    lines.push(
+      "The Worker cannot recover a contract from this key."
+    );
+  }
+
+  return new Response(
+    lines.join("\n"),
+    {
+      status: 200,
+      headers: textHeaders()
+    }
+  );
+}
+
+
+/* =========================================================
+   MAIN WORKER
+   ========================================================= */
+
+export default {
+
+  async fetch(
+    request,
+    env
+  ) {
+
+    const url =
+      new URL(
+        request.url
+      );
+
+
+    /* =====================================================
+       METHOD CHECK
+       ===================================================== */
+
+    if (
+      request.method !== "GET" &&
+      request.method !== "HEAD"
+    ) {
+      return new Response(
+        "Method Not Allowed",
+        {
+          status: 405,
+          headers: {
+            "allow": "GET, HEAD"
+          }
+        }
+      );
+    }
+
+
+    /* =====================================================
+       DIAGNOSTIC ROUTES
+       ===================================================== */
+
+    if (
+      url.pathname ===
+      "/__skymedia_kv"
+    ) {
+      return handleKVDiagnostic(
+        request,
+        env
+      );
+    }
+
+
+    if (
+      url.pathname ===
+      "/__skymedia_kv_write"
+    ) {
+      return handleKVWriteDiagnostic(
+        request,
+        env
+      );
+    }
+
+
+    /* =====================================================
+       QUERY PARAMETERS
+       ===================================================== */
+
+    const key =
+      url.searchParams.get(
+        "k"
+      );
+
+    const suppliedPayload =
+      url.searchParams.get(
+        "contractz"
+      );
+
+
+    const trace =
+      url.searchParams.get(
+        "__skymedia_trace"
+      ) === "1";
+
+
+    /* =====================================================
+       TEMPORARY TRACE
+
+       This occurs before normal KV handling.
+
+       It lets us inspect exactly what the Worker receives.
+       ===================================================== */
+
+    if (trace) {
+
+      return handleKVTrace(
+        request,
+        env
+      );
+    }
+
+
+    /* =====================================================
+       FIRST-USE KV URL
+
+       ?k=<key>&contractz=sr2.<payload>
+
+       THIS MUST BE HANDLED BEFORE NORMAL ASSET ROUTING.
+       ===================================================== */
+
+    if (
+      key &&
+      suppliedPayload
+    ) {
+
+      /*
+       * Basic key validation.
+       */
+      if (
+        !isValidKey(key)
+      ) {
+
+        return new Response(
+          [
+            "SkyMedia first-use URL error",
+            "",
+            "Invalid key.",
+            "",
+            "Received key length: " +
+              String(key.length),
+            "Received key: " +
+              key
+          ].join("\n"),
+          {
+            status: 400,
+            headers: textHeaders()
+          }
+        );
+      }
+
+
+      /*
+       * Contract validation.
+       */
+      if (
+        !isValidPayload(
+          suppliedPayload
+        )
+      ) {
+
+        return new Response(
+          [
+            "SkyMedia first-use URL error",
+            "",
+            "Invalid contract.",
+            "",
+            "Payload length: " +
+              String(
+                suppliedPayload.length
+              ),
+            "Payload prefix: " +
+              suppliedPayload.slice(0, 30)
+          ].join("\n"),
+          {
+            status: 400,
+            headers: textHeaders()
+          }
+        );
+      }
+
+
+      const normalizedKey =
+        key.toUpperCase();
+
+
+      /*
+       * Calculate the key from the supplied contract.
+       *
+       * We still do not reject a mismatched key here.
+       */
+      const calculatedKey =
+        makeKey(
+          suppliedPayload
+        );
+
+
+      /* ===================================================
+         WRITE
+         =================================================== */
+
+      try {
+
+        await env.MEDIA_KV.put(
+          normalizedKey,
+          suppliedPayload
+        );
+
+      } catch (error) {
+
+        return new Response(
+          [
+            "SkyMedia first-use KV WRITE FAILED",
+            "",
+            "Key: " +
+              normalizedKey,
+            "Payload length: " +
+              suppliedPayload.length,
+            "Calculated key: " +
+              calculatedKey,
+            "",
+            "ERROR:",
+            String(error)
+          ].join("\n"),
+          {
+            status: 500,
+            headers: textHeaders()
+          }
+        );
+      }
+
+
+      /* ===================================================
+         IMMEDIATE READ-BACK VERIFICATION
+         =================================================== */
+
+      let storedPayload = null;
+
+      try {
+
+        storedPayload =
+          await env.MEDIA_KV.get(
+            normalizedKey
+          );
+
+      } catch (error) {
+
+        return new Response(
+          [
+            "SkyMedia first-use KV READ-BACK FAILED",
+            "",
+            "The write appeared to succeed, but the",
+            "immediate verification read failed.",
+            "",
+            "Key: " +
+              normalizedKey,
+            "",
+            "ERROR:",
+            String(error)
+          ].join("\n"),
+          {
+            status: 500,
+            headers: textHeaders()
+          }
+        );
+      }
+
+
+      /* ===================================================
+         VERIFY VALUE
+         =================================================== */
+
+      if (
+        storedPayload !==
+        suppliedPayload
+      ) {
+
+        return new Response(
+          [
+            "SkyMedia first-use KV VERIFICATION FAILED",
+            "",
+            "Key: " +
+              normalizedKey,
+            "",
+            "Supplied payload length: " +
+              suppliedPayload.length,
+            "Stored payload length: " +
+              (
+                storedPayload
+                  ? storedPayload.length
+                  : 0
+              ),
+            "",
+            "The value stored in KV does not exactly",
+            "match the supplied contract."
+          ].join("\n"),
+          {
+            status: 500,
+            headers: textHeaders()
+          }
+        );
+      }
+
+
+      /* ===================================================
+         SUCCESSFUL FIRST USE
+         =================================================== */
+
+      const shortUrl =
+        new URL(
+          url.href
+        );
+
+      shortUrl.searchParams.delete(
+        "contractz"
+      );
+
+      shortUrl.searchParams.delete(
+        "__skymedia_trace"
+      );
+
+      shortUrl.searchParams.set(
+        "k",
+        normalizedKey
+      );
+
+
+      /*
+       * Redirect only after KV has been proven to contain
+       * the exact payload.
+       */
+      return Response.redirect(
+        shortUrl.toString(),
+        302
+      );
+    }
+
+
+    /* =====================================================
+       SHORT KV URL
+
+       ?k=<key>
+       ===================================================== */
+
+    if (key) {
+
+      if (
+        !isValidKey(key)
+      ) {
+
+        return new Response(
+          "Invalid SkyMedia key.",
+          {
+            status: 400,
+            headers: textHeaders()
+          }
+        );
+      }
+
+      const normalizedKey =
+        key.toUpperCase();
+
+      let payload = null;
+
+      try {
+
+        payload =
+          await env.MEDIA_KV.get(
+            normalizedKey
+          );
+
+      } catch (error) {
+
+        return new Response(
+          [
+            "SkyMedia KV read failed.",
+            "",
+            String(error)
+          ].join("\n"),
+          {
+            status: 500,
+            headers: textHeaders()
+          }
+        );
+      }
+
+
+      if (!payload) {
+
+        return new Response(
+          [
+            "SkyMedia publication not found.",
+            "",
+            "KV key: " +
+              normalizedKey
+          ].join("\n"),
+          {
+            status: 404,
+            headers: textHeaders()
+          }
+        );
+      }
+
+
+      if (
+        !isValidPayload(
+          payload
+        )
+      ) {
+
+        return new Response(
+          "SkyMedia publication data is invalid.",
+          {
+            status: 500,
+            headers: textHeaders()
+          }
+        );
+      }
+
+
+      return serveWithContract(
+        request,
+        env,
+        payload
+      );
+    }
+
+
+    /* =====================================================
+       EXISTING LONG C2.2 URL
+
+       ?contractz=sr2.<payload>
+       ===================================================== */
+
+    if (
+      suppliedPayload
+    ) {
+
+      if (
+        !isValidPayload(
+          suppliedPayload
+        )
+      ) {
+
+        return new Response(
+          "Invalid SkyMedia contract.",
+          {
+            status: 400,
+            headers: textHeaders()
+          }
+        );
+      }
+
+
+      return serveWithContract(
+        request,
+        env,
+        suppliedPayload
+      );
+    }
+
+
+    /* =====================================================
+       NORMAL SKYMEDIA REQUEST
+       ===================================================== */
+
+    return env.ASSETS.fetch(
+      request
+    );
+  }
+};
