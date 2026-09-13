@@ -206,257 +206,25 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
-    const keyParam =
-      url.searchParams.get("k");
-
-    const contractz =
-      url.searchParams.get("contractz");
-
-    /* =====================================================
-       FIRST USE
-
-       URL:
-
-       ?k=<key>&contractz=<payload>&section=...&id=...
-
-       Store the full contract in KV, then redirect to the
-       clean URL without the contract.
-       ===================================================== */
-
-    if (keyParam && contractz) {
-      const normalizedKey =
-        keyParam.trim().toUpperCase();
-
-      if (
-        !isValidKey(normalizedKey) ||
-        !isValidPayload(contractz)
-      ) {
-        return new Response(
-          "SkyMedia publication link is invalid.",
-          {
-            status: 400,
-            headers: textHeaders()
-          }
-        );
-      }
-
-      /*
-       * Calculate the expected key from the supplied
-       * contract.
-       *
-       * The calculated value should normally equal the
-       * supplied key. We enforce that relationship here
-       * so a malformed/mismatched share URL cannot store
-       * the contract under an unrelated key.
-       */
-      const calculatedKey =
-        makeKey(contractz);
-
-      if (calculatedKey !== normalizedKey) {
-        return new Response(
-          "SkyMedia publication link is invalid.",
-          {
-            status: 400,
-            headers: textHeaders()
-          }
-        );
-      }
-
-      /* Store contract in KV. */
-      try {
-        await env.MEDIA_KV.put(
-          normalizedKey,
-          contractz
-        );
-      } catch (error) {
-        return new Response(
-          "SkyMedia KV write failed.",
-          {
-            status: 500,
-            headers: textHeaders()
-          }
-        );
-      }
-
-      /*
-       * Verify the write immediately.
-       *
-       * This protects against proceeding to the clean URL
-       * if the KV write was not successful.
-       */
-      let storedPayload = null;
-
-      try {
-        storedPayload =
-          await env.MEDIA_KV.get(normalizedKey);
-      } catch (error) {
-        return new Response(
-          "SkyMedia KV verification read failed.",
-          {
-            status: 500,
-            headers: textHeaders()
-          }
-        );
-      }
-
-      if (storedPayload !== contractz) {
-        return new Response(
-          "SkyMedia KV verification failed.",
-          {
-            status: 500,
-            headers: textHeaders()
-          }
-        );
-      }
-
-      /*
-       * Remove only the long contract from the URL.
-       *
-       * Keep:
-       *   k
-       *   section
-       *   id
-       * and any other legitimate application parameters.
-       */
-      const cleanUrl =
-        new URL(request.url);
-
-      cleanUrl.searchParams.delete(
-        "contractz"
-      );
-
-      return Response.redirect(
-        cleanUrl.toString(),
-        302
-      );
-    }
-
-    /* =====================================================
-       CLEAN SHORT LINK
-
-       URL:
-
-       ?k=<key>&section=...&id=...
-
-       Retrieve the contract from KV and inject it into
-       index.html.
-       ===================================================== */
-
-    if (keyParam) {
-      const normalizedKey =
-        keyParam.trim().toUpperCase();
-
-      if (!isValidKey(normalizedKey)) {
-        return new Response(
-          "SkyMedia publication key is invalid.",
-          {
-            status: 400,
-            headers: textHeaders()
-          }
-        );
-      }
-
-      let payload = null;
-
-      try {
-        payload =
-          await env.MEDIA_KV.get(
-            normalizedKey
-          );
-      } catch (error) {
-        return new Response(
-          "SkyMedia KV read failed.",
-          {
-            status: 500,
-            headers: textHeaders()
-          }
-        );
-      }
-
-      if (!payload) {
-        return new Response(
-          "SkyMedia publication not found.",
-          {
-            status: 404,
-            headers: textHeaders()
-          }
-        );
-      }
-
-      if (!isValidPayload(payload)) {
-        return new Response(
-          "SkyMedia publication data is invalid.",
-          {
-            status: 500,
-            headers: textHeaders()
-          }
-        );
-      }
-
-      /*
-       * Serve the application with the recovered contract.
-       */
-      return serveWithContract(
-        request,
-        env,
-        payload
-      );
-    }
-
-    /* =====================================================
-       LEGACY DIRECT CONTRACT
-
-       Existing URLs such as:
-
-       ?contractz=sr2....
-
-       continue to work.
-       ===================================================== */
-
-    if (contractz) {
-      if (!isValidPayload(contractz)) {
-        return new Response(
-          "SkyMedia contract is invalid.",
-          {
-            status: 400,
-            headers: textHeaders()
-          }
-        );
-      }
-
-      return serveWithContract(
-        request,
-        env,
-        contractz
-      );
-    }
-
-    /* =====================================================
-       NORMAL REQUEST
-
-       No KV key and no direct contract.
-
-       Let Static Assets handle the normal application.
-       ===================================================== */
-
     /* =====================================================
        SHARE PRIMING ENDPOINT
 
-       ShareManager calls this endpoint before sharing. It
-       stores the supplied full contract in KV and returns
-       the clean short URL directly as JSON. CORS is enabled
-       because the app may run inside a Glide web embed.
+       IMPORTANT: this endpoint is checked BEFORE the normal
+       k/contractz routing.  The previous version placed it
+       after those handlers, so the priming request was caught
+       by the normal first-use redirect and ShareManager then
+       tried to parse an HTML response as JSON.
+
+       POST is preferred because the compressed contract can be
+       large.  A text/plain POST is used by the browser so the
+       request remains a simple CORS request (no preflight).
+       GET is retained for diagnostics/backward compatibility.
        ===================================================== */
 
     if (url.pathname === "/__sky_share_prime") {
-      const primeKey = url.searchParams.get("k");
-      const primeContract = url.searchParams.get("contractz");
-      const primeSection = url.searchParams.get("section");
-      const primeId = url.searchParams.get("id");
-
       const corsHeaders = {
         "access-control-allow-origin": "*",
-        "access-control-allow-methods": "GET, OPTIONS",
+        "access-control-allow-methods": "GET, POST, OPTIONS",
         "access-control-allow-headers": "Content-Type",
         "content-type": "application/json; charset=UTF-8",
         "cache-control": "no-store, no-cache, must-revalidate"
@@ -469,19 +237,39 @@ export default {
         });
       }
 
-      if (
-        request.method !== "GET" ||
-        !primeKey ||
-        !primeContract
-      ) {
+      let primeKey = "";
+      let primeContract = "";
+      let primeSection = "";
+      let primeId = "";
+
+      try {
+        if (request.method === "POST") {
+          const body = await request.text();
+          const data = JSON.parse(body || "{}");
+
+          primeKey = String(data.k || "");
+          primeContract = String(data.contractz || "");
+          primeSection = String(data.section || "");
+          primeId = String(data.id || "");
+        } else if (request.method === "GET") {
+          primeKey = url.searchParams.get("k") || "";
+          primeContract = url.searchParams.get("contractz") || "";
+          primeSection = url.searchParams.get("section") || "";
+          primeId = url.searchParams.get("id") || "";
+        } else {
+          return new Response(
+            JSON.stringify({ error: "Invalid share-prime method." }),
+            { status: 405, headers: corsHeaders }
+          );
+        }
+      } catch (error) {
         return new Response(
-          JSON.stringify({ error: "Invalid share-prime request." }),
+          JSON.stringify({ error: "Invalid share-prime request body." }),
           { status: 400, headers: corsHeaders }
         );
       }
 
-      const normalizedPrimeKey =
-        primeKey.trim().toUpperCase();
+      const normalizedPrimeKey = primeKey.trim().toUpperCase();
 
       if (
         !isValidKey(normalizedPrimeKey) ||
@@ -513,6 +301,8 @@ export default {
           throw new Error("KV verification failed.");
         }
       } catch (error) {
+        console.error("SkyMedia share-prime KV failure:", error);
+
         return new Response(
           JSON.stringify({ error: "SkyMedia KV write failed." }),
           { status: 500, headers: corsHeaders }
@@ -531,9 +321,121 @@ export default {
       }
 
       return new Response(
-        JSON.stringify({ url: cleanUrl.toString() }),
+        JSON.stringify({
+          ok: true,
+          url: cleanUrl.toString()
+        }),
         { status: 200, headers: corsHeaders }
       );
+    }
+
+    const keyParam = url.searchParams.get("k");
+    const contractz = url.searchParams.get("contractz");
+
+    /* =====================================================
+       FIRST USE
+       ===================================================== */
+
+    if (keyParam && contractz) {
+      const normalizedKey = keyParam.trim().toUpperCase();
+
+      if (
+        !isValidKey(normalizedKey) ||
+        !isValidPayload(contractz)
+      ) {
+        return new Response(
+          "SkyMedia publication link is invalid.",
+          { status: 400, headers: textHeaders() }
+        );
+      }
+
+      const calculatedKey = makeKey(contractz);
+
+      if (calculatedKey !== normalizedKey) {
+        return new Response(
+          "SkyMedia publication link is invalid.",
+          { status: 400, headers: textHeaders() }
+        );
+      }
+
+      try {
+        await env.MEDIA_KV.put(normalizedKey, contractz);
+
+        const storedPayload =
+          await env.MEDIA_KV.get(normalizedKey);
+
+        if (storedPayload !== contractz) {
+          throw new Error("KV verification failed.");
+        }
+      } catch (error) {
+        console.error("SkyMedia first-use KV failure:", error);
+        return new Response(
+          "SkyMedia KV write/verification failed.",
+          { status: 500, headers: textHeaders() }
+        );
+      }
+
+      const cleanUrl = new URL(request.url);
+      cleanUrl.searchParams.delete("contractz");
+
+      return Response.redirect(cleanUrl.toString(), 302);
+    }
+
+    /* =====================================================
+       CLEAN SHORT LINK
+       ===================================================== */
+
+    if (keyParam) {
+      const normalizedKey = keyParam.trim().toUpperCase();
+
+      if (!isValidKey(normalizedKey)) {
+        return new Response(
+          "SkyMedia publication key is invalid.",
+          { status: 400, headers: textHeaders() }
+        );
+      }
+
+      let payload = null;
+
+      try {
+        payload = await env.MEDIA_KV.get(normalizedKey);
+      } catch (error) {
+        return new Response(
+          "SkyMedia KV read failed.",
+          { status: 500, headers: textHeaders() }
+        );
+      }
+
+      if (!payload) {
+        return new Response(
+          "SkyMedia publication not found.",
+          { status: 404, headers: textHeaders() }
+        );
+      }
+
+      if (!isValidPayload(payload)) {
+        return new Response(
+          "SkyMedia publication data is invalid.",
+          { status: 500, headers: textHeaders() }
+        );
+      }
+
+      return serveWithContract(request, env, payload);
+    }
+
+    /* =====================================================
+       LEGACY DIRECT CONTRACT
+       ===================================================== */
+
+    if (contractz) {
+      if (!isValidPayload(contractz)) {
+        return new Response(
+          "SkyMedia contract is invalid.",
+          { status: 400, headers: textHeaders() }
+        );
+      }
+
+      return serveWithContract(request, env, contractz);
     }
 
     /* =====================================================
