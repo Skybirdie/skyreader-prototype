@@ -3,6 +3,11 @@
 const CONTRACT_PREFIX = "sr2.";
 const KEY_LENGTH = 16;
 
+/* =========================================================
+   Deterministic KV key generation
+   Must match the key generator used by ShareManager / Glide.
+   ========================================================= */
+
 function fnv1a32(value, seed) {
   let hash = (0x811c9dc5 ^ seed) >>> 0;
 
@@ -15,7 +20,10 @@ function fnv1a32(value, seed) {
 }
 
 function hex8(value) {
-  return value.toString(16).padStart(8, "0").toUpperCase();
+  return value
+    .toString(16)
+    .padStart(8, "0")
+    .toUpperCase();
 }
 
 function makeKey(payload) {
@@ -25,22 +33,37 @@ function makeKey(payload) {
   return hex8(hash1) + hex8(hash2);
 }
 
+/* =========================================================
+   Validation
+   ========================================================= */
+
 function isValidKey(key) {
-  return typeof key === "string" &&
+  return (
+    typeof key === "string" &&
     key.length === KEY_LENGTH &&
-    /^[A-Fa-f0-9]{16}$/.test(key);
+    /^[A-Fa-f0-9]{16}$/.test(key)
+  );
 }
 
 function isValidPayload(payload) {
   if (!payload) return false;
-  if (!payload.startsWith(CONTRACT_PREFIX)) return false;
+
+  if (!payload.startsWith(CONTRACT_PREFIX)) {
+    return false;
+  }
 
   const encoded = payload.slice(CONTRACT_PREFIX.length);
 
-  if (!encoded) return false;
+  if (!encoded) {
+    return false;
+  }
 
   return /^[A-Za-z0-9_-]+$/.test(encoded);
 }
+
+/* =========================================================
+   Response helpers
+   ========================================================= */
 
 function htmlHeaders() {
   return {
@@ -58,6 +81,15 @@ function textHeaders() {
   };
 }
 
+/* =========================================================
+   Asset request
+   Always serve the application's root index.html.
+
+   This prevents the query-string share URL from causing
+   the application to look for a physical file matching
+   the URL path.
+   ========================================================= */
+
 function makeCleanAssetRequest(request) {
   const assetUrl = new URL(request.url);
 
@@ -70,6 +102,16 @@ function makeCleanAssetRequest(request) {
     headers: request.headers
   });
 }
+
+/* =========================================================
+   Inject recovered contract into index.html.
+
+   The existing SkyMedia application already understands
+   ?contractz=sr2....
+
+   We recover the contract from KV and place it back into
+   the URL before the application starts.
+   ========================================================= */
 
 function injectContractBootstrap(html, payload) {
   const encodedPayload = JSON.stringify(payload);
@@ -92,10 +134,16 @@ function injectContractBootstrap(html, payload) {
     window.history.replaceState(
       null,
       "",
-      url.pathname + "?" + url.searchParams.toString() + url.hash
+      url.pathname +
+        "?" +
+        url.searchParams.toString() +
+        url.hash
     );
   } catch (error) {
-    console.error("SkyMedia KV bootstrap failed:", error);
+    console.error(
+      "SkyMedia KV bootstrap failed:",
+      error
+    );
   }
 })();
 </script>
@@ -104,28 +152,45 @@ function injectContractBootstrap(html, payload) {
   const marker = "</head>";
   const index = html.indexOf(marker);
 
-  if (index < 0) return html;
+  if (index < 0) {
+    return html;
+  }
 
-  return html.slice(0, index) + script + html.slice(index);
+  return (
+    html.slice(0, index) +
+    script +
+    html.slice(index)
+  );
 }
+
+/* =========================================================
+   Serve index.html with a recovered contract.
+   ========================================================= */
 
 async function serveWithContract(request, env, payload) {
   const assetResponse = await env.ASSETS.fetch(
     makeCleanAssetRequest(request)
   );
 
-  if (!assetResponse.ok) return assetResponse;
+  if (!assetResponse.ok) {
+    return assetResponse;
+  }
 
   const contentType =
     assetResponse.headers.get("content-type") || "";
 
-  if (!contentType.toLowerCase().includes("text/html")) {
+  if (!contentType
+    .toLowerCase()
+    .includes("text/html")) {
     return assetResponse;
   }
 
   const html = await assetResponse.text();
 
-  const modified = injectContractBootstrap(html, payload);
+  const modified = injectContractBootstrap(
+    html,
+    payload
+  );
 
   return new Response(modified, {
     status: 200,
@@ -133,173 +198,34 @@ async function serveWithContract(request, env, payload) {
   });
 }
 
-async function handleKVTrace(request, env) {
-  const url = new URL(request.url);
-
-  const suppliedKey = url.searchParams.get("k") || "";
-  const section = url.searchParams.get("section") || "";
-  const id = url.searchParams.get("id") || "";
-  const suppliedPayload = url.searchParams.get("contractz") || "";
-
-  const lines = [];
-
-  lines.push("SkyMedia KV trace");
-  lines.push("=================");
-  lines.push("");
-
-  lines.push("Pathname: " + url.pathname);
-  lines.push("Method: " + request.method);
-  lines.push("");
-
-  lines.push("Supplied key: " + (suppliedKey || "(none)"));
-  lines.push("Key length: " + suppliedKey.length);
-  lines.push("Key valid: " + isValidKey(suppliedKey));
-  lines.push("");
-
-  lines.push("Section: " + (section || "(none)"));
-  lines.push("ID: " + (id || "(none)"));
-  lines.push("");
-
-  lines.push(
-    "URL has contractz: " +
-    (suppliedPayload ? "YES" : "NO")
-  );
-
-  if (suppliedPayload) {
-    lines.push("URL contract length: " + suppliedPayload.length);
-    lines.push(
-      "URL contract prefix valid: " +
-      suppliedPayload.startsWith(CONTRACT_PREFIX)
-    );
-    lines.push(
-      "URL contract valid: " +
-      isValidPayload(suppliedPayload)
-    );
-
-    if (isValidPayload(suppliedPayload)) {
-      lines.push(
-        "Calculated key from URL contract: " +
-        makeKey(suppliedPayload)
-      );
-    }
-  }
-
-  lines.push("");
-
-  const normalizedKey = suppliedKey.trim().toUpperCase();
-
-  lines.push("Normalized key: " + (normalizedKey || "(none)"));
-  lines.push("");
-
-  let kvPayload = null;
-  let kvError = null;
-
-  try {
-    kvPayload = await env.MEDIA_KV.get(normalizedKey);
-  } catch (error) {
-    kvError = error;
-  }
-
-  lines.push(
-    "MEDIA_KV.get completed: " +
-    (kvError ? "NO" : "YES")
-  );
-
-  if (kvError) {
-    lines.push(
-      "KV error: " +
-      String(kvError && kvError.message
-        ? kvError.message
-        : kvError)
-    );
-  }
-
-  lines.push(
-    "KV value found: " +
-    (kvPayload !== null ? "YES" : "NO")
-  );
-
-  if (kvPayload !== null) {
-    lines.push("KV payload length: " + kvPayload.length);
-    lines.push(
-      "KV payload prefix valid: " +
-      kvPayload.startsWith(CONTRACT_PREFIX)
-    );
-    lines.push(
-      "KV payload valid: " +
-      isValidPayload(kvPayload)
-    );
-
-    if (isValidPayload(kvPayload)) {
-      const calculatedKVKey = makeKey(kvPayload);
-
-      lines.push(
-        "Calculated key from KV payload: " +
-        calculatedKVKey
-      );
-
-      lines.push(
-        "KV calculated key matches supplied key: " +
-        (
-          isValidKey(normalizedKey) &&
-          calculatedKVKey === normalizedKey
-        )
-      );
-    }
-
-    if (suppliedPayload) {
-      lines.push(
-        "KV payload equals URL payload: " +
-        (kvPayload === suppliedPayload)
-      );
-    }
-  }
-
-  lines.push("");
-  lines.push("Final result:");
-
-  if (!isValidKey(normalizedKey)) {
-    lines.push("INVALID KEY");
-  } else if (kvError) {
-    lines.push("KV READ ERROR");
-  } else if (kvPayload === null) {
-    lines.push("KEY NOT FOUND");
-  } else if (!isValidPayload(kvPayload)) {
-    lines.push("KV PAYLOAD INVALID");
-  } else {
-    lines.push("KEY FOUND AND PAYLOAD VALID");
-  }
-
-  return new Response(lines.join("\n"), {
-    status: 200,
-    headers: textHeaders()
-  });
-}
+/* =========================================================
+   Worker
+   ========================================================= */
 
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
-    const trace =
-      url.searchParams.get("__skymedia_trace") === "1";
+    const keyParam =
+      url.searchParams.get("k");
 
-    if (trace) {
-      return handleKVTrace(request, env);
-    }
+    const contractz =
+      url.searchParams.get("contractz");
 
-    const keyParam = url.searchParams.get("k");
-    const contractz = url.searchParams.get("contractz");
+    /* =====================================================
+       FIRST USE
 
-    /*
-     * FIRST USE:
-     *
-     * ?k=<key>&contractz=<payload>
-     *
-     * Store the supplied contract in KV, then redirect
-     * to the clean k URL.
-     */
+       URL:
+
+       ?k=<key>&contractz=<payload>&section=...&id=...
+
+       Store the full contract in KV, then redirect to the
+       clean URL without the contract.
+       ===================================================== */
+
     if (keyParam && contractz) {
-      const normalizedKey = keyParam.trim().toUpperCase();
+      const normalizedKey =
+        keyParam.trim().toUpperCase();
 
       if (
         !isValidKey(normalizedKey) ||
@@ -314,14 +240,29 @@ export default {
         );
       }
 
-      const calculatedKey = makeKey(contractz);
-
       /*
-       * The supplied key should correspond to the payload.
-       * We don't reject it here so the diagnostic behavior
-       * remains visible while testing.
+       * Calculate the expected key from the supplied
+       * contract.
+       *
+       * The calculated value should normally equal the
+       * supplied key. We enforce that relationship here
+       * so a malformed/mismatched share URL cannot store
+       * the contract under an unrelated key.
        */
+      const calculatedKey =
+        makeKey(contractz);
 
+      if (calculatedKey !== normalizedKey) {
+        return new Response(
+          "SkyMedia publication link is invalid.",
+          {
+            status: 400,
+            headers: textHeaders()
+          }
+        );
+      }
+
+      /* Store contract in KV. */
       try {
         await env.MEDIA_KV.put(
           normalizedKey,
@@ -329,12 +270,7 @@ export default {
         );
       } catch (error) {
         return new Response(
-          "SkyMedia KV write failed.\n\n" +
-          String(
-            error && error.message
-              ? error.message
-              : error
-          ),
+          "SkyMedia KV write failed.",
           {
             status: 500,
             headers: textHeaders()
@@ -342,6 +278,12 @@ export default {
         );
       }
 
+      /*
+       * Verify the write immediately.
+       *
+       * This protects against proceeding to the clean URL
+       * if the KV write was not successful.
+       */
       let storedPayload = null;
 
       try {
@@ -349,12 +291,7 @@ export default {
           await env.MEDIA_KV.get(normalizedKey);
       } catch (error) {
         return new Response(
-          "SkyMedia KV verification read failed.\n\n" +
-          String(
-            error && error.message
-              ? error.message
-              : error
-          ),
+          "SkyMedia KV verification read failed.",
           {
             status: 500,
             headers: textHeaders()
@@ -364,8 +301,7 @@ export default {
 
       if (storedPayload !== contractz) {
         return new Response(
-          "SkyMedia KV verification failed.\n\n" +
-          "The value written to KV could not be read back exactly.",
+          "SkyMedia KV verification failed.",
           {
             status: 500,
             headers: textHeaders()
@@ -373,9 +309,21 @@ export default {
         );
       }
 
-      const cleanUrl = new URL(request.url);
+      /*
+       * Remove only the long contract from the URL.
+       *
+       * Keep:
+       *   k
+       *   section
+       *   id
+       * and any other legitimate application parameters.
+       */
+      const cleanUrl =
+        new URL(request.url);
 
-      cleanUrl.searchParams.delete("contractz");
+      cleanUrl.searchParams.delete(
+        "contractz"
+      );
 
       return Response.redirect(
         cleanUrl.toString(),
@@ -383,16 +331,20 @@ export default {
       );
     }
 
-    /*
-     * CLEAN SHORT LINK:
-     *
-     * ?k=<key>
-     *
-     * Retrieve the contract from KV and inject it into
-     * index.html.
-     */
+    /* =====================================================
+       CLEAN SHORT LINK
+
+       URL:
+
+       ?k=<key>&section=...&id=...
+
+       Retrieve the contract from KV and inject it into
+       index.html.
+       ===================================================== */
+
     if (keyParam) {
-      const normalizedKey = keyParam.trim().toUpperCase();
+      const normalizedKey =
+        keyParam.trim().toUpperCase();
 
       if (!isValidKey(normalizedKey)) {
         return new Response(
@@ -408,15 +360,12 @@ export default {
 
       try {
         payload =
-          await env.MEDIA_KV.get(normalizedKey);
+          await env.MEDIA_KV.get(
+            normalizedKey
+          );
       } catch (error) {
         return new Response(
-          "SkyMedia KV read failed.\n\n" +
-          String(
-            error && error.message
-              ? error.message
-              : error
-          ),
+          "SkyMedia KV read failed.",
           {
             status: 500,
             headers: textHeaders()
@@ -444,6 +393,9 @@ export default {
         );
       }
 
+      /*
+       * Serve the application with the recovered contract.
+       */
       return serveWithContract(
         request,
         env,
@@ -451,11 +403,16 @@ export default {
       );
     }
 
-    /*
-     * LEGACY DIRECT CONTRACT:
-     *
-     * ?contractz=sr2....
-     */
+    /* =====================================================
+       LEGACY DIRECT CONTRACT
+
+       Existing URLs such as:
+
+       ?contractz=sr2....
+
+       continue to work.
+       ===================================================== */
+
     if (contractz) {
       if (!isValidPayload(contractz)) {
         return new Response(
@@ -474,9 +431,14 @@ export default {
       );
     }
 
-    /*
-     * NORMAL REQUEST
-     */
+    /* =====================================================
+       NORMAL REQUEST
+
+       No KV key and no direct contract.
+
+       Let Static Assets handle the normal application.
+       ===================================================== */
+
     return env.ASSETS.fetch(request);
   }
 };
