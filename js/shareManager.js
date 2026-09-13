@@ -389,32 +389,57 @@ window.ShareManager = (function () {
 
 
   /* =========================================================
-     CREATE SHARE URL
+     PRIME KV AND CREATE SHORT SHARE URL
      ========================================================= */
 
-  async function shorten(
-    longUrl
-  ) {
-
-    /*
-      There is no /api/shorten request anymore.
-
-      The first-use URL itself is the URL that Cloudflare
-      needs to see once in order to populate KV.
-
-      Keep this function for API compatibility with any
-      existing callers of ShareManager.shorten().
-    */
+  async function shorten(longUrl) {
 
     if (!longUrl) {
-
       throw new Error(
         "ShareManager: missing share URL."
       );
     }
 
+    /*
+      The Worker must see the first-use URL once so that it can
+      store the complete contract in KV.  The dedicated prime
+      endpoint performs that operation and returns the clean
+      short URL without requiring the browser to follow a
+      cross-origin redirect.
+    */
+    const response = await fetch(
+      longUrl.replace(
+        SKYMEDIA_BASE_URL,
+        SKYMEDIA_BASE_URL + "/__sky_share_prime"
+      ),
+      {
+        method: "GET",
+        mode: "cors",
+        cache: "no-store"
+      }
+    );
 
-    return longUrl;
+    if (!response.ok) {
+      throw new Error(
+        "ShareManager: unable to create the short share link (" +
+        response.status +
+        ")."
+      );
+    }
+
+    const data = await response.json();
+
+    if (
+      !data ||
+      typeof data.url !== "string" ||
+      !data.url
+    ) {
+      throw new Error(
+        "ShareManager: Worker returned an invalid short share link."
+      );
+    }
+
+    return data.url;
   }
 
 
@@ -522,19 +547,18 @@ window.ShareManager = (function () {
 
 
     /*
-      Build the FIRST-USE KV URL.
-
-      This contains:
-
-        k
-        contractz
-        section
-        id
+      Build the first-use URL, then prime KV and obtain the
+      clean short URL before anything is shared or copied.
     */
-    const shareUrl =
+    const firstUseUrl =
       buildLongUrl(
         normalizedSection,
         item.id
+      );
+
+    const shareUrl =
+      await shorten(
+        firstUseUrl
       );
 
 
