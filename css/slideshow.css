@@ -1094,6 +1094,16 @@ position:relative;    height: fit-content;
     text-align:center;
 }
 
+/* When there's no index/count to show, the indicator is left with an
+   empty textContent (see slideshowViewer.js updateStatus()). Collapsing
+   it here - rather than leaving an empty, still-occupying box - lets the
+   flex row's own centering (justify-content:center, gap) re-center the
+   status message on the bar instead of off-center around a phantom
+   sibling. Same fix as .video-status-indicator:empty in video.css. */
+.slideshow-status-indicator:empty{
+    display:none;
+}
+
 /* The welcome banner is part of the workspace bottom edge. */
 .slideshow-viewer > .sr-welcome-banner{
     position:absolute;
