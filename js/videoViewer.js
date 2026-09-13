@@ -117,33 +117,6 @@ function init(options = {}) {
 
     /*
     ---------------------------------------------------
-     Status bar: playback state
-    ---------------------------------------------------
-    */
-
-    videoElement.addEventListener(
-        "play",
-        () => setStatusMessage("Playing")
-    );
-
-    videoElement.addEventListener(
-        "pause",
-        () => setStatusMessage("Paused")
-    );
-
-    videoElement.addEventListener(
-        "ended",
-        () => setStatusMessage("Finished")
-    );
-
-    videoElement.addEventListener(
-        "waiting",
-        () => setStatusMessage("Buffering…")
-    );
-
-
-    /*
-    ---------------------------------------------------
      Responsive layout
     ---------------------------------------------------
     */
@@ -718,11 +691,19 @@ function setStatusMessage(message) {
 
 function updateStatusBar(video) {
 
+    /* The primary status text is the section identity when idle,
+       and the selected item title when an item is open. */
+    if (statusMessageElement) {
+
+        statusMessageElement.textContent =
+            video ? (video.title || "") : "MMicj";
+
+    }
+
+    /* Keep the legacy separate title element empty so the title is
+       never duplicated in the centered status row. */
     if (statusTitleElement) {
-
-        statusTitleElement.textContent =
-            video ? (video.title || "") : "";
-
+        statusTitleElement.textContent = "";
     }
 
     if (statusIndicatorElement) {
@@ -896,7 +877,6 @@ function stopForMediaManager() {
     }
 
     updateStatusBar(null);
-    setStatusMessage("");
 
     if (viewerElement) {
         viewerElement.classList.remove("has-video");
@@ -964,7 +944,6 @@ function openVideo(video) {
 
     updateStatusBar(video);
 
-    setStatusMessage("Loading…");
 
 
     /*
@@ -1040,6 +1019,20 @@ function closeVideo() {
         return;
     }
 
+/* The video may have been sent into true browser fullscreen — either
+   the <video> element itself, or the YouTube iframe when playing a
+   remote embed. Every legitimate close route (close button, Escape,
+   selecting another video) funnels through here, so this is the one
+   place that needs to release fullscreen, or the app is left looking
+   fullscreen with no video underneath it. */
+if (
+    document.fullscreenElement &&
+    (document.fullscreenElement === videoElement ||
+     document.fullscreenElement === iframeElement)
+) {
+    document.exitFullscreen?.().catch(() => {});
+}
+
 clearActivePlayer();
 
 if (
@@ -1058,7 +1051,6 @@ activePlayerType = "video";
 
     updateStatusBar(null);
 
-    setStatusMessage("");
 
     if (viewerElement) {
 

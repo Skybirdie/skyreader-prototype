@@ -381,6 +381,17 @@ return;
 
 }
 
+/* The book may have been opened in true browser fullscreen (either via
+   the Reader's own fullscreen button or via the Front Page "open full
+   viewer" control, both of which fullscreen document.documentElement).
+   Every legitimate close route funnels through here, so this is the one
+   place that needs to hand control back to the browser chrome — without
+   it, the document stays the fullscreenElement and the app is left
+   stuck looking fullscreen even though the book is gone. */
+if(document.fullscreenElement === document.documentElement){
+    document.exitFullscreen?.().catch(()=>{});
+}
+
 /* Centralized production close sound. Missing audio is safely ignored by
    AudioController, and mute applies before any playback attempt. */
 const playSound = options && options.playSound === true;
