@@ -150,9 +150,16 @@ function openFull(item){
                     }
                 }
                 else if(item.section === "video"){
-                    const video = document.getElementById("videoPlayer");
-                    if(video && !document.fullscreenElement){
-                        video.requestFullscreen?.().catch(()=>{});
+                    /*
+                     * Fullscreen the complete Video Viewer rather than the
+                     * <video> element itself. This keeps SkyMedia overlays
+                     * such as the share-feedback toast inside the browser's
+                     * fullscreen top layer. The player still expands to the
+                     * available viewer space through the existing viewer CSS.
+                     */
+                    const viewer = document.getElementById("videoViewer");
+                    if(viewer && !document.fullscreenElement){
+                        viewer.requestFullscreen?.().catch(()=>{});
                     }
                 }
                 else if(item.section === "slideshow"){
