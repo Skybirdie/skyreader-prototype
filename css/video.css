@@ -1020,7 +1020,12 @@ AppSwitcher marks the active section.
     text-align:center;
 
     border:
-border: 2px red solid;
+        1px solid
+        color-mix(
+            in srgb,
+            var(--muted) 28%,
+            transparent
+        );
 
     background:
         color-mix(

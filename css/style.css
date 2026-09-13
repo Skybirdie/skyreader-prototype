@@ -1160,7 +1160,9 @@ html:fullscreen #topBar{
   height:fit-content;
   width: fit-content;
   margin-bottom:10px;
+
 }
+
 
 
 /* Shared card styling. */
@@ -1894,6 +1896,8 @@ html[data-theme="dark"] #readerPanel #toolbar .iconButton{
     max-height:none;
     padding:8px;
   }
+
+
 
   #listView{
     display:flex;
@@ -2641,3 +2645,16 @@ max-width:35vw;
     }
 
 }
+
+#shelfView .bookCard.selected {
+    box-shadow:
+        0 0 0 3px #66CDAA,
+        0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+#listView .listItem.selected {
+    box-shadow:
+        0 0 0 3px #66CDAA,
+        0 8px 24px rgba(0, 0, 0, 0.4) !important;
+}
+
