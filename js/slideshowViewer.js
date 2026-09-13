@@ -271,9 +271,16 @@ img.addEventListener("error", () => {
     }
 
     function updateStatus(){
+        const indicator = document.getElementById("slideshowIndicator");
+        const total = slideCount();
+
         if(status) {
-            const total=slideCount();
-            status.textContent=current && total ? `${index+1} / ${total}` : "";
+            status.textContent = current ? (current.title || "MMicj") : "MMicj";
+        }
+
+        if(indicator) {
+            indicator.textContent =
+                current && total ? `${index+1} / ${total}` : "";
         }
     }
     function setStatus(message){

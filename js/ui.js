@@ -2109,6 +2109,15 @@ Reader.on(
 
 ui.hideToolbar();
 
+/* The "Focus viewer" toggle (viewerFullscreenButton) pins #app into a
+   fixed, full-viewport overlay that hides the top bar, welcome
+   messages, and library panel so only the book shows. That state is
+   independent of the book itself, so closing the book — by the close
+   button, by Next on the last page, or by any other route — must
+   explicitly drop it here or the app is left stuck looking fullscreen
+   with no book left to show. */
+exitViewerFocus();
+
 updateReaderTitle();
 
 updatePageIndicator();
@@ -2136,6 +2145,22 @@ const app=document.getElementById("app");
 if(!app)return;
 const active=app.classList.toggle("viewerFocus");
 updateViewerFocusIcon(active);
+requestAnimationFrame(()=>window.dispatchEvent(new Event("resize")));
+}
+
+/*
+ * Explicit exit (as opposed to toggleViewerFocus, which flips whichever
+ * state is currently active). Used whenever an item that could be in
+ * focus/fullscreen view is intentionally closed, so the app always lands
+ * back in normal mode rather than whatever state it happened to be in.
+ * Safe to call unconditionally: a no-op when focus mode isn't active.
+ */
+function exitViewerFocus(){
+const app=document.getElementById("app");
+if(!app)return;
+if(!app.classList.contains("viewerFocus"))return;
+app.classList.remove("viewerFocus");
+updateViewerFocusIcon(false);
 requestAnimationFrame(()=>window.dispatchEvent(new Event("resize")));
 }
 
