@@ -23,11 +23,15 @@ select(book,page=null){
         AudioController.playSelect();
     }
 
-    if(this._selectHandler){
-        return this._selectHandler(book,page);
-    }
+    /* Mark the selected library card before handing the book
+   to the reader/navigation layer. */
+this.setSelectedCard(book.id);
 
-    return this.open(book.id,page);
+if(this._selectHandler){
+    return this._selectHandler(book,page);
+}
+
+return this.open(book.id,page);
 
 },
 
@@ -287,6 +291,32 @@ return button;
 
 },
 
+
+setSelectedCard(bookId){
+
+    const shelves = [
+        document.getElementById("shelfView"),
+        document.getElementById("listView"),
+        document.getElementById("viewerShelfView")
+    ];
+
+    shelves.forEach(shelf => {
+
+        if(!shelf)return;
+
+        shelf.querySelectorAll(".bookCard, .listItem").forEach(card => {
+
+            card.classList.toggle(
+                "selected",
+                String(card.dataset.id) === String(bookId)
+            );
+
+        });
+
+    });
+
+},
+
 createShelfCard(book){
 
 const card=document.createElement("div");
@@ -294,6 +324,15 @@ const card=document.createElement("div");
 card.className="bookCard";
 
 card.dataset.id=book.id;
+
+/* Keep the currently open book visibly selected even when
+   the library cards are rebuilt. */
+if(
+    SkyReader.currentMagazine &&
+    String(SkyReader.currentMagazine.id) === String(book.id)
+){
+    card.classList.add("selected");
+}
 
 /* Optional per-book card background. Leave unset for the clean default.
    Later, a manifest entry can provide cardBackground without changing the layout. */
@@ -372,6 +411,14 @@ item.className="listItem";
 
 item.dataset.id=book.id;
 
+/* Keep the currently open book visibly selected in list view. */
+if(
+    SkyReader.currentMagazine &&
+    String(SkyReader.currentMagazine.id) === String(book.id)
+){
+    item.classList.add("selected");
+}
+
 const thumbWrap=document.createElement("div");
 thumbWrap.className="listThumb";
 
@@ -449,6 +496,10 @@ b=>b.id===id
 if(!book)return;
 
 SkyReader.currentMagazine=book;
+
+/* Keep the selected card visually synchronized with the
+   book that is currently open in the reader. */
+this.setSelectedCard(book.id);
 
 StorageManager.save();
 

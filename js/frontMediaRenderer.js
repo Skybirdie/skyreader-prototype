@@ -10,6 +10,7 @@
 */
 window.FrontMediaRenderer = (function(){
     let host=null, activeItem=null, cleanupFn=null, generation=0;
+let resizeObserver=null;
 
 
 
@@ -889,9 +890,17 @@ async function renderSlideshow(item,token){
 
             index=1;
 
-            await draw();
-            sync();
-            update();
+await new Promise(resolve=>{
+    requestAnimationFrame(()=>{
+        requestAnimationFrame(resolve);
+    });
+});
+
+if(token!==generation)return;
+
+await draw();
+sync();
+update();
 
             if(playing) schedule();
 
@@ -915,15 +924,23 @@ async function renderSlideshow(item,token){
                 "PDF preview unavailable";
         }
 
-        cleanupFn=()=>{
-            clear();
-            zoom?.destroy();
-            pdf=null;
-            if(audio){
-                audio.pause();
-                audio.currentTime=0;
-            }
-        };
+        watchContentResize(ui.content,()=>{
+    if(pdf && !busy){
+        draw();
+    }
+});
+
+cleanupFn=()=>{
+    clear();
+    resizeObserver?.disconnect();
+    resizeObserver=null;
+    zoom?.destroy();
+    pdf=null;
+    if(audio){
+        audio.pause();
+        audio.currentTime=0;
+    }
+};
 
         return;
     }
@@ -1205,9 +1222,34 @@ async function renderSlideshow(item,token){
         try{
             if(!window.pdfjsLib)throw new Error("PDF.js unavailable");
             const url=item.raw.pdf||item.raw.media||item.raw.url||item.raw.PDF||""; if(!url)throw new Error("PDF URL missing");
-            pdf=await pdfjsLib.getDocument({url}).promise; if(token!==generation)return; await draw();
+            pdf=await pdfjsLib.getDocument({url}).promise;
+
+if(token!==generation)return;
+
+await new Promise(resolve=>{
+    requestAnimationFrame(()=>{
+        requestAnimationFrame(resolve);
+    });
+});
+
+if(token!==generation)return;
+
+await draw();
         }catch(e){console.error("[FrontMediaRenderer] PDF preview failed",e);ui.content.innerHTML="";const img=document.createElement("img");img.className="front-media-fallback";img.src=item.thumbnail||"assets/default-thumbnail.png";img.alt=item.title||"";ui.content.appendChild(img);ui.status.textContent="PDF preview unavailable";}
-        cleanupFn=()=>{zoom?.destroy();pdf=null;}; update();
+        watchContentResize(ui.content,()=>{
+    if(pdf && !busy){
+        draw();
+    }
+});
+
+cleanupFn=()=>{
+    resizeObserver?.disconnect();
+    resizeObserver=null;
+    zoom?.destroy();
+    pdf=null;
+};
+
+update();
     }
 
 function stopPlayback(){
@@ -1220,6 +1262,56 @@ function stopPlayback(){
         cleanupFn=null;
     }
 }
+
+function watchContentResize(content, redraw){
+    if(resizeObserver){
+        resizeObserver.disconnect();
+        resizeObserver=null;
+    }
+
+    if(!content || typeof ResizeObserver==="undefined"){
+        return;
+    }
+
+    let lastWidth=0;
+    let lastHeight=0;
+    let scheduled=false;
+
+    resizeObserver=new ResizeObserver(entries=>{
+        const rect=entries[0]?.contentRect;
+        if(!rect) return;
+
+        const width=Math.round(rect.width);
+        const height=Math.round(rect.height);
+
+        if(width<80 || height<80) return;
+
+        if(width===lastWidth && height===lastHeight) return;
+
+        lastWidth=width;
+        lastHeight=height;
+
+        if(scheduled) return;
+
+        scheduled=true;
+
+        requestAnimationFrame(()=>{
+            scheduled=false;
+
+            try{
+                redraw();
+            }catch(error){
+                console.warn(
+                    "[FrontMediaRenderer] Resize redraw failed.",
+                    error
+                );
+            }
+        });
+    });
+
+    resizeObserver.observe(content);
+}
+
 
     function render(item){
     generation++;
