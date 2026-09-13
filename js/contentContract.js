@@ -614,13 +614,21 @@ function toYouTubeEmbedUrl(value) {
 
 
             /*
-             dateAdd (upload provenance) is intentionally never used
-             to substitute for a missing "date" (the publish/release
-             gate) -- see librarySorter.js, slideshowSorter.js, and
-             videoSorter.js, which document the same separation. An
-             item with no valid date has not been scheduled for
-             release and must stay invisible per SkyDate.isVisible().
+             Legacy dateAdd compatibility.
+
+             New Glide data should use date.
             */
+
+            if (
+                !item.date &&
+                raw.dateAdd
+            ) {
+
+                item.date =
+                    normalizeDate(
+                        raw.dateAdd
+                    );
+            }
 
 
             /*
@@ -783,7 +791,6 @@ function toYouTubeEmbedUrl(value) {
             );
 
         const content = [];
-        const diagnostics = [];
 
 
         for (
@@ -825,36 +832,6 @@ function toYouTubeEmbedUrl(value) {
         }
 
 
-        /*
-         --------------------------------------------------
-         ID COLLISION FALLBACK
-         --------------------------------------------------
-         `id` is relied on everywhere downstream (library
-         lookups, favorites, recently-read, front page
-         hand-off) to mean "exactly one item". Glide data is
-         hand-entered and can legitimately produce two rows
-         that share an id -- a copy-pasted row, a duplicated
-         fallback like "content-3", etc.
-
-         Without a fallback here, a lookup such as
-         `library.find(book => book.id === id)` silently
-         returns whichever of the two items happens to come
-         first, so a second/newer item can appear to "merge"
-         into an older one with the same id.
-
-         The first item to use a given id keeps it unchanged
-         (so existing bookmarks/favorites/recent-read entries
-         keep working). Every later item with the same id is
-         given a new, stable, unique id so it can never be
-         confused with the item(s) before it.
-        */
-
-        dedupeContentIds(
-            content,
-            diagnostics
-        );
-
-
         return {
             version: string(rawManifest && rawManifest.version),
             content: content,
@@ -862,66 +839,8 @@ function toYouTubeEmbedUrl(value) {
                 ? { ...rawManifest.frontPage, categories: Array.isArray(rawManifest.frontPage.categories) ? [...rawManifest.frontPage.categories] : [] }
                 : { categories: [] },
             background: string(rawManifest && rawManifest.background),
-            diagnostics: diagnostics
+            diagnostics: []
         };
-    }
-
-
-    /* =====================================================
-       ID COLLISION FALLBACK
-    ===================================================== */
-
-    function dedupeContentIds(
-        content,
-        diagnostics
-    ) {
-
-        const seen = new Map();
-
-        for (
-            let i = 0;
-            i < content.length;
-            i++
-        ) {
-
-            const item = content[i];
-            const originalId = item.id;
-            const timesSeen = seen.get(originalId) || 0;
-
-            if (timesSeen > 0) {
-
-                let newId =
-                    `${originalId}-dup${timesSeen + 1}`;
-
-                /*
-                 Guard against the generated id itself
-                 already being in use (extremely unlikely,
-                 but never assume).
-                */
-
-                while (seen.has(newId)) {
-                    newId = `${newId}-x`;
-                }
-
-                const message =
-                    `[ContentContract] Duplicate id "${originalId}" found on "${item.title || item.type}" ` +
-                    `(item ${i + 1}) -- reassigned to "${newId}" so it is not confused with the earlier item ` +
-                    `using that id.`;
-
-                console.warn(message);
-
-                diagnostics.push(message);
-
-                item.id = newId;
-
-                seen.set(newId, 1);
-            }
-
-            seen.set(
-                originalId,
-                timesSeen + 1
-            );
-        }
     }
 
 
