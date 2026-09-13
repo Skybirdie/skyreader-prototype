@@ -542,6 +542,56 @@ export default {
   );
 }
 
+if (
+  url.pathname === "/__skymedia_kv_write"
+) {
+  const testKey = "SKYMEDIA_WRITE_TEST";
+
+  try {
+    await env.MEDIA_KV.put(
+      testKey,
+      "SkyMedia KV write test successful"
+    );
+
+    const value =
+      await env.MEDIA_KV.get(
+        testKey
+      );
+
+    return new Response(
+      [
+        "SkyMedia KV write diagnostic",
+        "",
+        "Write: SUCCESS",
+        "Read immediately after write: " +
+          (value || "NO VALUE"),
+        "",
+        "MEDIA_KV is working for both write and read."
+      ].join("\n"),
+      {
+        status: 200,
+        headers: textHeaders()
+      }
+    );
+
+  } catch (error) {
+
+    return new Response(
+      [
+        "SkyMedia KV write diagnostic",
+        "",
+        "Write: FAILED",
+        "",
+        String(error)
+      ].join("\n"),
+      {
+        status: 500,
+        headers: textHeaders()
+      }
+    );
+  }
+}
+
 
     /* =====================================================
        READ QUERY PARAMETERS
