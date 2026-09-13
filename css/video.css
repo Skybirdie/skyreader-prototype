@@ -851,7 +851,7 @@ AppSwitcher marks the active section.
     overflow:hidden;
 
     background:transparent;
-    border-radius: 50px;
+    border-radius: 10px;
 
 }
 
@@ -966,13 +966,7 @@ AppSwitcher marks the active section.
     font-size:13px;
     letter-spacing:.02em;
 
-    border-radius:20px;
-
-    background:
-            transparent
-        ;
-
-    color:var(--text);
+    background:var(--panel);
 
 }
 
@@ -1012,6 +1006,7 @@ AppSwitcher marks the active section.
     text-overflow:ellipsis;
     white-space:nowrap;
 
+
 }
 
 
@@ -1025,12 +1020,7 @@ AppSwitcher marks the active section.
     text-align:center;
 
     border:
-        1px solid
-        color-mix(
-            in srgb,
-            var(--muted) 28%,
-            transparent
-        );
+border: 2px red solid;
 
     background:
         color-mix(

@@ -175,7 +175,7 @@ position:relative;    height: fit-content;
 
 .slideshow-library-card-info strong{font-size:13px;line-height:1.2}
 .slideshow-library-card-info span{font-size:11px;color:rgba(255,255,255,.72)}
-.slideshow-library-card.selected .slideshow-library-card-media{box-shadow:0 0 0 2px rgba(255,255,255,.85),0 3px 12px rgba(0,0,0,.3)}
+.slideshow-library-card.selected .slideshow-library-card-media{box-shadow:0 0 0 2px #66CDAA,0 3px 12px #66CDAA}
 .slideshow-favorite-control{position:absolute;right:clamp(6px,6%,10px);top:clamp(6px,6%,10px);z-index:15;width:25px;height:25px;display:flex;align-items:center;justify-content:center;border:0;border-radius:50%;background:color-mix(in srgb,var(--card,#222) 30%,transparent);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);color:var(--text,#fff);font-size:16px;line-height:1;cursor:pointer;transition:transform .2s ease,color .2s ease,background .2s ease}
 .slideshow-favorite-control:hover{transform:scale(1.08)}
 .slideshow-favorite-control.is-favorite{color:#e0435c}
@@ -191,6 +191,7 @@ position:relative;    height: fit-content;
     transform: translateY(-50%);
     padding-bottom:var(--slideshow-statusbar-height);
     display:flex;align-items:center;justify-content:center;overflow:hidden;background:transparent;
+    border-radius: 10px;
 }
 
 /* Landing is intentionally the same 60% centered treatment as Video Viewer.
@@ -448,7 +449,7 @@ position:relative;    height: fit-content;
 }
 
 /* Playback stage and controls are hidden until a show is actually selected. */
-.slideshow-stage,.slideshow-viewer-title,.slideshow-toolbar,.slideshow-status-bar,.slideshow-playback-status{display:none!important}
+.slideshow-stage,.slideshow-viewer-title,.slideshow-toolbar,.slideshow-playback-status{display:none!important}
 .slideshow-viewer.has-slideshow .slideshow-stage,.slideshow-viewer.has-slideshow .slideshow-viewer-title,.slideshow-viewer.has-slideshow .slideshow-toolbar,.slideshow-viewer.has-slideshow .slideshow-status-bar,.slideshow-viewer.has-slideshow .slideshow-playback-status{display:flex!important}
 .slideshow-viewer.has-slideshow .slideshow-status-bar{display:block}
 .slideshow-viewer-title{position:absolute;left:18px;top:16px;z-index:5;margin:0;max-width:70%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:clamp(17px,2vw,24px);text-shadow:0 1px 5px rgba(0,0,0,.8);pointer-events:none}
@@ -1052,6 +1053,8 @@ position:relative;    height: fit-content;
     letter-spacing:.02em;
     color:var(--text);
     z-index:50;
+    background: var(--panel);
+
 }
 
 .slideshow-status-bar center{
