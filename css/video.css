@@ -1040,6 +1040,15 @@ AppSwitcher marks the active section.
 
 }
 
+/* When there's no index/count to show, the indicator is left with an
+   empty textContent (see videoViewer.js). Collapsing it here - rather
+   than just leaving an empty, still-occupying box - lets the flex row's
+   own centering (justify-content:center, gap) re-center the status
+   message on the bar instead of off-center around a phantom sibling. */
+.video-status-indicator:empty{
+    display:none;
+}
+
 
 /* =======================================================
    NARROW LIBRARY TOGGLE
@@ -2378,7 +2387,9 @@ padding: 10px;
         position:absolute;
 
         left:50%;
-        top:50%;
+        /* Same vertical centering as desktop - see the base .video-landing
+           rule for why this isn't a plain 50%. */
+        top:calc(50% - (var(--video-statusbar-height,28px) + var(--video-welcome-height,22px)) / 2);
 
         width:calc(100% - 32px);
 
