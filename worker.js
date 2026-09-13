@@ -534,15 +534,13 @@ export default {
        ===================================================== */
 
     if (
-      url.searchParams.get(
-        "__skymedia_kv"
-      ) === "1"
-    ) {
-      return handleKVDiagnostic(
-        request,
-        env
-      );
-    }
+  url.pathname === "/__skymedia_kv"
+) {
+  return handleKVDiagnostic(
+    request,
+    env
+  );
+}
 
 
     /* =====================================================
