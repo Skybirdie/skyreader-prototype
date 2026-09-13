@@ -439,6 +439,107 @@ export default {
        Let Static Assets handle the normal application.
        ===================================================== */
 
+    /* =====================================================
+       SHARE PRIMING ENDPOINT
+
+       ShareManager calls this endpoint before sharing. It
+       stores the supplied full contract in KV and returns
+       the clean short URL directly as JSON. CORS is enabled
+       because the app may run inside a Glide web embed.
+       ===================================================== */
+
+    if (url.pathname === "/__sky_share_prime") {
+      const primeKey = url.searchParams.get("k");
+      const primeContract = url.searchParams.get("contractz");
+      const primeSection = url.searchParams.get("section");
+      const primeId = url.searchParams.get("id");
+
+      const corsHeaders = {
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, OPTIONS",
+        "access-control-allow-headers": "Content-Type",
+        "content-type": "application/json; charset=UTF-8",
+        "cache-control": "no-store, no-cache, must-revalidate"
+      };
+
+      if (request.method === "OPTIONS") {
+        return new Response(null, {
+          status: 204,
+          headers: corsHeaders
+        });
+      }
+
+      if (
+        request.method !== "GET" ||
+        !primeKey ||
+        !primeContract
+      ) {
+        return new Response(
+          JSON.stringify({ error: "Invalid share-prime request." }),
+          { status: 400, headers: corsHeaders }
+        );
+      }
+
+      const normalizedPrimeKey =
+        primeKey.trim().toUpperCase();
+
+      if (
+        !isValidKey(normalizedPrimeKey) ||
+        !isValidPayload(primeContract)
+      ) {
+        return new Response(
+          JSON.stringify({ error: "Invalid share-prime data." }),
+          { status: 400, headers: corsHeaders }
+        );
+      }
+
+      if (makeKey(primeContract) !== normalizedPrimeKey) {
+        return new Response(
+          JSON.stringify({ error: "Share-prime key mismatch." }),
+          { status: 400, headers: corsHeaders }
+        );
+      }
+
+      try {
+        await env.MEDIA_KV.put(
+          normalizedPrimeKey,
+          primeContract
+        );
+
+        const storedPrimeContract =
+          await env.MEDIA_KV.get(normalizedPrimeKey);
+
+        if (storedPrimeContract !== primeContract) {
+          throw new Error("KV verification failed.");
+        }
+      } catch (error) {
+        return new Response(
+          JSON.stringify({ error: "SkyMedia KV write failed." }),
+          { status: 500, headers: corsHeaders }
+        );
+      }
+
+      const cleanUrl = new URL(SKYMEDIA_BASE_URL);
+      cleanUrl.searchParams.set("k", normalizedPrimeKey);
+
+      if (primeSection) {
+        cleanUrl.searchParams.set("section", primeSection);
+      }
+
+      if (primeId) {
+        cleanUrl.searchParams.set("id", primeId);
+      }
+
+      return new Response(
+        JSON.stringify({ url: cleanUrl.toString() }),
+        { status: 200, headers: corsHeaders }
+      );
+    }
+
+    /* =====================================================
+       NORMAL REQUEST
+       ===================================================== */
+
     return env.ASSETS.fetch(request);
   }
 };
