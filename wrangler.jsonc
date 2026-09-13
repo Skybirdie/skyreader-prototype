@@ -1,0 +1,20 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "skyreader-prototype",
+  "compatibility_date": "2026-09-11",
+
+  "observability": {
+    "enabled": true
+  },
+
+  "assets": {
+    "directory": "."
+  },
+
+  "kv_namespaces": [
+    {
+      "binding": "MEDIA_KV",
+      "id": "8a4f692a796b4aeab25262e831739781"
+    }
+  ]
+}
