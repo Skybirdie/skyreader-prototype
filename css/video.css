@@ -993,7 +993,7 @@ AppSwitcher marks the active section.
 
 
 .video-status-message{
-    display:none;
+    display:inline-block;
     font-weight:600;
     opacity:.85;
 
@@ -1446,7 +1446,15 @@ html[data-theme="dark"] .video-narrow-library-toggle{
     position:absolute;
 
     left:50%;
-    top:50%;
+
+    /* Centered between the bottom of the top bar (top:0 of .video-viewer,
+       its containing block) and the top of the indicator bar (which sits
+       --video-statusbar-height above the welcome banner, at the very
+       bottom of .video-viewer). Halfway down the full viewer (50%) is
+       biased low by that reserved bottom strip, so the midpoint is
+       shifted up by half of it. */
+    top:
+        calc(50% - (var(--video-statusbar-height,28px) + var(--video-welcome-height,22px)) / 2);
 
     width:
         calc(100% - 48px);
@@ -2802,4 +2810,115 @@ and (orientation:landscape){
   min-height:var(--media-topbar-button-height,42px)!important;
   flex:0 0 var(--media-topbar-button-height,42px)!important;
   border-radius:7px!important;
+}
+
+
+/* =========================================================
+   SKYMEDIA WELCOME BANNER + STATUS BAR
+   Final baseline override
+   Keeps both elements inside the visible dynamic viewport.
+========================================================= */
+
+.video-viewer{
+    --video-welcome-height:22px;
+    --video-statusbar-height:28px;
+
+    top:0;
+    transform:none;
+    height:100%;
+    padding-bottom:calc(
+        var(--video-statusbar-height) +
+        var(--video-welcome-height)
+    );
+}
+
+/* Status/indicator row sits immediately above the welcome banner. */
+.video-status-bar{
+    position:absolute;
+    left:0;
+    right:0;
+    bottom:var(--video-welcome-height);
+    height:var(--video-statusbar-height);
+    min-height:var(--video-statusbar-height);
+    padding:2px 8px;
+    box-sizing:border-box;
+    display:block;
+    font-size:13px;
+    line-height:18px;
+    letter-spacing:.02em;
+    color:var(--text);
+    z-index:50;
+}
+
+/* Match Reader's centered status contents and typography. */
+.video-status-bar center{
+    width:100%;
+    height:100%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:14px;
+    margin:0;
+    font-size:13px;
+    line-height:18px;
+    letter-spacing:.02em;
+}
+
+.video-status-message,
+.video-status-title,
+.video-status-indicator{
+    font-size:13px;
+    line-height:18px;
+    letter-spacing:.02em;
+}
+
+.video-status-message{
+    display:inline-block;
+    font-weight:600;
+    opacity:.85;
+    max-width:60vw;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+}
+
+.video-status-title{
+    display:none;
+}
+
+/* The welcome banner is part of the workspace bottom edge. */
+.video-viewer > .sr-welcome-banner{
+    position:absolute;
+    left:0;
+    right:0;
+    bottom:env(safe-area-inset-bottom, 0px);
+    height:var(--video-welcome-height);
+    min-height:var(--video-welcome-height);
+    padding:2px 8px;
+    box-sizing:border-box;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    overflow:hidden;
+    background:var(--panel);
+    color:var(--muted);
+    border-top:none;
+    font-size:12px;
+    line-height:18px;
+    letter-spacing:normal;
+    z-index:51;
+}
+
+.video-viewer > .sr-welcome-banner center{
+    display:block;
+    width:100%;
+    margin:0;
+    padding:0;
+    line-height:18px;
+    text-align:center;
+}
+
+/* Focus mode intentionally remains media-only. */
+.video-section.videoFocus .video-viewer > .sr-welcome-banner{
+    display:none!important;
 }
