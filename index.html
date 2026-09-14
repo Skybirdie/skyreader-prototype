@@ -28,6 +28,7 @@
 <link rel="stylesheet" href="css/video.css">
 <link rel="stylesheet" href="css/slideshow.css?v=1.1.0">
 <link rel="stylesheet" href="css/front-page.css?v=wave3">
+<link rel="stylesheet" href="css/share.css">
 
 <script>
 /*
@@ -580,6 +581,7 @@ stroke-linecap="round"/>
 <script src="js/settingsPanel.js"></script>
 <script src="js/mediaManager.js"></script>
 <script src="js/shareManager.js"></script>
+<script src="js/shareViewer.js"></script>
 <script src="js/app.js"></script>
 <script src="js/videoContract.js"></script>
 <script src="js/videoFavorites.js"></script>
@@ -602,129 +604,299 @@ stroke-linecap="round"/>
 
 <script>
 document.addEventListener("DOMContentLoaded", function(){
+
+    /*
+     * Share Mode is intentionally isolated from the normal SkyMedia
+     * application shell.  Do not initialize Front Page navigation here
+     * when the URL is a standalone share link.
+     */
+    if (
+        window.ShareManager &&
+        typeof ShareManager.isShareMode === "function" &&
+        ShareManager.isShareMode()
+    ) {
+        return;
+    }
+
     const button=document.getElementById("frontMenuButton");
     const panel=document.getElementById("frontMenuPanel");
+
     if(!button||!panel) return;
-    const close=()=>{panel.classList.remove("is-open");button.setAttribute("aria-expanded","false");};
+
+    const close=()=>{
+        panel.classList.remove("is-open");
+        button.setAttribute("aria-expanded","false");
+    };
+
     button.addEventListener("click", function(event){
+
         event.stopPropagation();
+
         const open=!panel.classList.contains("is-open");
+
         panel.classList.toggle("is-open",open);
-        button.setAttribute("aria-expanded",open?"true":"false");
+
+        button.setAttribute(
+            "aria-expanded",
+            open?"true":"false"
+        );
+
     });
+
     panel.addEventListener("click", function(event){
-        const target=event.target.closest("[data-app-target]");
+
+        const target=
+            event.target.closest("[data-app-target]");
+
         if(!target) return;
-        if(window.AppSwitcher) AppSwitcher.show(target.dataset.appTarget);
+
+        if(window.AppSwitcher)
+            AppSwitcher.show(target.dataset.appTarget);
+
         close();
+
     });
+
     document.addEventListener("click", function(event){
-        if(!panel.contains(event.target)&&event.target!==button) close();
+
+        if(
+            !panel.contains(event.target) &&
+            event.target!==button
+        ){
+            close();
+        }
+
     });
+
 });
 </script>
+
 
 <script>
 document.addEventListener("DOMContentLoaded", async function () {
 
     /*
-     * Bring up the navigation and Front Page shell before the asynchronous
-     * Reader/Manifest boot.  This keeps Home reachable even if a later
-     * optional module has a startup problem.  The final FrontPage.refresh()
-     * below rebinds the doors to the normalized manifest once it is loaded.
+     * ---------------------------------------------------------
+     * SHARE MODE GATE
+     * ---------------------------------------------------------
+     *
+     * A standalone share URL contains:
+     *
+     *     ?k=...&section=...&id=...
+     *
+     * ShareManager identifies that URL as Share Mode.
+     *
+     * IMPORTANT:
+     *
+     * This check must occur BEFORE FrontPage, AppSwitcher,
+     * Video, Slideshow, or any other normal SkyMedia section
+     * is initialized.
+     *
+     * App.start() handles the actual ShareViewer startup.
+     * Once that is complete, there is nothing else for the
+     * normal application bootstrap to do.
      */
-    if (window.FrontPage) FrontPage.init();
-    if (window.AppSwitcher) AppSwitcher.init();
+    const isShareMode =
+        window.ShareManager &&
+        typeof ShareManager.isShareMode === "function" &&
+        ShareManager.isShareMode();
 
-    /* Unified boot: Reader/Manifest load first so every section receives
-       the same normalized content collection.
+    if (isShareMode) {
 
-       A failure here must NOT abort the rest of startup. loadManifest()
-       inside App.start() may have already populated Manifest._data
-       successfully before a *later*, unrelated step inside App.start()
-       (book-specific UI wiring, etc.) throws. If we return here, Video,
-       Slideshow, and the Front Page never get a chance to read that
-       already-loaded data — the Front Page in particular is left
-       showing only its empty shell forever, even though real content
-       was available. So: log the failure and keep going. Every step
-       below already tolerates missing/partial data on its own. */
-    if (window.App && typeof App.start === "function") {
-        try {
-            await App.start();
-            document.documentElement.dataset.appStartError = "";
-        } catch (error) {
-            console.error("[SkyMedia] Unified application startup failed.", error);
-            document.documentElement.dataset.appStartError = error.message || String(error);
+        if (
+            window.App &&
+            typeof App.start === "function"
+        ) {
+
+            try {
+
+                await App.start();
+
+                document.documentElement.dataset.appStartError = "";
+
+            } catch (error) {
+
+                console.error(
+                    "[SkyMedia] Share Mode startup failed.",
+                    error
+                );
+
+                document.documentElement.dataset.appStartError =
+                    error.message || String(error);
+
+            }
+
         }
+
+/*
+ * ---------------------------------------------------------
+ * SECOND SHARE MODE GATE
+ * ---------------------------------------------------------
+ *
+ * App.start() performs the actual Share Mode startup.
+ * If Share Mode was entered, do not initialize any of the
+ * normal SkyMedia sections.
+ */
+
+if (
+    window.App &&
+    typeof App.isShareMode === "function" &&
+    App.isShareMode()
+) {
+    return;
+}
+
+/*
+ * ---------------------------------------------------------
+ * NORMAL NAVIGATION / FRONT PAGE SHELL
+ * ---------------------------------------------------------
+ */
+
+if (window.FrontPage) {
+    FrontPage.init();
+}
+
+if (window.AppSwitcher) {
+    AppSwitcher.init();
+}
+        return;
     }
+
+
+    /*
+     * ---------------------------------------------------------
+     * NORMAL SKyMEDIA STARTUP
+     * ---------------------------------------------------------
+     *
+     * Everything below this point is normal SkyMedia startup.
+     */
+
+
+
+
+
+    /*
+     * Unified boot: Reader/Manifest load first so every section
+     * receives the same normalized content collection.
+     *
+     * A failure here must NOT abort the rest of startup.
+     *
+     * loadManifest() inside App.start() may have already populated
+     * Manifest._data successfully before a later, unrelated step
+     * inside App.start() throws.
+     *
+     * If we return here, Video, Slideshow, and the Front Page never
+     * get a chance to read that already-loaded data.
+     *
+     * So: log the failure and keep going. Every step below already
+     * tolerates missing/partial data on its own.
+     */
+    if (
+        window.App &&
+        typeof App.start === "function"
+    ) {
+
+        try {
+
+            await App.start();
+
+            document.documentElement.dataset.appStartError = "";
+
+        } catch (error) {
+
+            console.error(
+                "[SkyMedia] Unified application startup failed.",
+                error
+            );
+
+            document.documentElement.dataset.appStartError =
+                error.message || String(error);
+
+        }
+
+    }
+
+
+    /*
+     * ---------------------------------------------------------
+     * VIDEO SECTION
+     * ---------------------------------------------------------
+     */
 
     if (
         window.VideoViewer &&
         window.VideoLibrary
     ) {
-      try {
 
-        VideoLibrary.init();
+        try {
 
-        VideoViewer.init();
+            VideoLibrary.init();
 
-        VideoUI.init();
+            VideoViewer.init();
 
-VideoLibrary.load(Manifest.videos());
+            VideoUI.init();
 
-if (
-    window.VideoViewer &&
-    typeof VideoViewer.renderLanding === "function"
-) {
-
-    VideoViewer.renderLanding();
-
-}
+            VideoLibrary.load(
+                Manifest.videos()
+            );
 
 
-document
-    .querySelectorAll(
-        "[data-video-view]"
-    )
-    .forEach(button => {
+            if (
+                window.VideoViewer &&
+                typeof VideoViewer.renderLanding === "function"
+            ) {
 
-        button.addEventListener(
-            "click",
-            () => {
-
-                const view =
-                    button.dataset.videoView;
-
-                VideoLibrary.setView(
-                    view
-                );
-
-
-                document
-                    .querySelectorAll(
-                        "[data-video-view]"
-                    )
-                    .forEach(item => {
-
-                        item.classList.toggle(
-                            "active",
-                            item === button
-                        );
-
-                    });
+                VideoViewer.renderLanding();
 
             }
-        );
 
-    });
 
-      } catch (error) {
-          console.error("[SkyMedia] Video section startup failed.", error);
-      }
+            document
+                .querySelectorAll(
+                    "[data-video-view]"
+                )
+                .forEach(button => {
 
+                    button.addEventListener(
+                        "click",
+                        () => {
+
+                            const view =
+                                button.dataset.videoView;
+
+                            VideoLibrary.setView(
+                                view
+                            );
+
+
+                            document
+                                .querySelectorAll(
+                                    "[data-video-view]"
+                                )
+                                .forEach(item => {
+
+                                    item.classList.toggle(
+                                        "active",
+                                        item === button
+                                    );
+
+                                });
+
+                        }
+                    );
+
+                });
+
+        } catch (error) {
+
+            console.error(
+                "[SkyMedia] Video section startup failed.",
+                error
+            );
+
+        }
 
     }
-
 
     /*
     -----------------------------------------------------
