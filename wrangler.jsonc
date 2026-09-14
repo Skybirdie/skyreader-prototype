@@ -9,16 +9,19 @@
   },
 
   "assets": {
-  "directory": ".",
-  "binding": "ASSETS",
-  "run_worker_first": true
-},
+    "directory": ".",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  },
 
   "kv_namespaces": [
     {
       "binding": "MEDIA_KV",
       "id": "8a4f692a796b4aeab25262e831739781"
     }
-  ]
-}
+  ],
 
+  "images": {
+    "binding": "IMAGES"
+  }
+}
