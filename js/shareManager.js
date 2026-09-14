@@ -955,6 +955,29 @@ window.ShareManager = (function () {
 
 
   /* =========================================================
+     SHARE MODE DETECTION
+     ========================================================= */
+
+  function isShareMode() {
+
+    const target = readTarget();
+
+    return !!(
+      target &&
+      target.section &&
+      target.id
+    );
+  }
+
+
+  function getShareTarget() {
+
+    return readTarget();
+
+  }
+
+
+  /* =========================================================
      PUBLIC API
      ========================================================= */
 
@@ -963,9 +986,13 @@ window.ShareManager = (function () {
     buildLongUrl,
     shorten,
     share,
+
     readTarget,
     findManifestItem,
-    openDeepLink
+    openDeepLink,
+
+    isShareMode,
+    getShareTarget
 
   };
 

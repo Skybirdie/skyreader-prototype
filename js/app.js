@@ -26,6 +26,9 @@ let started=false;
 
 let manifestLoaded=false;
 
+let shareMode=false;
+let shareStarted=false;
+
 /*-------------------------------------------------------
   Configuration
 -------------------------------------------------------*/
@@ -59,6 +62,19 @@ app.started=function(){
 app.manifestLoaded=function(){
 
     return manifestLoaded;
+
+};
+
+
+app.isShareMode=function(){
+
+    return shareMode;
+
+};
+
+app.shareStarted=function(){
+
+    return shareStarted;
 
 };
 
@@ -451,6 +467,85 @@ function connectModules(){
 
 }
 
+
+/*-------------------------------------------------------
+  Share Mode
+-------------------------------------------------------*/
+
+async function startShareMode(){
+
+    log("Starting Share Mode...");
+
+    shareMode=true;
+
+    await Manifest.load();
+
+    manifestLoaded=true;
+
+    const target =
+        typeof ShareManager !== "undefined" &&
+        typeof ShareManager.getShareTarget === "function"
+            ? ShareManager.getShareTarget()
+            : null;
+
+    if(!target){
+        throw new Error(
+            "Share Mode: no valid section/id target was found."
+        );
+    }
+
+    const item =
+        typeof ShareManager !== "undefined" &&
+        typeof ShareManager.findManifestItem === "function"
+            ? ShareManager.findManifestItem(target)
+            : null;
+
+    if(!item){
+        throw new Error(
+            "Share Mode: the requested item could not be found."
+        );
+    }
+
+    window.SkyMediaShareItem=item;
+    window.SkyMediaShareTarget=target;
+
+    if(
+        typeof window.ShareViewer === "undefined" ||
+        typeof window.ShareViewer.start !== "function"
+    ){
+        throw new Error(
+            "Share Mode: ShareViewer is not available."
+        );
+    }
+
+    await window.ShareViewer.start(
+        item,
+        target
+    );
+
+    shareStarted=true;
+
+    const reloadScreen =
+        document.getElementById("reloadScreen");
+
+    if(reloadScreen){
+
+        reloadScreen.classList.add("isReady");
+
+        window.setTimeout(
+            ()=>reloadScreen.remove(),
+            500
+        );
+
+    }
+
+    log(
+        "Share Mode started:",
+        target.section,
+        target.id
+    );
+}
+
 /*-------------------------------------------------------
   Start
 -------------------------------------------------------*/
@@ -458,45 +553,59 @@ function connectModules(){
 app.start=async function(){
 
     if(started){
+        return;
+    }
+
+    if(
+        typeof window.ShareManager !== "undefined" &&
+        typeof ShareManager.isShareMode === "function" &&
+        ShareManager.isShareMode()
+    ){
+
+        await startShareMode();
+
+        started=true;
 
         return;
-
     }
 
     log("Starting SkyReader...");
 
     await initializeModules();
 
-cacheDom();
+    cacheDom();
 
-attachEvents();
+    attachEvents();
 
-await loadManifest();
+    await loadManifest();
 
-await buildLibrary();
+    await buildLibrary();
 
-/* Front Page is refreshed after all optional media modules have been
-   initialized. It must never be allowed to interrupt core startup. */
+    initializeFeatureModules();
 
-initializeFeatureModules();
+    connectModules();
 
-connectModules();
-
-showDefaultView();
+    showDefaultView();
 
     started=true;
 
-    // Remove the branded startup layer only after the normalized library
-    // has rendered and the application is actually ready.
-    const reloadScreen=document.getElementById("reloadScreen");
+    const reloadScreen =
+        document.getElementById("reloadScreen");
+
     if(reloadScreen){
+
         reloadScreen.classList.add("isReady");
-        window.setTimeout(()=>reloadScreen.remove(),500);
+
+        window.setTimeout(
+            ()=>reloadScreen.remove(),
+            500
+        );
+
     }
 
     log("SkyReader started.");
-
 };
+
 
 /*-------------------------------------------------------
   Shutdown
