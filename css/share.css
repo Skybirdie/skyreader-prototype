@@ -1,1 +1,338 @@
-/* ========================================================= SkyMedia Share Mode Version 1.2.0 Share Mode uses the existing SkyMedia viewer engines, but mounts the active viewer into the Share Mode shell. This preserves: • normal viewer background • viewer surface • viewer controls • navigation • audio controls • fullscreen behavior • video controls • slideshow controls • Reader controls Share Mode removes only: • Front Page • libraries • AppSwitcher • search • settings • normal application navigation ========================================================= */ /* --------------------------------------------------------- Share Mode body --------------------------------------------------------- */ body.sky-share-mode { margin: 0; padding: 0; overflow: hidden; } /* --------------------------------------------------------- Share shell --------------------------------------------------------- */ .sky-share-shell { position: fixed; inset: 0; z-index: 1000000; display: flex; flex-direction: column; /* * Keep the shell transparent so the mounted SkyMedia * viewer remains responsible for its normal background. */ background: transparent; color: var(--text-color, #fff); pointer-events: none; } /* --------------------------------------------------------- Header --------------------------------------------------------- */ .sky-share-header { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; min-height: 54px; padding: 8px 18px; box-sizing: border-box; background: rgba(0, 0, 0, .22); pointer-events: auto; } .sky-share-brand { font-size: 15px; font-weight: 600; letter-spacing: .02em; } .sky-share-section { font-size: 13px; opacity: .72; } /* --------------------------------------------------------- Main Share Mode area --------------------------------------------------------- */ .sky-share-main { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; align-items: stretch; padding: 10px 16px 16px; box-sizing: border-box; pointer-events: none; } /* --------------------------------------------------------- Share title --------------------------------------------------------- */ .sky-share-heading { flex: 0 0 auto; text-align: center; padding: 2px 10px 8px; pointer-events: none; } .sky-share-title { margin: 0; font-size: clamp(18px, 2vw, 27px); line-height: 1.2; text-shadow: 0 1px 4px rgba(0,0,0,.65); } .sky-share-subtitle { margin-top: 3px; font-size: 13px; opacity: .78; text-shadow: 0 1px 4px rgba(0,0,0,.65); } /* --------------------------------------------------------- Media host --------------------------------------------------------- The actual viewer is moved into this element by ShareViewer.mountViewer(). This is intentionally a real layout container rather than an empty overlay. --------------------------------------------------------- */ .sky-share-media-host { position: relative; flex: 1 1 auto; min-width: 0; min-height: 0; width: 100%; height: 100%; overflow: hidden; display: flex; align-items: stretch; justify-content: stretch; pointer-events: auto; } /* --------------------------------------------------------- Mounted viewer --------------------------------------------------------- */ .sky-share-mounted-viewer { position: relative !important; flex: 1 1 auto !important; min-width: 0 !important; min-height: 0 !important; width: 100% !important; height: 100% !important; max-width: none !important; max-height: none !important; margin: 0 !important; overflow: hidden; } /* --------------------------------------------------------- Status --------------------------------------------------------- */ .sky-share-status { flex: 0 0 auto; min-height: 18px; text-align: center; font-size: 12px; opacity: .7; text-shadow: 0 1px 4px rgba(0,0,0,.65); pointer-events: none; } /* --------------------------------------------------------- Share actions --------------------------------------------------------- */ .sky-share-actions { flex: 0 0 auto; display: flex; justify-content: center; align-items: center; gap: 10px; padding-top: 8px; pointer-events: auto; } .sky-share-open-button, .sky-share-close-button { min-height: 38px; padding: 8px 16px; border: 0; border-radius: 20px; font: inherit; font-size: 13px; cursor: pointer; text-decoration: none; box-sizing: border-box; } .sky-share-open-button { background: rgba(255,255,255,.14); color: inherit; backdrop-filter: blur(6px); } .sky-share-close-button { background: rgba(0,0,0,.18); color: inherit; border: 1px solid rgba(255,255,255,.25); backdrop-filter: blur(6px); } .sky-share-open-button:hover, .sky-share-close-button:hover { background: rgba(255,255,255,.22); } /* ========================================================= VIDEO ========================================================= */ body.sky-share-mode .sky-share-media-host #videoViewer { display: flex !important; flex: 1 1 auto !important; flex-direction: column; align-items: center; justify-content: center; min-width: 0 !important; min-height: 0 !important; width: 100% !important; height: 100% !important; max-width: none !important; max-height: none !important; margin: 0 !important; } /* * The video landing screen is unnecessary because the * requested item has already been opened. */ body.sky-share-mode .sky-share-media-host #videoLanding { display: none !important; } /* * Keep the native video controls. */ body.sky-share-mode .sky-share-media-host #videoPlayer { display: block; width: 100%; height: 100%; max-width: 100%; max-height: 100%; object-fit: contain; } /* * Keep the Video Viewer share and close controls. */ body.sky-share-mode .sky-share-media-host #videoViewerShare, body.sky-share-mode .sky-share-media-host #videoViewerClose { display: flex !important; } /* ========================================================= SLIDESHOW ========================================================= */ body.sky-share-mode .sky-share-media-host #slideshowViewer { display: flex !important; flex: 1 1 auto !important; flex-direction: column; min-width: 0 !important; min-height: 0 !important; width: 100% !important; height: 100% !important; max-width: none !important; max-height: none !important; margin: 0 !important; } /* * The requested slideshow item is already open. * Therefore the normal landing panel is not needed. */ body.sky-share-mode .sky-share-media-host #slideshowLanding { display: none !important; } /* * Preserve the slideshow workspace. */ body.sky-share-mode .sky-share-media-host .slideshow-workspace { display: flex !important; flex: 1 1 auto !important; min-width: 0 !important; min-height: 0 !important; width: 100% !important; height: 100% !important; } /* * Preserve the actual slideshow stage. */ body.sky-share-mode .sky-share-media-host #slideshowStage { flex: 1 1 auto; min-width: 0; min-height: 0; width: 100%; height: 100%; } /* * IMPORTANT: * * Slideshow controls are intentionally NOT hidden. * * These remain available: * * Previous * Restart * Play / Pause * Next * Share * Mute * Fullscreen * Audio mode * Close */ body.sky-share-mode .sky-share-media-host .slideshow-toolbar { display: flex; } /* * Preserve slideshow playback/status elements. */ body.sky-share-mode .sky-share-media-host .slideshow-playback-status, body.sky-share-mode .sky-share-media-host .slideshow-status-bar { display: block; } /* ========================================================= READER ========================================================= */ /* * The existing Reader viewer is mounted into the Share * Mode media host. */ body.sky-share-mode .sky-share-media-host #viewerArea { position: relative !important; flex: 1 1 auto !important; min-width: 0 !important; min-height: 0 !important; width: 100% !important; height: 100% !important; max-width: none !important; max-height: none !important; margin: 0 !important; } /* * Preserve the Reader's normal controls. * * Nothing below intentionally hides: * navigation * fullscreen * mute * share * close * page controls */ /* ========================================================= APPLICATION CHROME REMOVED FROM SHARE MODE ========================================================= These are outside the mounted viewer and therefore can safely remain hidden. */ /* Front Page */ body.sky-share-mode #frontPage, body.sky-share-mode #frontSection { display: none !important; } /* AppSwitcher */ body.sky-share-mode .app-switcher, body.sky-share-mode .responsive-app-menu, body.sky-share-mode .responsive-app-menu-button { display: none !important; } /* Search */ body.sky-share-mode #videoSearchGroup, body.sky-share-mode #slideshowSearchGroup, body.sky-share-mode #readerSearchGroup { display: none !important; } /* Libraries */ body.sky-share-mode #videoLibrary, body.sky-share-mode #slideshowLibrary, body.sky-share-mode #readerLibrary, body.sky-share-mode #readerDrawer { display: none !important; } /* Settings */ body.sky-share-mode #settingsPanel, body.sky-share-mode #settingsOverlay { display: none !important; } /* Normal application welcome banners */ body.sky-share-mode .sr-welcome-banner { display: none !important; } /* * App navigation buttons that belong to the normal * application rather than the viewer itself. */ body.sky-share-mode [data-app-target], body.sky-share-mode .app-switch-button { display: none !important; } /* ========================================================= NORMAL TOP BARS ========================================================= These belong to the normal application shell and are not needed because Share Mode supplies its own small header. The actual viewer controls remain untouched. */ body.sky-share-mode .video-top-bar, body.sky-share-mode .slideshow-top-bar, body.sky-share-mode #readerTopBar { display: none !important; } /* ========================================================= Share Mode media sizing ========================================================= */ body.sky-share-mode .sky-share-media-host { box-sizing: border-box; display: flex; flex: 1 1 auto; min-width: 0; min-height: 0; width: 100%; height: 100%; } /* ========================================================= Small screens ========================================================= */ @media (max-width: 600px) { .sky-share-header { min-height: 46px; padding: 6px 12px; } .sky-share-main { padding: 6px 8px 10px; } .sky-share-heading { padding-bottom: 5px; } .sky-share-title { font-size: 18px; } .sky-share-actions { padding-top: 5px; } .sky-share-open-button, .sky-share-close-button { min-height: 36px; padding: 7px 13px; } }
+/* =========================================================
+   SkyMedia Share Mode
+   ========================================================= */
+
+body.sky-share-mode {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+}
+
+
+/* ---------------------------------------------------------
+   Share shell
+   --------------------------------------------------------- */
+
+.sky-share-shell {
+    position: fixed;
+    inset: 0;
+    z-index: 999999;
+
+    display: flex;
+    flex-direction: column;
+
+    background: var(--app-background, #111);
+    color: var(--text-color, #fff);
+}
+
+
+/* ---------------------------------------------------------
+   Header
+   --------------------------------------------------------- */
+
+.sky-share-header {
+    flex: 0 0 auto;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    min-height: 54px;
+    padding: 8px 18px;
+
+    box-sizing: border-box;
+
+    background: rgba(0, 0, 0, .22);
+}
+
+
+.sky-share-brand {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: .02em;
+}
+
+
+.sky-share-section {
+    font-size: 13px;
+    opacity: .72;
+}
+
+
+/* ---------------------------------------------------------
+   Main
+   --------------------------------------------------------- */
+
+.sky-share-main {
+    flex: 1 1 auto;
+
+    min-height: 0;
+
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+
+    padding: 10px 16px 16px;
+
+    box-sizing: border-box;
+}
+
+
+.sky-share-heading {
+    flex: 0 0 auto;
+
+    text-align: center;
+
+    padding: 2px 10px 8px;
+}
+
+
+.sky-share-title {
+    margin: 0;
+
+    font-size: clamp(18px, 2vw, 27px);
+    line-height: 1.2;
+}
+
+
+.sky-share-subtitle {
+    margin-top: 3px;
+
+    font-size: 13px;
+    opacity: .72;
+}
+
+
+.sky-share-media-host {
+    position: relative;
+
+    flex: 1 1 auto;
+
+    min-height: 0;
+    width: 100%;
+
+    overflow: hidden;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+
+.sky-share-status {
+    flex: 0 0 auto;
+
+    min-height: 18px;
+
+    text-align: center;
+
+    font-size: 12px;
+    opacity: .65;
+}
+
+
+/* ---------------------------------------------------------
+   Actions
+   --------------------------------------------------------- */
+
+.sky-share-actions {
+    flex: 0 0 auto;
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+
+    padding-top: 8px;
+}
+
+
+.sky-share-open-button,
+.sky-share-close-button {
+    min-height: 38px;
+
+    padding: 8px 16px;
+
+    border: 0;
+    border-radius: 20px;
+
+    font: inherit;
+    font-size: 13px;
+
+    cursor: pointer;
+
+    text-decoration: none;
+
+    box-sizing: border-box;
+}
+
+
+.sky-share-open-button {
+    background: rgba(255,255,255,.14);
+    color: inherit;
+}
+
+
+.sky-share-close-button {
+    background: transparent;
+    color: inherit;
+
+    border: 1px solid rgba(255,255,255,.25);
+}
+
+
+.sky-share-open-button:hover,
+.sky-share-close-button:hover {
+    background: rgba(255,255,255,.22);
+}
+
+
+/* ---------------------------------------------------------
+   Mounted existing viewers
+   --------------------------------------------------------- */
+
+.sky-share-mounted-viewer {
+    position: relative !important;
+
+    width: 100% !important;
+    height: 100% !important;
+
+    max-width: none !important;
+    max-height: none !important;
+
+    margin: 0 !important;
+
+    flex: 1 1 auto !important;
+}
+
+
+/* ---------------------------------------------------------
+   Video
+   --------------------------------------------------------- */
+
+.sky-share-media-host #videoViewer {
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+}
+
+
+.sky-share-media-host #videoLanding {
+    display: none !important;
+}
+
+
+.sky-share-media-host #videoPlayer {
+    max-width: 100%;
+    max-height: 100%;
+}
+
+
+/* ---------------------------------------------------------
+   Slideshow
+   --------------------------------------------------------- */
+
+.sky-share-media-host #slideshowViewer {
+    display: flex !important;
+    flex-direction: column;
+
+    min-width: 0;
+    min-height: 0;
+}
+
+
+.sky-share-media-host #slideshowLanding {
+    display: none !important;
+}
+
+
+/*
+ * The normal Slideshow toolbar is intentionally hidden in Share Mode.
+ * The shared item is presented as a single-purpose viewer.
+ *
+ * The slideshow engine itself remains active underneath.
+ */
+
+body.sky-share-mode .slideshow-toolbar,
+body.sky-share-mode .slideshow-status-bar,
+body.sky-share-mode .slideshow-playback-status,
+body.sky-share-mode .slideshow-viewer-title {
+    display: none !important;
+}
+
+
+/* ---------------------------------------------------------
+   Reader
+   --------------------------------------------------------- */
+
+.sky-share-media-host #viewerArea {
+    width: 100% !important;
+    height: 100% !important;
+
+    max-width: none !important;
+    max-height: none !important;
+}
+
+
+/*
+ * Keep Reader's actual PDF surface, but remove application chrome.
+ */
+
+body.sky-share-mode #readerTopBar,
+body.sky-share-mode #readerToolbar,
+body.sky-share-mode #readerLibrary,
+body.sky-share-mode #readerDrawer,
+body.sky-share-mode #readerShareButton,
+body.sky-share-mode #readerCloseButton {
+    display: none !important;
+}
+
+
+/* ---------------------------------------------------------
+   Hide normal section chrome while Share Mode is active
+   --------------------------------------------------------- */
+
+body.sky-share-mode .video-top-bar,
+body.sky-share-mode .video-library,
+body.sky-share-mode .slideshow-top-bar,
+body.sky-share-mode .slideshow-library,
+body.sky-share-mode .app-switcher,
+body.sky-share-mode .responsive-app-menu,
+body.sky-share-mode .responsive-app-menu-button {
+    display: none !important;
+}
+
+
+/* ---------------------------------------------------------
+   Small screens
+   --------------------------------------------------------- */
+
+@media (max-width: 600px) {
+
+    .sky-share-header {
+        min-height: 46px;
+        padding: 6px 12px;
+    }
+
+    .sky-share-main {
+        padding: 6px 8px 10px;
+    }
+
+    .sky-share-heading {
+        padding-bottom: 5px;
+    }
+
+    .sky-share-title {
+        font-size: 18px;
+    }
+
+    .sky-share-actions {
+        padding-top: 5px;
+    }
+
+    .sky-share-open-button,
+    .sky-share-close-button {
+        min-height: 36px;
+        padding: 7px 13px;
+    }
+}
