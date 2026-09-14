@@ -479,7 +479,6 @@ function escapeHtml(value) {
 }
 
 
-```javascript
 /* =========================================================
    Build Open Graph metadata.
    ========================================================= */
@@ -612,7 +611,7 @@ function buildOgTags(request, key, payload) {
 
   return tags;
 }
-```
+
 
 
 /* =========================================================
