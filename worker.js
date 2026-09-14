@@ -1548,11 +1548,11 @@ export default {
 
 
       return serveWithContract(
-        request,
-        env,
-        payload,
-        normalizedKey
-      );
+  request,
+  env,
+  stored.contractz,
+  key
+);
     }
 
 
@@ -1582,11 +1582,12 @@ export default {
       }
 
 
-      return serveWithContract(
-        request,
-        env,
-        contractz
-      );
+      serveWithContract(
+  request,
+  env,
+  payload,
+  key
+);
     }
 
 
