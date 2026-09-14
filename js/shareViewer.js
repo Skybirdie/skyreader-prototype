@@ -741,41 +741,80 @@ window.ShareViewer = (function () {
 
     async function start(item, target) {
 
-        if (started) {
-            return;
-        }
+    if (started) {
+        return;
+    }
 
-        if (!item) {
-            throw new Error(
-                "Share Mode: no item supplied."
-            );
-        }
+    console.log("[SkyMedia Share] start() entered.");
 
-        if (!target) {
-            throw new Error(
-                "Share Mode: no target supplied."
-            );
-        }
+    if (!item) {
+        console.error("[SkyMedia Share] No item supplied.");
+        throw new Error(
+            "Share Mode: no item supplied."
+        );
+    }
 
+    if (!target) {
+        console.error("[SkyMedia Share] No target supplied.");
+        throw new Error(
+            "Share Mode: no target supplied."
+        );
+    }
 
-        started = true;
+    console.log(
+        "[SkyMedia Share] Target:",
+        target.section,
+        target.id
+    );
+
+    console.log(
+        "[SkyMedia Share] Item:",
+        item
+    );
+
+    started = true;
+
+    try {
+
+        console.log("[SkyMedia Share] Creating shell.");
 
         createShell();
-        isolateApplication();
+
+        console.log("[SkyMedia Share] Binding Escape.");
+
         bindEscape();
 
-        try {
+        console.log("[SkyMedia Share] Opening item.");
 
-            await openItem(item, target);
+        await openItem(item, target);
 
-        } catch (error) {
+        console.log("[SkyMedia Share] Item opened successfully.");
 
-            started = false;
-            throw error;
+        /*
+         * Only hide the normal application chrome AFTER
+         * the requested viewer has successfully opened.
+         *
+         * This prevents Share Mode from hiding the viewer
+         * while it is still initializing.
+         */
 
-        }
+        isolateApplication();
 
+        console.log("[SkyMedia Share] Application isolated.");
+
+    } catch (error) {
+
+        console.error(
+            "[SkyMedia Share] STARTUP FAILED:",
+            error
+        );
+
+        started = false;
+
+        throw error;
     }
+
+}
 
 
     /*-------------------------------------------------------
