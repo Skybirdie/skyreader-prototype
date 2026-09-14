@@ -331,12 +331,121 @@ window.GlideContract = (function () {
     }
 
 
+    /*
+       JSON arriving from Glide may be wrapped as a JSON string
+       (for example: "{\"id\":...}") and may also contain
+       literal control characters inside quoted values.
+
+       Decode the outer JSON-string wrapper first when present,
+       then repair only raw control characters that occur INSIDE
+       JSON strings.  This preserves normal escaped sequences such
+       as \\n, \\r, \\t and does not alter URLs or other content.
+    */
+    function normalizeJsonTransportText(text) {
+
+        let normalized = cleanString(text);
+
+        if (!normalized) {
+            return normalized;
+        }
+
+        /*
+         If the whole value is itself a JSON string, decode that
+         wrapper.  This is safer than manually replacing \" because
+         JSON.parse correctly handles all JSON escape sequences.
+        */
+        if (
+            normalized.length >= 2 &&
+            normalized.startsWith('"') &&
+            normalized.endsWith('"')
+        ) {
+            try {
+                const decoded = JSON.parse(normalized);
+
+                if (typeof decoded === "string") {
+                    normalized = decoded.trim();
+                }
+            } catch (_) {
+                /* Continue with the original text. */
+            }
+        }
+
+        /*
+         JSON forbids literal U+0000..U+001F characters inside a
+         quoted string. Glide can occasionally pass a real newline
+         or tab in a text field instead of an escaped JSON sequence.
+
+         Walk the JSON and escape only those characters while inside
+         a string. Existing backslash escapes are preserved exactly.
+        */
+        let output = "";
+        let inString = false;
+        let escaped = false;
+
+        for (let i = 0; i < normalized.length; i++) {
+            const ch = normalized[i];
+            const code = normalized.charCodeAt(i);
+
+            if (inString) {
+                if (escaped) {
+                    output += ch;
+                    escaped = false;
+                    continue;
+                }
+
+                if (ch === "\\") {
+                    output += ch;
+                    escaped = true;
+                    continue;
+                }
+
+                if (ch === '"') {
+                    output += ch;
+                    inString = false;
+                    continue;
+                }
+
+                if (code < 0x20) {
+                    if (ch === "\n") {
+                        output += "\\n";
+                    } else if (ch === "\r") {
+                        output += "\\r";
+                    } else if (ch === "\t") {
+                        output += "\\t";
+                    } else if (ch === "\b") {
+                        output += "\\b";
+                    } else if (ch === "\f") {
+                        output += "\\f";
+                    } else {
+                        output += "\\u" + code.toString(16).padStart(4, "0");
+                    }
+                    continue;
+                }
+
+                output += ch;
+                continue;
+            }
+
+            output += ch;
+
+            if (ch === '"') {
+                inString = true;
+            }
+        }
+
+        return output;
+    }
+
+
     function parseJsonText(text) {
+
+        const normalized =
+            normalizeJsonTransportText(text);
 
         try {
 
             return parseObject(
-                JSON.parse(text)
+                JSON.parse(normalized)
             );
 
         } catch (error) {
