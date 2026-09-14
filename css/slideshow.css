@@ -178,6 +178,7 @@ position:relative;    height: fit-content;
 .slideshow-library-card.selected .slideshow-library-card-media{box-shadow:
         0 0 0 3px #66CDAA,
         0 8px 24px rgba(0,0,0,.4);
+border:2px red solid;
 }
 .slideshow-favorite-control{position:absolute;right:clamp(6px,6%,10px);top:clamp(6px,6%,10px);z-index:15;width:25px;height:25px;display:flex;align-items:center;justify-content:center;border:0;border-radius:50%;background:color-mix(in srgb,var(--card,#222) 30%,transparent);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);color:var(--text,#fff);font-size:16px;line-height:1;cursor:pointer;transition:transform .2s ease,color .2s ease,background .2s ease}
 .slideshow-favorite-control:hover{transform:scale(1.08)}
@@ -461,11 +462,9 @@ position:relative;    height: fit-content;
 .slideshow-slide img{max-width:100%;max-height:100%;width:100%;height:100%;object-fit:contain;user-select:none}.slideshow-slide canvas{max-width:100%;max-height:100%;width:auto;height:auto;display:block;user-select:none}
 .slideshow-caption{position:absolute;left:0;right:0;bottom:0;padding:12px 16px;background:none;font-size:14px;text-align:center}
 .slideshow-playback-status{position:absolute;top:48px;left:50%;transform:translateX(-50%);font-size:12px;opacity:.72;z-index:8;pointer-events:none}
-.slideshow-toolbar{position:absolute;display:flex;gap:6px;align-items:center;padding:6px 8px;border-radius:10px;border:1px solid color-mix(in srgb,var(--control-text) 22%,transparent);
-  background:color-mix(in srgb,var(--control-bg,#fff) 94%,transparent);
-  color:var(--control-text);
-  backdrop-filter:blur(7px);
-  box-shadow:0 5px 18px rgba(0,0,0,.16);z-index:10}
+.slideshow-toolbar{position:absolute;display:flex;gap:6px;align-items:center;padding:6px 8px;border-radius:10px;
+  background:transparent;
+  color:var(--control-text)}
 
 .slideshow-toolbar-main{bottom:0;left:50%;transform:translateX(-50%)}
 
@@ -473,7 +472,7 @@ position:relative;    height: fit-content;
 
 
 
-.slideshow-control{width:42px;height:42px;flex:0 0 42px;bottom:10px;border:1px solid color-mix(in srgb,var(--control-text) 22%,transparent);border-radius:50%;background:rgba(255,255,255,.30)!important;color:var(--control-text);backdrop-filter:blur(7px);box-shadow:0 5px 18px rgba(0,0,0,.16);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .25s,transform .25s,box-shadow .25s}
+.slideshow-control{width:42px;height:42px;flex:0 0 42px;bottom:10px;border:1px solid color-mix(in srgb,var(--control-text) 22%,transparent);border-radius:50%;background:color-mix(in srgb,var(--panel) 22%,transparent);color:var(--control-text);backdrop-filter:blur(7px);box-shadow:0 5px 18px rgba(0,0,0,.16);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .25s,transform .25s,box-shadow .25s}
 
 .slideshow-control .icon{width:20px;height:20px;color:var(--control-text);stroke:currentColor}
 .slideshow-control:hover{background:rgba(255,255,255,.42)!important;transform:translateY(-2px);box-shadow:0 6px 18px rgba(0,0,0,.18)}
@@ -494,7 +493,8 @@ position:relative;    height: fit-content;
   }
 }
 
-.slideshow-audio-mode{position:relative;height:42px;display:flex;align-items:center;gap:4px;padding:0 8px;border:1px solid color-mix(in srgb,var(--control-text) 22%,transparent);border-radius:21px;background:rgba(255,255,255,.30)!important;color:var(--control-text);backdrop-filter:blur(7px);box-shadow:0 5px 18px rgba(0,0,0,.16)}
+
+.slideshow-audio-mode{position:relative;height:42px;display:flex;align-items:center;gap:4px;padding:0 8px;border:1px solid color-mix(in srgb,var(--control-text) 22%,transparent);border-radius:21px;background:color-mix(in srgb,var(--panel) 22%,transparent);color:var(--control-text);backdrop-filter:blur(7px);box-shadow:0 5px 18px rgba(0,0,0,.16)}
 .slideshow-audio-mode .icon{width:19px;height:19px;color:var(--control-text)}.slideshow-audio-mode select{max-width:118px;border:0;outline:0;background:transparent;color:var(--control-text);font-size:11px}.slideshow-audio-mode option{background:#20242a;color:#fff}
 
 .slideshow-music-picker{

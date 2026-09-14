@@ -175,7 +175,7 @@ html:fullscreen #topBar{
   display:flex;
   overflow:hidden;
   position:relative;
-  padding:0 30px 0 0;
+  padding:0 30px;
   background:var(--panel);
 }
 
@@ -859,6 +859,7 @@ html:fullscreen #topBar{
 
   margin:0;
   padding:0;
+
 }
 
 
@@ -1308,14 +1309,14 @@ html:fullscreen #topBar{
   gap:10px;
   width:100%;
   min-width:0;
-  padding:0 0 24px;
+  padding:0 0 24px 10px;
 }
 
 #listView .listItem{
   display:flex;
   align-items:center;
   gap:16px;
-  width:100%;
+  width:99%;
   min-width:0;
   padding:12px;
   border-radius:16px;
@@ -1904,6 +1905,7 @@ html[data-theme="dark"] #readerPanel #toolbar .iconButton{
     flex-direction:column;
     width:100%;
     gap:10px;
+
   }
 
   #libraryDrawerClose{
