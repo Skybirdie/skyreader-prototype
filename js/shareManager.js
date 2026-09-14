@@ -389,98 +389,78 @@ window.ShareManager = (function () {
 
 
   /* =========================================================
-     PRIME KV AND CREATE SHORT SHARE URL
+     SHARE FEEDBACK
      ========================================================= */
 
-  async function shorten(longUrl) {
+  let shareNoticeTimer = null;
 
-    if (!longUrl) {
-      throw new Error("ShareManager: missing share URL.");
+  function showShareNotice(message, isSuccess = true) {
+    let notice = document.getElementById("skyShareNotice");
+
+    if (!notice) {
+      notice = document.createElement("div");
+      notice.id = "skyShareNotice";
+      notice.className = "sky-share-notice";
+      notice.setAttribute("role", "status");
+      notice.setAttribute("aria-live", "polite");
+      document.body.appendChild(notice);
     }
 
-    const url = new URL(longUrl);
-    const key = url.searchParams.get("k");
-    const contractz = url.searchParams.get("contractz");
-    const section = url.searchParams.get("section") || "";
-    const id = url.searchParams.get("id") || "";
+    notice.textContent = message;
+    notice.classList.toggle("is-error", !isSuccess);
+    notice.classList.add("is-visible");
 
-    if (!key || !contractz) {
-      throw new Error("ShareManager: incomplete first-use URL.");
+    if (shareNoticeTimer) {
+      clearTimeout(shareNoticeTimer);
     }
 
-    const response = await fetch(
-      SKYMEDIA_BASE_URL + "/__sky_share_prime",
-      {
-        method: "POST",
-        mode: "cors",
-        cache: "no-store",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          k: key,
-          contractz,
-          section,
-          id
-        })
-      }
-    );
-
-    if (!response.ok) {
-      let detail = "";
-      try { detail = (await response.json())?.error || ""; } catch (_) {}
-      throw new Error(
-        "ShareManager: unable to create the short share link" +
-        (detail ? " — " + detail : " (" + response.status + ")")
-      );
-    }
-
-    const data = await response.json();
-
-    if (!data || typeof data.url !== "string" || !data.url) {
-      throw new Error("ShareManager: Worker returned an invalid short share link.");
-    }
-
-    return data.url;
+    shareNoticeTimer = setTimeout(() => {
+      notice.classList.remove("is-visible");
+    }, 2600);
   }
 
-
-  /* =========================================================
-     SHARE FEEDBACK TOAST
-     ========================================================= */
-
-  function showShareToast(message, kind = "info") {
-    let toast = document.getElementById("skymediaShareToast");
-
-    /*
-      A fullscreen element lives in the browser's top layer.
-      Anything outside that element can be hidden behind it.
-      When the document itself is fullscreen, append the toast
-      there so it remains visible. For video fullscreen (where
-      a <video> element cannot contain children), the native
-      browser controls remain authoritative and the toast falls
-      back to the nearest document-level overlay.
-    */
-    const fs = document.fullscreenElement;
-    const host = fs && fs !== document.documentElement &&
-                 fs instanceof HTMLElement ? fs : document.body;
-
-    if (!toast) {
-      toast = document.createElement("div");
-      toast.id = "skymediaShareToast";
-      toast.className = "skymedia-share-toast";
+  function installShareNoticeStyles() {
+    if (document.getElementById("skyShareNoticeStyles")) {
+      return;
     }
 
-    if (toast.parentElement !== host) host.appendChild(toast);
+    const style = document.createElement("style");
+    style.id = "skyShareNoticeStyles";
+    style.textContent = `
+      .sky-share-notice {
+        position: fixed;
+        left: 50%;
+        bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+        transform: translate(-50%, 14px);
+        z-index: 2147483647;
+        max-width: min(88vw, 420px);
+        padding: 10px 16px;
+        border-radius: 999px;
+        background: rgba(20,20,20,.94);
+        color: #fff;
+        font: 600 13px/1.2 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        text-align: center;
+        letter-spacing: .01em;
+        box-shadow: 0 6px 24px rgba(0,0,0,.28);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity .18s ease, transform .18s ease;
+      }
+      .sky-share-notice.is-visible {
+        opacity: 1;
+        transform: translate(-50%, 0);
+      }
+      .sky-share-notice.is-error {
+        background: rgba(120,35,35,.96);
+      }
+    `;
+    document.head.appendChild(style);
+  }
 
-    toast.textContent = message;
-    toast.dataset.kind = kind;
-    toast.classList.remove("visible");
-    void toast.offsetWidth;
-    toast.classList.add("visible");
-
-    clearTimeout(toast._hideTimer);
-    toast._hideTimer = setTimeout(() => {
-      toast.classList.remove("visible");
-    }, 2800);
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", installShareNoticeStyles, { once: true });
+  } else {
+    installShareNoticeStyles();
   }
 
 
@@ -488,76 +468,118 @@ window.ShareManager = (function () {
      COPY HELPER
      ========================================================= */
 
-  async function copyToClipboard(
-    text
-  ) {
-
+  async function copyToClipboard(text) {
     if (
       navigator.clipboard &&
-      typeof navigator.clipboard.writeText ===
-        "function"
+      typeof navigator.clipboard.writeText === "function"
     ) {
-
-      await navigator.clipboard.writeText(
-        text
-      );
-
-      return true;
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch (_) {
+        // Continue to the legacy fallback.
+      }
     }
 
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "fixed";
+    textarea.style.left = "-9999px";
+    textarea.style.top = "0";
+    textarea.style.opacity = "0";
+    document.body.appendChild(textarea);
 
-    /*
-      Older-browser fallback.
-    */
-    const textarea =
-      document.createElement(
-        "textarea"
-      );
-
-
-    textarea.value =
-      text;
-
-    textarea.setAttribute(
-      "readonly",
-      ""
-    );
-
-    textarea.style.position =
-      "fixed";
-
-    textarea.style.opacity =
-      "0";
-
-
-    document.body.appendChild(
-      textarea
-    );
-
-
+    textarea.focus();
     textarea.select();
-
+    textarea.setSelectionRange(0, textarea.value.length);
 
     let copied = false;
 
-
     try {
-
-      copied =
-        document.execCommand(
-          "copy"
-        );
-
+      copied = document.execCommand("copy");
     } catch (_) {
-
       copied = false;
     }
 
-
     textarea.remove();
-
-
     return copied;
+  }
+
+
+  /* =========================================================
+     PRIME KV AND CREATE SHORT SHARE URL
+
+     The request is deliberately started WITHOUT awaiting it.
+     This is important because navigator.share() requires the
+     original user gesture. Awaiting a network request first can
+     cause browsers to reject navigator.share() with a
+     NotAllowedError.
+     ========================================================= */
+
+  function primeKV(longUrl) {
+    if (!longUrl) {
+      return Promise.reject(
+        new Error("ShareManager: missing share URL.")
+      );
+    }
+
+    const source = new URL(longUrl);
+    const endpoint = new URL(
+      "/__sky_share_prime",
+      SKYMEDIA_BASE_URL
+    );
+
+    const payload = {
+      k: source.searchParams.get("k") || "",
+      contractz: source.searchParams.get("contractz") || "",
+      section: source.searchParams.get("section") || "",
+      id: source.searchParams.get("id") || ""
+    };
+
+    return fetch(endpoint.toString(), {
+      method: "POST",
+      mode: "cors",
+      cache: "no-store",
+      headers: {
+        "Content-Type": "text/plain;charset=UTF-8"
+      },
+      body: JSON.stringify(payload),
+      keepalive: true
+    }).then(async response => {
+      if (!response.ok) {
+        let detail = "";
+        try {
+          detail = await response.text();
+        } catch (_) {}
+        throw new Error(
+          "ShareManager: short-link setup failed (" +
+          response.status +
+          ")" +
+          (detail ? ": " + detail : ".")
+        );
+      }
+
+      const data = await response.json();
+
+      if (
+        !data ||
+        data.ok !== true ||
+        typeof data.url !== "string" ||
+        !data.url
+      ) {
+        throw new Error(
+          "ShareManager: Worker returned an invalid short share link."
+        );
+      }
+
+      return data.url;
+    });
+  }
+
+
+  async function shorten(longUrl) {
+    return primeKV(longUrl);
   }
 
 
@@ -565,88 +587,111 @@ window.ShareManager = (function () {
      SHARE
      ========================================================= */
 
-  async function share(
-    section,
-    item
-  ) {
+  async function share(section, item) {
+    if (!item || !item.id) {
+      showShareNotice("Unable to share this item.", false);
+      throw new Error(
+        "ShareManager: cannot share an item without an id."
+      );
+    }
+
+    const normalizedSection = normalizeSection(section);
+    const firstUseUrl = buildLongUrl(
+      normalizedSection,
+      item.id
+    );
+
+    /*
+      The short URL is deterministic. Start KV priming now,
+      but do NOT await it before calling navigator.share().
+      That preserves the browser's user-gesture activation.
+    */
+    const primePromise = primeKV(firstUseUrl);
+
+    const source = new URL(firstUseUrl);
+    const shortUrlPreview = new URL(SKYMEDIA_BASE_URL);
+    shortUrlPreview.searchParams.set(
+      "k",
+      source.searchParams.get("k") || ""
+    );
+    shortUrlPreview.searchParams.set(
+      "section",
+      source.searchParams.get("section") || normalizedSection
+    );
+    shortUrlPreview.searchParams.set(
+      "id",
+      source.searchParams.get("id") || String(item.id)
+    );
+
+    const shareUrl = shortUrlPreview.toString();
+
+    /*
+      Native Web Share MUST be attempted while the click/tap
+      activation is still alive.
+    */
+    if (
+      navigator.share &&
+      typeof navigator.share === "function"
+    ) {
+      try {
+        await navigator.share({
+          title: item.title || "SkyMedia",
+          text: item.title
+            ? `View ${item.title} in SkyMedia`
+            : "View this item in SkyMedia",
+          url: shareUrl
+        });
+
+        try {
+          await primePromise;
+          showShareNotice("Share link sent.", true);
+        } catch (error) {
+          console.error("SkyMedia: KV priming failed after native share.", error);
+          showShareNotice("Share started, but link setup failed.", false);
+        }
+
+        return shareUrl;
+      } catch (error) {
+        /*
+          AbortError means the user intentionally closed/cancelled
+          the native share sheet. Do not unexpectedly copy anything.
+        */
+        if (error && error.name === "AbortError") {
+          return shareUrl;
+        }
+
+        /*
+          NotAllowedError and other native-share failures fall
+          through to the clipboard fallback.
+        */
+        console.warn("SkyMedia native share unavailable; using clipboard.", error);
+      }
+    }
+
+    /*
+      Desktop browsers and browsers without Web Share use the
+      same short URL. Wait for KV setup before copying so the
+      copied link is never the long contract URL.
+    */
+    let readyUrl;
 
     try {
-      if (!item || !item.id) {
-        throw new Error("ShareManager: cannot share an item without an id.");
-      }
-
-      const normalizedSection = normalizeSection(section);
-      const firstUseUrl = buildLongUrl(normalizedSection, item.id);
-
-      /*
-        The short URL itself can be constructed synchronously from
-        the deterministic key. Start KV priming immediately, but do
-        not wait for the network before invoking navigator.share.
-        This preserves the browser's user-activation window.
-      */
-      const firstUse = new URL(firstUseUrl);
-      const shareUrl = new URL(SKYMEDIA_BASE_URL);
-      shareUrl.searchParams.set("k", firstUse.searchParams.get("k"));
-      shareUrl.searchParams.set("section", firstUse.searchParams.get("section"));
-      shareUrl.searchParams.set("id", firstUse.searchParams.get("id"));
-      const shortUrl = shareUrl.toString();
-
-      const primePromise = shorten(firstUseUrl);
-
-      if (navigator.share && typeof navigator.share === "function") {
-        try {
-          await navigator.share({
-            title: item.title || "SkyMedia",
-            text: item.title
-              ? `View ${item.title} in SkyMedia`
-              : "View this item in SkyMedia",
-            url: shortUrl
-          });
-
-          /* Ensure KV is actually ready before reporting success. */
-          try {
-            await primePromise;
-            showShareToast("Share link sent.", "success");
-          } catch (primeError) {
-            showShareToast("Share opened, but the link could not be prepared.", "error");
-            console.error(primeError);
-          }
-
-          return shortUrl;
-        } catch (error) {
-          if (error && error.name === "AbortError") {
-            /* User cancelled; do not claim success. */
-            showShareToast("Share cancelled.", "info");
-            return shortUrl;
-          }
-          /* Other native-share failures fall through to clipboard. */
-        }
-      }
-
-      let preparedUrl;
-      try {
-        preparedUrl = await primePromise;
-      } catch (error) {
-        showShareToast("Unable to create share link.", "error");
-        console.error(error);
-        return null;
-      }
-
-      const copied = await copyToClipboard(preparedUrl);
-
-      if (copied) {
-        showShareToast("Link copied.", "success");
-        return preparedUrl;
-      }
-
-      showShareToast("Share link created, but could not copy it.", "error");
-      return preparedUrl;
-
+      readyUrl = await primePromise;
     } catch (error) {
-      showShareToast("Unable to create share link.", "error");
-      console.error(error);
-      return null;
+      console.error("SkyMedia: unable to create short share link.", error);
+      showShareNotice("Unable to create share link.", false);
+      throw error;
     }
+
+    const copied = await copyToClipboard(readyUrl);
+
+    if (copied) {
+      showShareNotice("Link copied.", true);
+      return readyUrl;
+    }
+
+    showShareNotice("Share link created, but could not copy it.", false);
+    return readyUrl;
   }
 
 
