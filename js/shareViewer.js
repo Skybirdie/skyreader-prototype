@@ -3,17 +3,18 @@
 /*
 =========================================================
  SkyMedia Share Viewer
- Version 1.0.0
+ Version 1.1.0
 
  Standalone one-item viewer for social/share links.
 
- Responsibilities
- • Detect the requested section + item
- • Present exactly one item
- • Reuse existing SkyMedia rendering engines
- • Remove/hide normal application navigation
- • Provide a simple "Open Meditation Mornings" button
- • Keep normal SkyMedia application behavior untouched
+ Share Mode:
+ • Opens exactly one requested item
+ • Reuses the existing SkyMedia viewer engines
+ • Keeps the viewer inside its original SkyMedia section
+ • Preserves the normal viewer background and controls
+ • Hides libraries and application navigation
+ • Provides "Open Meditation Mornings"
+ • Escape / Close returns to Meditation Mornings Glide
 
  Share Mode intentionally does NOT expose:
  • Front Page
@@ -40,6 +41,8 @@ window.ShareViewer = (function () {
     let openButton = null;
     let closeButton = null;
     let statusElement = null;
+
+    let activeRoot = null;
 
     const GLIDE_MEDIA_URL =
         "https://meditationmornings.glide.page/dl/media";
@@ -109,6 +112,7 @@ window.ShareViewer = (function () {
 
         shell.id = "skyShareShell";
 
+
         /*
          * Header
          */
@@ -162,7 +166,15 @@ window.ShareViewer = (function () {
 
 
         /*
-         * Media host
+         * Media host remains as a structural placeholder.
+         *
+         * IMPORTANT:
+         *
+         * The actual Reader / Video / Slideshow viewer is NOT moved
+         * into this element.
+         *
+         * It remains in its original SkyMedia section so that all
+         * normal viewer CSS, backgrounds and controls continue to work.
          */
 
         mediaHost = createElement(
@@ -170,10 +182,12 @@ window.ShareViewer = (function () {
             "sky-share-media-host"
         );
 
+
         statusElement = createElement(
             "div",
             "sky-share-status"
         );
+
 
         /*
          * Footer actions
@@ -194,6 +208,7 @@ window.ShareViewer = (function () {
         openButton.target = "_blank";
         openButton.rel = "noopener noreferrer";
 
+
         closeButton = createElement(
             "button",
             "sky-share-close-button",
@@ -206,6 +221,7 @@ window.ShareViewer = (function () {
             "click",
             close
         );
+
 
         actions.appendChild(openButton);
         actions.appendChild(closeButton);
@@ -222,8 +238,72 @@ window.ShareViewer = (function () {
 
         document.body.appendChild(shell);
 
-        section.textContent = "";
-        section.dataset.section = "";
+
+        const section =
+            shell.querySelector(".sky-share-section");
+
+        if (section) {
+            section.textContent = "";
+            section.dataset.section = "";
+        }
+
+    }
+
+
+    /*-------------------------------------------------------
+      Find the original SkyMedia section/root
+    -------------------------------------------------------*/
+
+    function findViewerRoot(viewer) {
+
+        if (!viewer) {
+            return null;
+        }
+
+
+        /*
+         * Video and Slideshow have known section containers.
+         */
+
+        if (viewer.id === "videoViewer") {
+
+            return document.getElementById(
+                "videoSection"
+            ) || viewer.closest("section");
+
+        }
+
+
+        if (viewer.id === "slideshowViewer") {
+
+            return document.getElementById(
+                "slideshowSection"
+            ) || viewer.closest("section");
+
+        }
+
+
+        /*
+         * Reader:
+         *
+         * viewerArea belongs to the normal Reader section.
+         * Walk upward until we find the nearest section.
+         */
+
+        const section =
+            viewer.closest("section");
+
+        if (section) {
+            return section;
+        }
+
+
+        /*
+         * Fallback for an unusual Reader DOM structure.
+         */
+
+        return viewer.parentElement || viewer;
+
     }
 
 
@@ -233,14 +313,13 @@ window.ShareViewer = (function () {
 
     function isolateApplication() {
 
-        document.body.classList.add("sky-share-mode");
+        document.body.classList.add(
+            "sky-share-mode"
+        );
+
 
         /*
-         * Hide normal application sections/chrome.
-         *
-         * We deliberately do this with a class rather than deleting
-         * elements. Existing Viewer/Renderer code can therefore still
-         * use the DOM it was designed for.
+         * Hide application-level navigation.
          */
 
         const selectors = [
@@ -248,28 +327,20 @@ window.ShareViewer = (function () {
             "#frontPage",
             "#frontSection",
 
-            "#videoTopBar",
-            "#videoLibrary",
-            "#videoSearchGroup",
-            "#videoTopBarRightControls",
-
-            "#slideshowLibrary",
-            ".slideshow-top-bar",
-
             ".app-switcher",
             ".responsive-app-menu",
-
-            "#readerLibrary",
-            "#library",
-            "#libraryPanel",
+            ".responsive-app-menu-button",
 
             "#settingsPanel",
             "#settingsOverlay",
 
-            ".video-library",
-            ".slideshow-library"
+            "[data-app-target]",
+            ".app-switch-button",
+
+            ".sr-welcome-banner"
 
         ];
+
 
         selectors.forEach(selector => {
 
@@ -277,100 +348,163 @@ window.ShareViewer = (function () {
                 .querySelectorAll(selector)
                 .forEach(element => {
 
-                    element.dataset.skyShareHidden = "true";
-                    element.style.display = "none";
+                    /*
+                     * Do not hide anything inside the active viewer.
+                     * Viewer controls belong to the shared item and
+                     * must remain available.
+                     */
+
+                    if (
+                        activeRoot &&
+                        activeRoot.contains(element)
+                    ) {
+                        return;
+                    }
+
+
+                    element.dataset.skyShareHidden =
+                        "true";
+
+                    element.style.display =
+                        "none";
 
                 });
 
         });
 
-
-        /*
-         * Any existing Reader/Video/Slideshow section remains available
-         * underneath the Share Viewer only when its rendering engine needs it.
-         */
-
-        document
-            .querySelectorAll(
-                "#frontPage, #frontSection"
-            )
-            .forEach(element => {
-                element.style.display = "none";
-            });
-
-
-        /*
-         * Disable ordinary navigation controls.
-         */
-
-        document
-            .querySelectorAll(
-                "[data-app-target], .app-switch-button, .responsive-app-menu-button"
-            )
-            .forEach(element => {
-
-                element.dataset.skyShareHidden = "true";
-                element.style.display = "none";
-
-            });
-
-
-        /*
-         * Hide the normal welcome/release banners.
-         */
-
-        document
-            .querySelectorAll(".sr-welcome-banner")
-            .forEach(element => {
-
-                element.dataset.skyShareHidden = "true";
-                element.style.display = "none";
-
-            });
     }
 
 
     /*-------------------------------------------------------
-      Viewer mounting helpers
+      Hide normal library/navigation within active section
     -------------------------------------------------------*/
 
-    function detachExistingViewer(viewer) {
+    function isolateActiveSection(root, type) {
 
-        if (!viewer) {
+        if (!root) {
             return;
         }
 
+        activeRoot = root;
+
+        root.classList.add(
+            "sky-share-active-root"
+        );
+
+
         /*
-         * The actual rendering element remains in the document because
-         * the existing engine depends on it.
-         *
-         * We visually move it into the Share Viewer host.
+         * VIDEO
          */
 
-        viewer.dataset.skyShareOriginalParent =
-            viewer.parentElement ? viewer.parentElement.id || "" : "";
+        if (type === "video") {
 
-        viewer.dataset.skyShareOriginalDisplay =
-            viewer.style.display || "";
+            [
+                "#videoTopBar",
+                "#videoLibrary",
+                "#videoSearchGroup",
+                "#videoTopBarRightControls",
+                ".video-library"
+            ]
+                .forEach(selector => {
 
-        mediaHost.appendChild(viewer);
+                    root
+                        .querySelectorAll(selector)
+                        .forEach(element => {
 
-        viewer.style.display = "";
-        viewer.classList.add("sky-share-mounted-viewer");
+                            element.dataset.skyShareHidden =
+                                "true";
+
+                            element.style.display =
+                                "none";
+
+                        });
+
+                });
+
+        }
+
+
+        /*
+         * SLIDESHOW
+         */
+
+        if (type === "slideshow") {
+
+            [
+                ".slideshow-top-bar",
+                "#slideshowLibrary",
+                ".slideshow-library"
+            ]
+                .forEach(selector => {
+
+                    root
+                        .querySelectorAll(selector)
+                        .forEach(element => {
+
+                            element.dataset.skyShareHidden =
+                                "true";
+
+                            element.style.display =
+                                "none";
+
+                        });
+
+                });
+
+        }
+
+
+        /*
+         * READER
+         *
+         * We deliberately do NOT hide Reader controls here.
+         *
+         * The Reader's normal viewer controls must remain available.
+         *
+         * Only known library/navigation containers are hidden.
+         */
+
+        if (type === "book") {
+
+            [
+                "#readerLibrary",
+                "#library",
+                "#libraryPanel",
+                ".reader-library",
+                ".reader-library-panel"
+            ]
+                .forEach(selector => {
+
+                    root
+                        .querySelectorAll(selector)
+                        .forEach(element => {
+
+                            element.dataset.skyShareHidden =
+                                "true";
+
+                            element.style.display =
+                                "none";
+
+                        });
+
+                });
+
+        }
+
     }
 
 
-    function prepareVideo(item) {
+    /*-------------------------------------------------------
+      Prepare Video
+    -------------------------------------------------------*/
 
-        /*
-         * VideoLibrary is needed internally because VideoViewer.init()
-         * expects its library dependency to exist. Its UI remains hidden.
-         */
+    async function prepareVideo(item) {
 
         if (
             window.VideoLibrary &&
             typeof VideoLibrary.init === "function"
         ) {
+
             VideoLibrary.init();
 
             if (
@@ -378,68 +512,78 @@ window.ShareViewer = (function () {
                 window.Manifest &&
                 typeof Manifest.videos === "function"
             ) {
+
                 VideoLibrary.load(
                     Manifest.videos()
                 );
+
             }
+
         }
 
 
         const viewer =
-            document.getElementById("videoViewer");
+            document.getElementById(
+                "videoViewer"
+            );
+
 
         if (!viewer) {
+
             throw new Error(
                 "Share Mode: #videoViewer not found."
             );
+
         }
 
-
-        /*
-         * VideoViewer can use its normal DOM safely.
-         */
 
         if (
             window.VideoViewer &&
             typeof VideoViewer.init === "function"
         ) {
+
             VideoViewer.init();
+
         }
 
 
-        detachExistingViewer(viewer);
+        const root =
+            findViewerRoot(viewer);
 
+        isolateActiveSection(
+            root,
+            "video"
+        );
 
-        /*
-         * Open the exact shared item.
-         */
 
         if (
             !window.VideoViewer ||
             typeof VideoViewer.openVideo !== "function"
         ) {
+
             throw new Error(
                 "Share Mode: VideoViewer.openVideo() unavailable."
             );
+
         }
 
-        return VideoViewer.openVideo(item);
+
+        await VideoViewer.openVideo(item);
+
     }
 
 
-    async function prepareSlideshow(item) {
+    /*-------------------------------------------------------
+      Prepare Slideshow
+    -------------------------------------------------------*/
 
-        /*
-         * SlideshowViewer expects its normal DOM IDs, so we initialize
-         * the existing viewer and then mount that viewer into Share Mode.
-         *
-         * The library itself remains hidden.
-         */
+    async function prepareSlideshow(item) {
 
         if (
             window.SlideshowLibrary &&
             typeof SlideshowLibrary.init === "function"
         ) {
+
             SlideshowLibrary.init();
 
             if (
@@ -447,10 +591,13 @@ window.ShareViewer = (function () {
                 window.Manifest &&
                 typeof Manifest.slideshows === "function"
             ) {
+
                 SlideshowLibrary.load(
                     Manifest.slideshows()
                 );
+
             }
+
         }
 
 
@@ -458,90 +605,104 @@ window.ShareViewer = (function () {
             !window.SlideshowViewer ||
             typeof SlideshowViewer.init !== "function"
         ) {
+
             throw new Error(
                 "Share Mode: SlideshowViewer unavailable."
             );
+
         }
 
 
         const viewer =
-            document.getElementById("slideshowViewer");
+            document.getElementById(
+                "slideshowViewer"
+            );
+
 
         if (!viewer) {
+
             throw new Error(
                 "Share Mode: #slideshowViewer not found."
             );
+
         }
 
 
         /*
-         * SlideshowViewer.init() must see its expected IDs before the
-         * viewer is moved.
+         * Initialize before altering section visibility.
          */
 
         SlideshowViewer.init();
 
-        detachExistingViewer(viewer);
 
+        const root =
+            findViewerRoot(viewer);
 
-        /*
-         * Open only the requested item.
-         */
+        isolateActiveSection(
+            root,
+            "slideshow"
+        );
+
 
         await SlideshowViewer.open(item);
+
     }
 
 
-    async function prepareBook(item) {
+    /*-------------------------------------------------------
+      Prepare Book
+    -------------------------------------------------------*/
 
-        /*
-         * Reader/Renderer already initialize automatically from
-         * DOMContentLoaded. We therefore reuse the existing Reader
-         * engine rather than creating another PDF renderer.
-         */
+    async function prepareBook(item) {
 
         if (
             !window.Reader ||
             typeof Reader.open !== "function"
         ) {
+
             throw new Error(
                 "Share Mode: Reader.open() unavailable."
             );
+
         }
 
 
         const viewerArea =
-            document.getElementById("viewerArea");
+            document.getElementById(
+                "viewerArea"
+            );
+
 
         if (!viewerArea) {
+
             throw new Error(
                 "Share Mode: #viewerArea not found."
             );
+
         }
 
 
         /*
-         * Move the actual Reader viewer into Share Mode.
+         * IMPORTANT:
          *
-         * Renderer continues to use #viewerArea and #pageContainer,
-         * so no engine changes are necessary.
+         * Do not move #viewerArea.
+         *
+         * Renderer and Sky180FlipEngine continue using their
+         * original DOM hierarchy and therefore retain the normal
+         * Reader background, sizing and controls.
          */
 
-        detachExistingViewer(viewerArea);
+        const root =
+            findViewerRoot(viewerArea);
 
+        isolateActiveSection(
+            root,
+            "book"
+        );
 
-        /*
-         * The Reader's normal surrounding chrome is hidden by Share Mode.
-         */
-
-        viewerArea.style.display = "";
-
-
-        /*
-         * Open the exact shared book.
-         */
 
         await Reader.open(item);
+
     }
 
 
@@ -552,33 +713,43 @@ window.ShareViewer = (function () {
     async function openItem(item, target) {
 
         const section =
-            String(target.section || item.type || "")
-                .toLowerCase();
+            String(
+                target.section ||
+                item.type ||
+                ""
+            ).toLowerCase();
+
 
         activeItem = item;
         activeTarget = target;
 
 
         titleElement.textContent =
-            escapeText(item.title) || "Meditation Mornings";
+            escapeText(item.title) ||
+            "Meditation Mornings";
+
 
         subtitleElement.textContent =
             escapeText(item.subtitle);
 
-        document
-            .querySelector(".sky-share-section")
-            ?.setAttribute(
+
+        const sectionElement =
+            shell.querySelector(
+                ".sky-share-section"
+            );
+
+
+        if (sectionElement) {
+
+            sectionElement.setAttribute(
                 "data-section",
                 section
             );
 
-        document
-            .querySelector(".sky-share-section")
-            ?.replaceChildren(
-                document.createTextNode(
-                    getSectionLabel(section)
-                )
-            );
+            sectionElement.textContent =
+                getSectionLabel(section);
+
+        }
 
 
         statusElement.textContent =
@@ -589,9 +760,7 @@ window.ShareViewer = (function () {
 
         try {
 
-            if (
-                section === "video"
-            ) {
+            if (section === "video") {
 
                 await prepareVideo(item);
 
@@ -636,7 +805,9 @@ window.ShareViewer = (function () {
                 "Unable to open this item.";
 
             throw error;
+
         }
+
     }
 
 
@@ -657,7 +828,9 @@ window.ShareViewer = (function () {
                 window.VideoViewer &&
                 typeof VideoViewer.closeVideo === "function"
             ) {
+
                 VideoViewer.closeVideo();
+
             }
 
 
@@ -670,7 +843,9 @@ window.ShareViewer = (function () {
                 window.SlideshowViewer &&
                 typeof SlideshowViewer.close === "function"
             ) {
+
                 SlideshowViewer.close();
+
             }
 
 
@@ -685,9 +860,11 @@ window.ShareViewer = (function () {
                 typeof Reader.close === "function" &&
                 Reader.isOpen()
             ) {
+
                 Reader.close({
                     playSound: false
                 });
+
             }
 
         } catch (error) {
@@ -701,13 +878,14 @@ window.ShareViewer = (function () {
 
 
         /*
-         * Return to the normal SkyMedia URL rather than trying to
-         * reconstruct application state.
+         * Return to the actual Meditation Mornings application.
+         *
+         * Do NOT return to the Cloudflare Front Page.
          */
 
         window.location.href =
-            window.location.origin +
-            window.location.pathname;
+            GLIDE_MEDIA_URL;
+
     }
 
 
@@ -721,13 +899,21 @@ window.ShareViewer = (function () {
             "keydown",
             event => {
 
-                if (!document.body.classList.contains("sky-share-mode")) {
+                if (
+                    !document.body.classList.contains(
+                        "sky-share-mode"
+                    )
+                ) {
                     return;
                 }
 
+
                 if (event.key === "Escape") {
+
                     event.preventDefault();
+
                     close();
+
                 }
 
             }
@@ -746,32 +932,47 @@ window.ShareViewer = (function () {
             return;
         }
 
+
         if (!item) {
+
             throw new Error(
                 "Share Mode: no item supplied."
             );
+
         }
 
+
         if (!target) {
+
             throw new Error(
                 "Share Mode: no target supplied."
             );
+
         }
 
 
         started = true;
 
+
         createShell();
-        isolateApplication();
+
         bindEscape();
+
 
         try {
 
-            await openItem(item, target);
+            await openItem(
+                item,
+                target
+            );
+
+            isolateApplication();
+
 
         } catch (error) {
 
             started = false;
+
             throw error;
 
         }
