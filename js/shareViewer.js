@@ -3,15 +3,15 @@
 /*
 =========================================================
  SkyMedia Share Viewer
- Version 1.1.0
+ Version 1.2.0
 
  Standalone one-item viewer for social/share links.
 
  Share Mode:
  • Opens exactly one requested item
- • Reuses the existing SkyMedia viewer engines
- • Keeps the viewer inside its original SkyMedia section
- • Preserves the normal viewer background and controls
+ • Reuses existing SkyMedia rendering engines
+ • Retains the normal viewer background
+ • Retains normal viewer controls
  • Hides libraries and application navigation
  • Provides "Open Meditation Mornings"
  • Escape / Close returns to Meditation Mornings Glide
@@ -41,8 +41,6 @@ window.ShareViewer = (function () {
     let openButton = null;
     let closeButton = null;
     let statusElement = null;
-
-    let activeRoot = null;
 
     const GLIDE_MEDIA_URL =
         "https://meditationmornings.glide.page/dl/media";
@@ -166,15 +164,7 @@ window.ShareViewer = (function () {
 
 
         /*
-         * Media host remains as a structural placeholder.
-         *
-         * IMPORTANT:
-         *
-         * The actual Reader / Video / Slideshow viewer is NOT moved
-         * into this element.
-         *
-         * It remains in its original SkyMedia section so that all
-         * normal viewer CSS, backgrounds and controls continue to work.
+         * Media host
          */
 
         mediaHost = createElement(
@@ -190,7 +180,7 @@ window.ShareViewer = (function () {
 
 
         /*
-         * Footer actions
+         * Footer
          */
 
         const actions = createElement(
@@ -240,75 +230,23 @@ window.ShareViewer = (function () {
 
 
         const section =
-            shell.querySelector(".sky-share-section");
+            shell.querySelector(
+                ".sky-share-section"
+            );
 
         if (section) {
+
             section.textContent = "";
+
             section.dataset.section = "";
+
         }
 
     }
 
 
     /*-------------------------------------------------------
-      Find the original SkyMedia section/root
-    -------------------------------------------------------*/
-
-    function findViewerRoot(viewer) {
-
-        if (!viewer) {
-            return null;
-        }
-
-
-        /*
-         * Video and Slideshow have known section containers.
-         */
-
-        if (viewer.id === "videoViewer") {
-
-            return document.getElementById(
-                "videoSection"
-            ) || viewer.closest("section");
-
-        }
-
-
-        if (viewer.id === "slideshowViewer") {
-
-            return document.getElementById(
-                "slideshowSection"
-            ) || viewer.closest("section");
-
-        }
-
-
-        /*
-         * Reader:
-         *
-         * viewerArea belongs to the normal Reader section.
-         * Walk upward until we find the nearest section.
-         */
-
-        const section =
-            viewer.closest("section");
-
-        if (section) {
-            return section;
-        }
-
-
-        /*
-         * Fallback for an unusual Reader DOM structure.
-         */
-
-        return viewer.parentElement || viewer;
-
-    }
-
-
-    /*-------------------------------------------------------
-      Normal application shell isolation
+      Normal application isolation
     -------------------------------------------------------*/
 
     function isolateApplication() {
@@ -319,7 +257,11 @@ window.ShareViewer = (function () {
 
 
         /*
-         * Hide application-level navigation.
+         * Hide only application navigation.
+         *
+         * IMPORTANT:
+         *
+         * We do NOT hide viewer controls here.
          */
 
         const selectors = [
@@ -334,9 +276,6 @@ window.ShareViewer = (function () {
             "#settingsPanel",
             "#settingsOverlay",
 
-            "[data-app-target]",
-            ".app-switch-button",
-
             ".sr-welcome-banner"
 
         ];
@@ -348,19 +287,107 @@ window.ShareViewer = (function () {
                 .querySelectorAll(selector)
                 .forEach(element => {
 
-                    /*
-                     * Do not hide anything inside the active viewer.
-                     * Viewer controls belong to the shared item and
-                     * must remain available.
-                     */
+                    element.dataset.skyShareHidden =
+                        "true";
 
-                    if (
-                        activeRoot &&
-                        activeRoot.contains(element)
-                    ) {
-                        return;
-                    }
+                    element.style.display =
+                        "none";
 
+                });
+
+        });
+
+
+        /*
+         * Hide ordinary application navigation buttons.
+         */
+
+        document
+            .querySelectorAll(
+                "[data-app-target], .app-switch-button"
+            )
+            .forEach(element => {
+
+                element.dataset.skyShareHidden =
+                    "true";
+
+                element.style.display =
+                    "none";
+
+            });
+
+    }
+
+
+    /*-------------------------------------------------------
+      Mount existing viewer
+    -------------------------------------------------------*/
+
+    function mountViewer(viewer) {
+
+        if (!viewer) {
+            return;
+        }
+
+
+        /*
+         * Preserve the actual existing viewer.
+         *
+         * The viewer itself is moved into the Share media host.
+         *
+         * Its internal controls, background and rendering engine
+         * remain intact.
+         */
+
+        viewer.dataset.skyShareOriginalParent =
+            viewer.parentElement
+                ? viewer.parentElement.id || ""
+                : "";
+
+        viewer.dataset.skyShareOriginalDisplay =
+            viewer.style.display || "";
+
+
+        mediaHost.appendChild(viewer);
+
+
+        viewer.style.display = "";
+
+        viewer.classList.add(
+            "sky-share-mounted-viewer"
+        );
+
+    }
+
+
+    /*-------------------------------------------------------
+      Hide libraries
+    -------------------------------------------------------*/
+
+    function hideLibraries() {
+
+        const selectors = [
+
+            "#videoLibrary",
+            ".video-library",
+
+            "#slideshowLibrary",
+            ".slideshow-library",
+
+            "#readerLibrary",
+            "#library",
+            "#libraryPanel",
+            ".reader-library",
+            ".reader-library-panel"
+
+        ];
+
+
+        selectors.forEach(selector => {
+
+            document
+                .querySelectorAll(selector)
+                .forEach(element => {
 
                     element.dataset.skyShareHidden =
                         "true";
@@ -376,126 +403,7 @@ window.ShareViewer = (function () {
 
 
     /*-------------------------------------------------------
-      Hide normal library/navigation within active section
-    -------------------------------------------------------*/
-
-    function isolateActiveSection(root, type) {
-
-        if (!root) {
-            return;
-        }
-
-        activeRoot = root;
-
-        root.classList.add(
-            "sky-share-active-root"
-        );
-
-
-        /*
-         * VIDEO
-         */
-
-        if (type === "video") {
-
-            [
-                "#videoTopBar",
-                "#videoLibrary",
-                "#videoSearchGroup",
-                "#videoTopBarRightControls",
-                ".video-library"
-            ]
-                .forEach(selector => {
-
-                    root
-                        .querySelectorAll(selector)
-                        .forEach(element => {
-
-                            element.dataset.skyShareHidden =
-                                "true";
-
-                            element.style.display =
-                                "none";
-
-                        });
-
-                });
-
-        }
-
-
-        /*
-         * SLIDESHOW
-         */
-
-        if (type === "slideshow") {
-
-            [
-                ".slideshow-top-bar",
-                "#slideshowLibrary",
-                ".slideshow-library"
-            ]
-                .forEach(selector => {
-
-                    root
-                        .querySelectorAll(selector)
-                        .forEach(element => {
-
-                            element.dataset.skyShareHidden =
-                                "true";
-
-                            element.style.display =
-                                "none";
-
-                        });
-
-                });
-
-        }
-
-
-        /*
-         * READER
-         *
-         * We deliberately do NOT hide Reader controls here.
-         *
-         * The Reader's normal viewer controls must remain available.
-         *
-         * Only known library/navigation containers are hidden.
-         */
-
-        if (type === "book") {
-
-            [
-                "#readerLibrary",
-                "#library",
-                "#libraryPanel",
-                ".reader-library",
-                ".reader-library-panel"
-            ]
-                .forEach(selector => {
-
-                    root
-                        .querySelectorAll(selector)
-                        .forEach(element => {
-
-                            element.dataset.skyShareHidden =
-                                "true";
-
-                            element.style.display =
-                                "none";
-
-                        });
-
-                });
-
-        }
-
-    }
-
-
-    /*-------------------------------------------------------
-      Prepare Video
+      Video
     -------------------------------------------------------*/
 
     async function prepareVideo(item) {
@@ -547,14 +455,12 @@ window.ShareViewer = (function () {
         }
 
 
-        const root =
-            findViewerRoot(viewer);
-
-        isolateActiveSection(
-            root,
-            "video"
-        );
-
+        /*
+         * Open the exact item BEFORE mounting.
+         *
+         * This allows VideoViewer to perform all of its normal
+         * initialization against its expected DOM.
+         */
 
         if (
             !window.VideoViewer ||
@@ -570,11 +476,18 @@ window.ShareViewer = (function () {
 
         await VideoViewer.openVideo(item);
 
+
+        /*
+         * Now mount the already-initialized viewer.
+         */
+
+        mountViewer(viewer);
+
     }
 
 
     /*-------------------------------------------------------
-      Prepare Slideshow
+      Slideshow
     -------------------------------------------------------*/
 
     async function prepareSlideshow(item) {
@@ -629,28 +542,27 @@ window.ShareViewer = (function () {
 
 
         /*
-         * Initialize before altering section visibility.
+         * Initialize while the viewer still has its normal DOM
+         * relationships.
          */
 
         SlideshowViewer.init();
 
 
-        const root =
-            findViewerRoot(viewer);
-
-        isolateActiveSection(
-            root,
-            "slideshow"
-        );
-
-
         await SlideshowViewer.open(item);
+
+
+        /*
+         * Mount only after the slideshow is successfully open.
+         */
+
+        mountViewer(viewer);
 
     }
 
 
     /*-------------------------------------------------------
-      Prepare Book
+      Reader
     -------------------------------------------------------*/
 
     async function prepareBook(item) {
@@ -683,31 +595,26 @@ window.ShareViewer = (function () {
 
 
         /*
-         * IMPORTANT:
-         *
-         * Do not move #viewerArea.
-         *
-         * Renderer and Sky180FlipEngine continue using their
-         * original DOM hierarchy and therefore retain the normal
-         * Reader background, sizing and controls.
+         * Open the book while Renderer still has the exact
+         * DOM structure it expects.
          */
 
-        const root =
-            findViewerRoot(viewerArea);
-
-        isolateActiveSection(
-            root,
-            "book"
-        );
-
-
         await Reader.open(item);
+
+
+        /*
+         * Mount the complete Reader viewer after opening.
+         *
+         * #pageContainer remains inside #viewerArea.
+         */
+
+        mountViewer(viewerArea);
 
     }
 
 
     /*-------------------------------------------------------
-      Media type dispatch
+      Open item
     -------------------------------------------------------*/
 
     async function openItem(item, target) {
@@ -789,6 +696,15 @@ window.ShareViewer = (function () {
                 );
 
             }
+
+
+            /*
+             * Hide libraries only after the viewer has opened.
+             */
+
+            hideLibraries();
+
+            isolateApplication();
 
 
             statusElement.textContent = "";
@@ -878,9 +794,8 @@ window.ShareViewer = (function () {
 
 
         /*
-         * Return to the actual Meditation Mornings application.
-         *
-         * Do NOT return to the Cloudflare Front Page.
+         * Return directly to the actual Meditation Mornings
+         * application.
          */
 
         window.location.href =
@@ -890,7 +805,7 @@ window.ShareViewer = (function () {
 
 
     /*-------------------------------------------------------
-      Escape key
+      Escape
     -------------------------------------------------------*/
 
     function bindEscape() {
@@ -965,9 +880,6 @@ window.ShareViewer = (function () {
                 item,
                 target
             );
-
-            isolateApplication();
-
 
         } catch (error) {
 
