@@ -479,6 +479,7 @@ function escapeHtml(value) {
 }
 
 
+```javascript
 /* =========================================================
    Build Open Graph metadata.
    ========================================================= */
@@ -518,18 +519,6 @@ function buildOgTags(request, key, payload) {
     ).trim();
 
 
-  const subtitle =
-    String(
-      item?.subtitle || ""
-    ).trim();
-
-
-  const thumbnail =
-    cleanMediaUrl(
-      item?.thumbnail
-    );
-
-
   const imageUrl =
     new URL(
       OG_IMAGE_PATH,
@@ -543,9 +532,8 @@ function buildOgTags(request, key, payload) {
 
 
   /*
-   * Preserve id when supplied so that a future
-   * multi-item share contract can select the
-   * correct thumbnail.
+   * Preserve id when supplied so that the OG image
+   * endpoint can select the correct item.
    */
   const requestedId =
     String(
@@ -563,6 +551,9 @@ function buildOgTags(request, key, payload) {
   const escapedTitle =
     escapeHtml(title);
 
+  const escapedSiteName =
+    escapeHtml(OG_SITE_NAME);
+
   const escapedImageUrl =
     escapeHtml(
       imageUrl.toString()
@@ -573,60 +564,55 @@ function buildOgTags(request, key, payload) {
       url.toString()
     );
 
-  const escapedAlt =
-    escapeHtml(
-      title +
-      " — " +
-      OG_SITE_NAME
-    );
-
 
   let tags = "";
 
+
+  /*
+   * Open Graph title.
+   */
   tags +=
     `<meta property="og:title" content="${escapedTitle}">`;
 
-  tags +=
-    `<meta property="og:site_name" content="${escapeHtml(OG_SITE_NAME)}">`;
 
+  /*
+   * Temporary site name.
+   */
   tags +=
-    `<meta property="og:type" content="website">`;
+    `<meta property="og:site_name" content="${escapedSiteName}">`;
 
+
+  /*
+   * The actual short share URL.
+   */
   tags +=
     `<meta property="og:url" content="${escapedPageUrl}">`;
 
+
+  /*
+   * Generated OG image.
+   *
+   * The __sky_og_image endpoint handles the
+   * item's thumbnail and falls back to the
+   * default thumbnail when necessary.
+   */
   tags +=
     `<meta property="og:image" content="${escapedImageUrl}">`;
 
-  tags +=
-    `<meta property="og:image:alt" content="${escapedAlt}">`;
 
   /*
-   * Use subtitle as a description when available.
-   */
-  if (subtitle) {
-
-    tags +=
-      `<meta property="og:description" content="${escapeHtml(subtitle)}">`;
-  }
-
-
-  /*
-   * Twitter/X understands these tags as well.
-   * They do not alter the normal SkyMedia application.
+   * Explicit image dimensions for social crawlers.
    */
   tags +=
-    `<meta name="twitter:card" content="summary_large_image">`;
+    `<meta property="og:image:width" content="1200">`;
 
   tags +=
-    `<meta name="twitter:title" content="${escapedTitle}">`;
-
-  tags +=
-    `<meta name="twitter:image" content="${escapedImageUrl}">`;
+    `<meta property="og:image:height" content="630">`;
 
 
   return tags;
 }
+```
 
 
 /* =========================================================
