@@ -1613,3 +1613,57 @@ body.sky-share-mode .sky-share-header {
         opacity .35s ease,
         visibility .35s ease;
 }
+
+
+/* =========================================================
+   Share Mode — Reader sizing
+   Give the reparented Reader viewer a real flex-sized box.
+   Normal Reader layout is unchanged.
+========================================================= */
+
+body.sky-share-mode .sky-share-media-host #readerPanel {
+    position: relative !important;
+    display: flex !important;
+    flex: 1 1 auto !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+}
+
+body.sky-share-mode .sky-share-media-host #viewerBackground {
+    position: relative !important;
+    display: flex !important;
+    flex: 1 1 auto !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+}
+
+body.sky-share-mode .sky-share-media-host #viewerArea {
+    position: relative !important;
+    display: flex !important;
+    flex: 1 1 auto !important;
+    width: 100% !important;
+    height: auto !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+}
+
+body.sky-share-mode .sky-share-media-host #pageContainer {
+    position: relative !important;
+    display: flex !important;
+    flex: 1 1 auto !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    max-width: none !important;
+    max-height: none !important;
+    overflow: hidden !important;
+}
