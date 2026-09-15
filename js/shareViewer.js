@@ -427,69 +427,7 @@ window.ShareViewer = (function () {
     }
 
 
-    async function prepareSlideshow(item) {
-
-        /*
-         * SlideshowViewer expects its normal DOM IDs, so we initialize
-         * the existing viewer and then mount that viewer into Share Mode.
-         *
-         * The library itself remains hidden.
-         */
-
-        if (
-            window.SlideshowLibrary &&
-            typeof SlideshowLibrary.init === "function"
-        ) {
-            SlideshowLibrary.init();
-
-            if (
-                typeof SlideshowLibrary.load === "function" &&
-                window.Manifest &&
-                typeof Manifest.slideshows === "function"
-            ) {
-                SlideshowLibrary.load(
-                    Manifest.slideshows()
-                );
-            }
-        }
-
-
-        if (
-            !window.SlideshowViewer ||
-            typeof SlideshowViewer.init !== "function"
-        ) {
-            throw new Error(
-                "Share Mode: SlideshowViewer unavailable."
-            );
-        }
-
-
-        const viewer =
-            document.getElementById("slideshowViewer");
-
-        if (!viewer) {
-            throw new Error(
-                "Share Mode: #slideshowViewer not found."
-            );
-        }
-
-
-        /*
-         * SlideshowViewer.init() must see its expected IDs before the
-         * viewer is moved.
-         */
-
-        SlideshowViewer.init();
-
-        detachExistingViewer(viewer);
-
-
-        /*
-         * Open only the requested item.
-         */
-
-        await SlideshowViewer.open(item);
-    }
+    async function prepareSlideshow(item) { if (typeof SlideshowLibrary === "undefined") { throw new Error("Share Mode: SlideshowLibrary is not available."); } if (typeof SlideshowViewer === "undefined") { throw new Error("Share Mode: SlideshowViewer is not available."); } /* * Initialize the slideshow library first. */ if (typeof SlideshowLibrary.init === "function") { SlideshowLibrary.init(); } /* * Load the slideshow manifest if the normal library exposes it. */ if ( typeof Manifest !== "undefined" && typeof Manifest.slideshows !== "undefined" && typeof Manifest.slideshows.load === "function" ) { await Manifest.slideshows.load(); } /* * Initialize the actual slideshow viewer before reparenting it. * This preserves the working Share Mode initialization order. */ const initialized = SlideshowViewer.init(); if (initialized === false) { throw new Error("Share Mode: SlideshowViewer failed to initialize."); } /* * IMPORTANT: * Share Mode bypasses the normal application startup, so the * normal SlideshowUI initializer may never run. * * SlideshowViewer exposes the slideshow functions, but * SlideshowUI is what attaches the click handlers to: * Previous, Next, Play, Restart, Mute, Share, Fullscreen, etc. */ if ( typeof SlideshowUI !== "undefined" && typeof SlideshowUI.init === "function" ) { SlideshowUI.init(); } const viewer = document.getElementById("slideshowViewer"); if (!viewer) { throw new Error("Share Mode: #slideshowViewer was not found."); } /* * Reparent the already-initialized viewer into the Share Mode host. * Do NOT initialize the viewer again after moving it. */ detachExistingViewer(viewer); /* * Open the requested slideshow. */ await SlideshowViewer.open(item); return viewer; }
 
 
     async function prepareBook(item) {
