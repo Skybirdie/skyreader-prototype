@@ -277,7 +277,7 @@ img.addEventListener("error", () => {
         const total = slideCount();
 
         if(status) {
-            status.textContent = current ? (current.title || "MMicj") : "MMicj";
+            status.textContent = current ? (current.title || "") : "";
         }
 
         if(indicator) {
@@ -591,10 +591,6 @@ function setAudioMode(mode) { const select = document.getElementById("slideshowA
         }
 
         matches.forEach(track => { const item = document.createElement("button"); item.type = "button"; item.className = "slideshow-music-picker-item"; if ( selectedMusicTrack && selectedMusicTrack.file === track.file ) { item.classList.add("is-selected"); } item.textContent = track.title; item.addEventListener("click", async event => { event.preventDefault(); event.stopPropagation(); console.log( "[SlideshowViewer] Music track selected:", track.title ); /* * The user's click is a real browser gesture. * Select the new track and make Music the active mode. */ selectedMusicTrack = track; audioMode = "music"; audioCompleted = false; audioNeedsGesture = false; /* * Synchronize the dropdown immediately. */ const select = document.getElementById("slideshowAudioMode"); if (select) { select.value = "music"; } /* * Stop and completely discard the previous music * instance before creating the new one. */ if (musicAudio) { musicAudio.pause(); musicAudio.currentTime = 0; musicAudio.removeAttribute("src"); musicAudio.load(); musicAudio = null; } /* * Start the newly selected track immediately. * * The click itself is the user's gesture, so this * playback request should normally be accepted by * the browser. */ startSelectedAudio(); /* * startSelectedAudio() normally starts the track when * playing is true. Make one additional direct attempt * here so selecting Music never requires a second * click on the slideshow Play button. */ if ( musicAudio && musicAudio.paused && !muted ) { try { await musicAudio.play(); audioNeedsGesture = false; console.log( "[SlideshowViewer] Selected music started:", track.title ); } catch (error) { audioNeedsGesture = true; console.warn( "[SlideshowViewer] Selected music could not " + "start immediately:", error ); } } updateAudioCue(); closeMusicPicker(); }); list.appendChild(item); });
-
-            list.appendChild(item);
-
-        });
     }
 
 
@@ -741,10 +737,8 @@ function updateAudioCue() { const cue = document.getElementById("slideshowAudioC
         playing=!playing;
         if(playing){
             pendingAdvance=false;
-    playing = true;
-
-    audioNeedsGesture = false;
-    updateAudioCue();
+            audioNeedsGesture = false;
+            updateAudioCue();
             setStatus("Playing");
             startSelectedAudio();
             if(!transitionBusy) schedule();
