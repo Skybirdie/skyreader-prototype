@@ -271,11 +271,15 @@ engine.open=async function(options={}){
 
     ensureLibrary();
 
-    engine.close();
+    /*
+     * Renderer.open() already closes an existing document before
+     * starting a new presentation. Do not perform a second close here.
+     *
+     * A second close during the first PageFlip initialization can
+     * invalidate the newly-created presentation while Renderer.open()
+     * is still waiting for it to become ready.
+     */
 
-    /* The first StPageFlip initialization is asynchronous. Return a
-       readiness promise so Renderer.open() never finishes before the
-       visual engine is actually ready. */
     let resolveReady;
     let rejectReady;
     const readyPromise=new Promise((resolve,reject)=>{
