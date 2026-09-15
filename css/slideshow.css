@@ -1147,3 +1147,6 @@ border:2px red solid;
         bottom:58px;
     }
 }
+
+
+/* ========================================================= SLIDESHOW AUDIO CUE Appears when continuous audio is available but the browser requires a user gesture before it will begin playback. ========================================================= */ .slideshow-audio-cue{ position:absolute; top:72px; left:50%; transform:translateX(-50%); z-index:95; max-width:min(90vw,520px); padding:7px 14px; border-radius:999px; font-size:13px; line-height:1.25; text-align:center; color:var(--text); background:var(--panel); pointer-events:none; box-shadow:0 2px 10px rgba(0,0,0,.18); white-space:nowrap; } .slideshow-audio-cue.is-audio-prompt{ font-weight:600; } /* Share Mode positioning */ body.sky-share-mode .slideshow-audio-cue{ top:72px; z-index:95; } /* Mobile */ @media (max-width:700px){ .slideshow-audio-cue{ top:64px; max-width:calc(100vw - 32px); padding:6px 11px; font-size:12px; } body.sky-share-mode .slideshow-audio-cue{ top:64px; } }
