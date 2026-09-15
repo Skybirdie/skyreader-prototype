@@ -1569,3 +1569,124 @@ body.sky-share-mode #toolbar {
 
 }
 
+
+/* =========================================================
+   SHARE MODE — TRANSPARENT VIEWER SURROUND
+   The Share screen should show the background image everywhere
+   except for:
+     1. the top bar
+     2. the status bar
+     3. the welcome banner
+========================================================= */
+
+/* Share shell itself must remain completely transparent. */
+body.sky-share-mode,
+body.sky-share-mode .sky-share-shell,
+body.sky-share-mode .sky-share-main,
+body.sky-share-mode .sky-share-media-host{
+    background:transparent!important;
+}
+
+/*
+ * The mounted slideshow must not introduce a panel, white strip,
+ * border, shadow, or rounded container around the viewing area.
+ */
+body.sky-share-mode .sky-share-media-host #slideshowViewer{
+    position:relative!important;
+
+    width:100%!important;
+    max-width:none!important;
+
+    height:100%!important;
+    max-height:none!important;
+
+    min-width:0!important;
+    min-height:0!important;
+
+    margin:0!important;
+
+    border:0!important;
+    border-radius:0!important;
+
+    background:transparent!important;
+
+    box-shadow:none!important;
+
+    overflow:hidden!important;
+}
+
+/*
+ * The slideshow workspace is normally responsible for the
+ * desktop side margins/padding. It must not create those margins
+ * when the viewer has been mounted into Share Mode.
+ */
+body.sky-share-mode .sky-share-media-host .slideshow-workspace{
+    width:100%!important;
+    max-width:none!important;
+
+    margin:0!important;
+    padding:0!important;
+
+    background:transparent!important;
+
+    border:0!important;
+    box-shadow:none!important;
+}
+
+/*
+ * Remove any background/panel treatment from the mounted viewer
+ * and its immediate containers.
+ */
+body.sky-share-mode .sky-share-media-host #slideshowViewer,
+body.sky-share-mode .sky-share-media-host #slideshowViewer > *,
+body.sky-share-mode .sky-share-media-host .slideshow-viewer{
+    background-color:transparent!important;
+}
+
+/*
+ * The playback stage itself remains transparent. The actual slide
+ * image/canvas is the only media occupying this area.
+ */
+body.sky-share-mode .sky-share-media-host #slideshowStage,
+body.sky-share-mode .sky-share-media-host .slideshow-stage{
+    background:transparent!important;
+    border:0!important;
+    box-shadow:none!important;
+}
+
+/*
+ * Do not allow the slideshow viewer's normal rounded edge or
+ * panel treatment to appear on the Share screen.
+ */
+body.sky-share-mode .sky-share-mounted-viewer{
+    background:transparent!important;
+    border:0!important;
+    border-radius:0!important;
+    box-shadow:none!important;
+}
+
+/*
+ * The two Share controls remain above the transparent viewing
+ * area rather than appearing to sit inside a separate panel.
+ */
+body.sky-share-mode .sky-share-actions{
+    background:transparent!important;
+    border:0!important;
+    box-shadow:none!important;
+}
+
+/*
+ * Keep the three intentional white UI blocks.
+ * These overrides do NOT make them transparent.
+ */
+body.sky-share-mode .sky-share-header{
+    background:var(--panel)!important;
+}
+
+body.sky-share-mode .sky-share-media-host .slideshow-status-bar{
+    background:var(--panel)!important;
+}
+
+body.sky-share-mode .sky-share-media-host .sr-welcome-banner{
+    background:var(--panel)!important;
+}
