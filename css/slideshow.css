@@ -175,10 +175,15 @@ position:relative;    height: fit-content;
 
 .slideshow-library-card-info strong{font-size:13px;line-height:1.2}
 .slideshow-library-card-info span{font-size:11px;color:rgba(255,255,255,.72)}
+
+.slideshow-library-card.selected .slideshow-library-card{box-shadow:
+        0 0 0 3px #66CDAA,
+        0 8px 24px rgba(0,0,0,.4);
+}
+
 .slideshow-library-card.selected .slideshow-library-card-media{box-shadow:
         0 0 0 3px #66CDAA,
         0 8px 24px rgba(0,0,0,.4);
-border:2px red solid;
 }
 .slideshow-favorite-control{position:absolute;right:clamp(6px,6%,10px);top:clamp(6px,6%,10px);z-index:15;width:25px;height:25px;display:flex;align-items:center;justify-content:center;border:0;border-radius:50%;background:color-mix(in srgb,var(--card,#222) 30%,transparent);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);color:var(--text,#fff);font-size:16px;line-height:1;cursor:pointer;transition:transform .2s ease,color .2s ease,background .2s ease}
 .slideshow-favorite-control:hover{transform:scale(1.08)}
