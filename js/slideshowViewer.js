@@ -770,6 +770,10 @@ function updateAudioCue() { const cue = document.getElementById("slideshowAudioC
         playing=!playing;
         if(playing){
             pendingAdvance=false;
+    playing = true;
+
+    audioNeedsGesture = false;
+    updateAudioCue();
             setStatus("Playing");
             startSelectedAudio();
             if(!transitionBusy) schedule();
