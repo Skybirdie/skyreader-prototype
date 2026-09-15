@@ -194,8 +194,8 @@ html:fullscreen #topBar{
 
     width: clamp(70px, 7vw, 120px);
     height: auto;
-    opacity:0.5;
-    filter: drop-shadow(0 5px 18px rgba(0,0,0,.16);
+    opacity: 0.5;
+    filter: drop-shadow(0 5px 18px rgba(0,0,0,.16));
     display: block;
     z-index: 20;
     pointer-events: none;
