@@ -499,7 +499,7 @@ function stopForMediaManager() {
 ) { const track = selectedMusicTrack; musicAudio = new Audio(track.url); musicAudio.preload = "auto"; musicAudio.loop = false; musicAudio.muted = muted; musicAudio.addEventListener("ended", () => { /* * The selected music track has ended. * * Do not permanently stop the slideshow. The * slideshow may continue/loop according to its * normal playback behavior. */ audioCompleted = true; if ( playing && slideCount() && index >= slideCount() - 1 ) { finish(); } }); if (playing) { const playPromise = musicAudio.play(); if ( playPromise && typeof playPromise.catch === "function" ) { playPromise.catch(error => { audioNeedsGesture = true; console.warn( "[SlideshowViewer] Music autoplay was " + "blocked or failed:", error ); updateAudioCue(); }); } } if (musicAudio.paused) { audioNeedsGesture = true; } updateAudioCue(); return; } /* ------------------------------------------------------- NONE / PAGE TURN EFFECTS These modes intentionally have no continuous audio source. ------------------------------------------------------- */ updateAudioCue(); } 
 
 
-function setAudioMode(mode) { const select = document.getElementById("slideshowAudioMode"); const requested = ["none", "original", "effects", "music"].includes(mode) ? mode : "none"; /* ------------------------------------------------------- MUSIC PICKER CLEANUP Once the user leaves Music, close the music picker and completely detach the previously selected music track from the active playback state. This is important because selectedMusicTrack is persistent state and must not continue controlling playback after the user chooses another mode. ------------------------------------------------------- */ if ( requested !== "music" && audioMode === "music" ) { closeMusicPicker(); if (musicAudio) { musicAudio.pause(); musicAudio.currentTime = 0; musicAudio.src = ""; musicAudio.load(); musicAudio = null; } /* * The selected track belongs to Music mode. * It should not remain an active source once Music * has been left. */ selectedMusicTrack = null; audioCompleted = false; audioNeedsGesture = false; } /* ------------------------------------------------------- VALIDATE ORIGINAL SOUND ------------------------------------------------------- */ if ( requested === "original" && !current?.audio ) { audioMode = "none"; } else { audioMode = requested; } /* ------------------------------------------------------- SYNCHRONIZE SELECTOR ------------------------------------------------------- */ if (select) { select.value = audioMode; const original = select.querySelector( 'option[value="original"]' ); if (original) { original.disabled = !current?.audio; } const music = select.querySelector( 'option[value="music"]' ); if (music) { music.disabled = !MUSIC_LIBRARY.length; } } /* ------------------------------------------------------- START ONLY THE CURRENTLY SELECTED MODE ------------------------------------------------------- */ audioCompleted = false; audioNeedsGesture = false; startSelectedAudio(); /* ------------------------------------------------------- STATUS ------------------------------------------------------- */ setStatus( audioMode === "original" ? "Original sound" : audioMode === "music" ? "Music" : audioMode === "effects" ? "Page turn effects" : "No sound" ); updateAudioCue(); }
+function setAudioMode(mode) { const select = document.getElementById("slideshowAudioMode"); const requested = ["none", "original", "effects", "music"].includes(mode) ? mode : "none"; /* ------------------------------------------------------- DETERMINE THE ACTUAL NEW MODE FIRST ------------------------------------------------------- */ let nextMode = requested; if ( nextMode === "original" && !current?.audio ) { nextMode = "none"; } /* ------------------------------------------------------- LEAVING MUSIC This must happen BEFORE closeMusicPicker(). Otherwise closeMusicPicker() has no way to know that the user has already selected another audio mode. ------------------------------------------------------- */ if ( audioMode === "music" && nextMode !== "music" ) { /* * Stop the currently playing music immediately. */ if (musicAudio) { musicAudio.pause(); musicAudio.currentTime = 0; musicAudio.removeAttribute("src"); musicAudio.load(); musicAudio = null; } /* * Music is no longer the selected audio source. */ selectedMusicTrack = null; audioCompleted = false; audioNeedsGesture = false; } /* ------------------------------------------------------- SET THE NEW MODE BEFORE CLOSING THE PICKER ------------------------------------------------------- */ audioMode = nextMode; /* ------------------------------------------------------- CLOSE MUSIC PICKER Now that audioMode contains the NEW value, closing the picker cannot accidentally restore "music". ------------------------------------------------------- */ if (audioMode !== "music") { closeMusicPicker(); } /* ------------------------------------------------------- SYNCHRONIZE THE VISIBLE SELECTOR ------------------------------------------------------- */ if (select) { select.value = audioMode; const original = select.querySelector( 'option[value="original"]' ); if (original) { original.disabled = !current?.audio; } const music = select.querySelector( 'option[value="music"]' ); if (music) { music.disabled = !MUSIC_LIBRARY.length; } } /* ------------------------------------------------------- START ONLY THE NEWLY SELECTED AUDIO SOURCE ------------------------------------------------------- */ audioCompleted = false; audioNeedsGesture = false; startSelectedAudio(); /* ------------------------------------------------------- STATUS ------------------------------------------------------- */ setStatus( audioMode === "original" ? "Original sound" : audioMode === "music" ? "Music" : audioMode === "effects" ? "Page turn effects" : "No sound" ); updateAudioCue(); }
 
 
     /*
@@ -657,27 +657,8 @@ function updateAudioCue() { const cue = document.getElementById("slideshowAudioC
         }
     }
 
-    function closeMusicPicker() {
+    function closeMusicPicker() { if (!musicPickerEl) { musicPickerOpen = false; return; } musicPickerEl.panel.hidden = true; musicPickerOpen = false; /* * IMPORTANT: * * Do NOT change #slideshowAudioMode here. * * closeMusicPicker() can be called while setAudioMode() * is in the middle of changing from Music to another * mode. At that moment audioMode may still contain the * previous value ("music"). * * The audio-mode selector is synchronized exclusively by * setAudioMode(). */ }
 
-        if (!musicPickerEl) {
-            return;
-        }
-
-        musicPickerEl.panel.hidden = true;
-        musicPickerOpen = false;
-
-        /*
-        Leaving the dropdown showing "Music" without an
-        actual selection is confusing — revert it to
-        whatever mode is genuinely active.
-        */
-
-        const select = document.getElementById("slideshowAudioMode");
-
-        if (select) {
-            select.value = audioMode;
-        }
-    }
     async function show(indexToShow,direction=1,autoAdvance=false){
         if(!current||transitionBusy)return;
         const generation=transitionGeneration;
