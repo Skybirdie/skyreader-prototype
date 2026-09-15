@@ -2,6 +2,10 @@
 
 window.SlideshowUI=(function(){
     let initialized=false;
+    let toolbarTimeout = null;
+    const TOOLBAR_TIMEOUT = 10000;
+
+
     function init(){
         if(initialized)return true; initialized=true;
         const bind=(id,fn)=>{const el=document.getElementById(id);if(el)el.addEventListener("click",fn);};
@@ -12,6 +16,7 @@ window.SlideshowUI=(function(){
         bind("slideshowMute",()=>{const m=SlideshowViewer.toggleMute();const el=document.getElementById("slideshowMute");if(el){el.title=m?"Unmute audio":"Mute audio";el.setAttribute("aria-label",m?"Unmute audio":"Mute audio");const use=el.querySelector("use");if(use)use.setAttribute("href",m?"#icon-volume-off":"#icon-volume");}});
         bind("slideshowShare",()=>{const item=SlideshowViewer.getCurrent?.(); if(item&&window.ShareManager)ShareManager.share("slideshow",item);});
         bind("slideshowFullscreen",()=>SlideshowViewer.toggleFullscreen());
+        bindToolbarTimeout();
         bind("slideshowClose",()=>SlideshowViewer.close());
         bind("slideshowNarrowLibraryToggle",toggleDrawer);
         bind("slideshowLibraryDrawerClose",closeDrawer);
@@ -35,6 +40,50 @@ window.SlideshowUI=(function(){
         document.getElementById("slideshowSettingsButton")?.addEventListener("click",()=>{if(typeof SettingsPanel!=="undefined")SettingsPanel.toggle();});
         populateCategories(); return true;
     }
+
+function showToolbar() {
+    const viewer = document.getElementById("slideshowViewer");
+
+    if (!viewer) {
+        return;
+    }
+
+    viewer.classList.remove("slideshow-toolbar-hidden");
+
+    if (toolbarTimeout) {
+        window.clearTimeout(toolbarTimeout);
+    }
+
+    toolbarTimeout = window.setTimeout(() => {
+        viewer.classList.add("slideshow-toolbar-hidden");
+    }, TOOLBAR_TIMEOUT);
+}
+
+function bindToolbarTimeout() {
+    const viewer = document.getElementById("slideshowViewer");
+
+    if (!viewer) {
+        return;
+    }
+
+    const wakeEvents = [
+        "pointermove",
+        "pointerdown",
+        "touchstart",
+        "mousemove",
+        "keydown"
+    ];
+
+    wakeEvents.forEach(eventName => {
+        viewer.addEventListener(eventName, showToolbar, {
+            passive: true
+        });
+    });
+
+    showToolbar();
+}
+
+
     function populateCategories(){const select=document.getElementById("slideshowCategory");if(!select)return; SlideshowLibrary.getCategories().forEach(c=>{const o=document.createElement("option");o.value=c;o.textContent=c;select.appendChild(o);});}
     function toggleMenu(open,close){document.getElementById(close)?.classList.add("hidden");document.getElementById(open)?.classList.toggle("hidden");}
     function toggleDrawer(){document.getElementById("slideshowSection")?.classList.toggle("slideshow-drawer-open");const b=document.getElementById("slideshowNarrowLibraryToggle");b?.setAttribute("aria-expanded",String(document.getElementById("slideshowSection")?.classList.contains("slideshow-drawer-open")));}

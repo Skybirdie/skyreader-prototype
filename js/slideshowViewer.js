@@ -226,7 +226,11 @@ img.addEventListener("error", () => {
     img.dataset.fallbackApplied = "true";
     img.src = fallbackThumbnail;
 
+
 });
+
+
+
             const info=document.createElement("div"); info.className="slideshow-landing-recent-info";
             const title=document.createElement("div"); title.className="slideshow-landing-recent-title"; title.textContent=recentItem.title||"";
             const subtitle=document.createElement("div"); subtitle.className="slideshow-landing-recent-subtitle"; subtitle.textContent="Last viewed";
@@ -259,9 +263,34 @@ img.addEventListener("error", () => {
     img.src = fallbackThumbnail;
 
 });
-            const s=document.createElement("span"); s.className="slideshow-landing-card-title"; s.textContent=item.title;
-            b.append(img,s);
-            b.addEventListener("click",()=>open(item)); container.appendChild(b);
+            const s = document.createElement("span");
+s.className = "slideshow-landing-card-title";
+s.textContent = item.title;
+
+b.append(img, s);
+
+/*
+ * Add the favorite control to every landing card.
+ *
+ * SlideshowLibrary owns the favorite implementation so
+ * the landing cards use the same saved state and behavior
+ * as the normal slideshow library.
+ */
+if (
+    window.SlideshowLibrary &&
+    typeof SlideshowLibrary.createFavorite === "function"
+) {
+    b.appendChild(
+        SlideshowLibrary.createFavorite(item.id)
+    );
+}
+
+b.addEventListener(
+    "click",
+    () => open(item)
+);
+
+container.appendChild(b);
         });
     }
     function slideCount(){
