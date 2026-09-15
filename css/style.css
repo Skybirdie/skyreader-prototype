@@ -196,7 +196,7 @@ html:fullscreen #topBar{
     height: auto;
 
     display: block;
-    z-index: 202;
+    z-index: 20;
     pointer-events: none;
 }
 
