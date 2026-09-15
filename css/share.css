@@ -1599,7 +1599,15 @@ body.sky-share-mode #workspace {
    SHARE MODE — 10 SECOND TOOLBAR TIMEOUT
    ========================================================= */
 
-body.sky-share-mode .sky-share-header.share-toolbar-hidden {
+body.sky-share-mode .sky-share-header.share-toolbar-hidden, 
+body.sky-share-mode.sky-share-toolbar-hidden
+    .sky-share-actions,
+body.sky-share-mode.sky-share-toolbar-hidden
+    .slideshow-toolbar-main,
+body.sky-share-mode.sky-share-toolbar-hidden
+    .slideshow-toolbar-secondary,
+body.sky-share-mode.sky-share-toolbar-hidden
+    .sky-share-media-host #toolbar {
     opacity: 0 !important;
     visibility: hidden !important;
     pointer-events: none !important;
@@ -1613,6 +1621,10 @@ body.sky-share-mode .sky-share-header {
         opacity .35s ease,
         visibility .35s ease;
 }
+
+
+
+
 
 
 /* =========================================================
@@ -1697,4 +1709,58 @@ body.sky-share-mode .sr-control-dock {
 body.sky-share-mode .sky-share-media-host #viewerArea {
     padding: 12px 16px 48px !important;
     box-sizing: border-box !important;
+}
+
+/* =========================================================
+   Share Mode — Reader Toolbar
+   The normal Reader toolbar is reused in Share Mode.
+   ========================================================= */
+
+body.sky-share-mode .sky-share-media-host #toolbar {
+    display: flex !important;
+    position: absolute !important;
+
+    left: 50% !important;
+    bottom: 12px !important;
+    transform: translateX(-50%) !important;
+
+    width: auto !important;
+    height: auto !important;
+
+    min-width: 0 !important;
+    min-height: 0 !important;
+
+    padding: 6px 10px !important;
+    margin: 0 !important;
+
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 6px !important;
+
+    z-index: 500 !important;
+
+    visibility: visible !important;
+    opacity: 1 !important;
+
+    pointer-events: auto !important;
+}
+
+body.sky-share-mode .sky-share-media-host #toolbar .iconButton {
+    flex: 0 0 auto !important;
+    width: 40px !important;
+    height: 40px !important;
+}
+
+body.sky-share-mode .sky-share-media-host #previousButton,
+body.sky-share-mode .sky-share-media-host #nextButton,
+body.sky-share-mode .sky-share-media-host #rotateButton,
+body.sky-share-mode .sky-share-media-host #muteButton,
+body.sky-share-mode .sky-share-media-host #viewerFullscreenButton,
+body.sky-share-mode .sky-share-media-host #readerCloseButton,
+body.sky-share-mode .sky-share-media-host #readerShareButton,
+body.sky-share-mode .sky-share-media-host #bookmarkAddButton {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
 }
