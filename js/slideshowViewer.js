@@ -590,23 +590,7 @@ function setAudioMode(mode) { const select = document.getElementById("slideshowA
             return;
         }
 
-        matches.forEach(track => {
-
-            const item = document.createElement("button");
-            item.type = "button";
-            item.className = "slideshow-music-picker-item";
-
-            if (selectedMusicTrack && selectedMusicTrack.file === track.file) {
-                item.classList.add("is-selected");
-            }
-
-            item.textContent = track.title;
-
-            item.addEventListener("click", () => {
-                selectedMusicTrack = track;
-                setAudioMode("music");
-                closeMusicPicker();
-            });
+        matches.forEach(track => { const item = document.createElement("button"); item.type = "button"; item.className = "slideshow-music-picker-item"; if ( selectedMusicTrack && selectedMusicTrack.file === track.file ) { item.classList.add("is-selected"); } item.textContent = track.title; item.addEventListener("click", async event => { event.preventDefault(); event.stopPropagation(); console.log( "[SlideshowViewer] Music track selected:", track.title ); /* * The user's click is a real browser gesture. * Select the new track and make Music the active mode. */ selectedMusicTrack = track; audioMode = "music"; audioCompleted = false; audioNeedsGesture = false; /* * Synchronize the dropdown immediately. */ const select = document.getElementById("slideshowAudioMode"); if (select) { select.value = "music"; } /* * Stop and completely discard the previous music * instance before creating the new one. */ if (musicAudio) { musicAudio.pause(); musicAudio.currentTime = 0; musicAudio.removeAttribute("src"); musicAudio.load(); musicAudio = null; } /* * Start the newly selected track immediately. * * The click itself is the user's gesture, so this * playback request should normally be accepted by * the browser. */ startSelectedAudio(); /* * startSelectedAudio() normally starts the track when * playing is true. Make one additional direct attempt * here so selecting Music never requires a second * click on the slideshow Play button. */ if ( musicAudio && musicAudio.paused && !muted ) { try { await musicAudio.play(); audioNeedsGesture = false; console.log( "[SlideshowViewer] Selected music started:", track.title ); } catch (error) { audioNeedsGesture = true; console.warn( "[SlideshowViewer] Selected music could not " + "start immediately:", error ); } } updateAudioCue(); closeMusicPicker(); }); list.appendChild(item); });
 
             list.appendChild(item);
 
@@ -824,50 +808,7 @@ function restart(){
     }
 }
 
-    function toggleMute(){
-    muted = !muted;
-
-    if (audio) {
-        audio.muted = muted;
-
-        if (!muted && playing) {
-
-    const audioPromise = audio?.play();
-
-    if (
-        audioPromise &&
-        typeof audioPromise.catch === "function"
-    ) {
-        audioPromise.catch(() => {});
-    }
-
-    const musicPromise = musicAudio?.play();
-
-    if (
-        musicPromise &&
-        typeof musicPromise.catch === "function"
-    ) {
-        musicPromise.catch(() => {});
-    }
-
-    /*
-     * Unmute is a user gesture, so audio can now be started.
-     */
-    audioNeedsGesture = false;
-    updateAudioCue();
-}
-    }
-
-    if (musicAudio) {
-        musicAudio.muted = muted;
-
-        if (!muted && playing && musicAudio.src) {
-            musicAudio.play().catch(() => {});
-        }
-    }
-
-    return muted;
-}
+    function toggleMute() { muted = !muted; if (audio) { audio.muted = muted; } if (musicAudio) { musicAudio.muted = muted; } if (effectAudio) { effectAudio.muted = muted; } /* * If the user has just unmuted, try to resume the * currently selected audio source immediately. */ if (!muted) { let playPromise = null; if ( audioMode === "original" && audio && current?.audio && audio.paused ) { playPromise = audio.play(); } else if ( audioMode === "music" && musicAudio && musicAudio.paused ) { playPromise = musicAudio.play(); } if ( playPromise && typeof playPromise.then === "function" ) { playPromise .then(() => { audioNeedsGesture = false; updateAudioCue(); }) .catch(error => { audioNeedsGesture = true; console.warn( "[SlideshowViewer] Audio could not resume " + "after unmute:", error ); updateAudioCue(); }); } else { /* * If audio is already playing, there is no reason * to keep displaying the "Press Play" cue. */ if ( (audioMode === "original" && audio && !audio.paused) || (audioMode === "music" && musicAudio && !musicAudio.paused) ) { audioNeedsGesture = false; } updateAudioCue(); } } else { updateAudioCue(); } return muted; }
 
 function finish(){
     playing=false;
