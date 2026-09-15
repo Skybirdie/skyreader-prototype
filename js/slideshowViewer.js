@@ -4,6 +4,8 @@ window.SlideshowViewer = (function () {
     let root, stage, title, status, audio, landing, current = null, index = 0, timer = null, playing = false, muted = false, transitionBusy = false, transitionGeneration = 0, pendingAdvance = false;
     let audioMode = "none";
     let audioCompleted = false;
+    let audioNeedsGesture = false;
+    let audioCueTimer = null;
     let musicAudio = null;
     let effectAudio = null;
     const EFFECT_URL = "assets/audio/slide.mp3";
@@ -426,10 +428,18 @@ function playSound(src, volume=1){
     musicAudio?.pause();
 
     if(effectAudio){
-        effectAudio.pause();
-        effectAudio.currentTime = 0;
-        effectAudio = null;
-    }
+    effectAudio.pause();
+    effectAudio.currentTime = 0;
+    effectAudio = null;
+}
+
+if(musicAudio){
+    musicAudio.pause();
+    musicAudio.currentTime = 0;
+    musicAudio.src = "";
+    musicAudio.load();
+    musicAudio = null;
+}
 
 }
 
@@ -483,32 +493,7 @@ function stopForMediaManager() {
 }
 
 
-    function startSelectedAudio(){
-        stopAudio();
-        audioCompleted=false;
-        if(!current)return;
-        if(audioMode === "original" && current.audio && audio){ audio.src=current.audio; audio.muted=muted; audio.load(); if(playing)audio.play().catch(()=>{}); }
-        else if(audioMode === "music" && (selectedMusicTrack || MUSIC_LIBRARY.length)){
-            const track=selectedMusicTrack || MUSIC_LIBRARY[0];
-            musicAudio=new Audio(track.url);
-            musicAudio.loop=false;
-            musicAudio.muted=muted;
-            musicAudio.addEventListener("ended",()=>{
-                audioCompleted=true;
-                if(playing && slideCount() && index >= slideCount() - 1) finish();
-            });
-            if(playing)musicAudio.play().catch(()=>{});
-        }
-    }
-    function setAudioMode(mode){
-        const select=document.getElementById("slideshowAudioMode");
-        const requested=["none","original","effects","music"].includes(mode)?mode:"none";
-        if(requested==="original" && !current?.audio) audioMode="none"; else audioMode=requested;
-        if(select) select.value=audioMode;
-        if(select){ const original=select.querySelector('option[value="original"]'); if(original) original.disabled=!current?.audio; const music=select.querySelector('option[value="music"]'); if(music) music.disabled=!MUSIC_LIBRARY.length; }
-        startSelectedAudio();
-        setStatus(audioMode==="original"?"Original sound":audioMode==="music"?"Music":audioMode==="effects"?"Page turn effects":"No sound");
-    }
+    function startSelectedAudio() { /* ------------------------------------------------------- FULL AUDIO RESET Every time the sound mode changes, the previous audio source must be completely stopped and discarded. ------------------------------------------------------- */ stopAudio(); audioCompleted = false; audioNeedsGesture = false; if (!current) { updateAudioCue(); return; } /* ------------------------------------------------------- ORIGINAL ITEM AUDIO ------------------------------------------------------- */ if (audioMode === "original" && current.audio && audio) { let audioUrl = String(current.audio).trim(); /* * Support Markdown-style audio URLs if they occur * in content supplied by Glide. */ const markdownMatch = audioUrl.match( /^\[([^\]]+)\]\((https?:\/\/[^)]+)\)$/ ); if (markdownMatch) { audioUrl = markdownMatch[2]; } /* * Remove accidental surrounding quotes. */ audioUrl = audioUrl .replace(/^["']+|["']+$/g, "") .trim(); if (!audioUrl) { console.warn( "[SlideshowViewer] Original sound selected " + "but the audio URL is empty." ); updateAudioCue(); return; } console.log( "[SlideshowViewer] Loading original audio:", audioUrl ); audio.src = audioUrl; audio.preload = "auto"; audio.muted = muted; /* * Keep the source attached even if autoplay is rejected. */ audio.load(); /* * If playback was already active, attempt to continue * immediately. */ if (playing) { const playPromise = audio.play(); if ( playPromise && typeof playPromise.catch === "function" ) { playPromise.catch(error => { /* * NotAllowedError is expected when Share Mode * tries to begin unmuted audio without a * user gesture. */ audioNeedsGesture = true; console.warn( "[SlideshowViewer] Original sound autoplay " + "was blocked or failed:", error ); updateAudioCue(); }); } } /* * Show the cue immediately when this item has original * audio available. If autoplay succeeds, it changes to * the normal "Original sound" indication. */ if (audio.paused) { audioNeedsGesture = true; } updateAudioCue(); return; } /* ------------------------------------------------------- MUSIC ------------------------------------------------------- */ if ( audioMode === "music" && (selectedMusicTrack || MUSIC_LIBRARY.length) ) { const track = selectedMusicTrack || MUSIC_LIBRARY[0]; musicAudio = new Audio(track.url); musicAudio.preload = "auto"; musicAudio.loop = false; musicAudio.muted = muted; musicAudio.addEventListener("ended", () => { /* * The selected music track has ended. * * Do not permanently stop the slideshow. The * slideshow may continue/loop according to its * normal playback behavior. */ audioCompleted = true; if ( playing && slideCount() && index >= slideCount() - 1 ) { finish(); } }); if (playing) { const playPromise = musicAudio.play(); if ( playPromise && typeof playPromise.catch === "function" ) { playPromise.catch(error => { audioNeedsGesture = true; console.warn( "[SlideshowViewer] Music autoplay was " + "blocked or failed:", error ); updateAudioCue(); }); } } if (musicAudio.paused) { audioNeedsGesture = true; } updateAudioCue(); return; } /* ------------------------------------------------------- NONE / PAGE TURN EFFECTS These modes intentionally have no continuous audio source. ------------------------------------------------------- */ updateAudioCue(); } function setAudioMode(mode) { const select = document.getElementById("slideshowAudioMode"); const requested = ["none", "original", "effects", "music"].includes(mode) ? mode : "none"; /* ------------------------------------------------------- VALIDATE ORIGINAL SOUND ------------------------------------------------------- */ if ( requested === "original" && !current?.audio ) { audioMode = "none"; } else { audioMode = requested; } /* ------------------------------------------------------- UPDATE SELECTOR ------------------------------------------------------- */ if (select) { select.value = audioMode; const original = select.querySelector( 'option[value="original"]' ); if (original) { original.disabled = !current?.audio; } const music = select.querySelector( 'option[value="music"]' ); if (music) { music.disabled = !MUSIC_LIBRARY.length; } } /* ------------------------------------------------------- IMPORTANT: A mode change is a complete audio-source switch. startSelectedAudio() first calls stopAudio(), which stops and replaces the previous Music/Original source. We also explicitly reset the completion state so the new sound selection starts with a clean playback state. ------------------------------------------------------- */ audioCompleted = false; audioNeedsGesture = false; startSelectedAudio(); /* ------------------------------------------------------- STATUS ------------------------------------------------------- */ setStatus( audioMode === "original" ? "Original sound" : audioMode === "music" ? "Music" : audioMode === "effects" ? "Page turn effects" : "No sound" ); updateAudioCue(); }
 
 
     /*
@@ -621,6 +606,10 @@ function stopForMediaManager() {
 
         });
     }
+
+
+function updateAudioCue() { const cue = document.getElementById("slideshowAudioCue"); if (!cue) { return; } if ( audioMode === "original" && current?.audio && audioNeedsGesture ) { cue.textContent = "🔊 Audio available — Press Play to hear"; cue.hidden = false; cue.classList.add("is-audio-prompt"); /* * Keep the cue visible until the user actually starts * playback. It should not disappear simply because the * browser rejected autoplay. */ return; } if ( audioMode === "original" && current?.audio && playing && audio && !audio.paused ) { cue.textContent = "🔊 Original sound"; cue.hidden = false; cue.classList.remove("is-audio-prompt"); return; } /* * No cue is necessary for: * None * Page turn effects * Music * unless the selected music itself is waiting for Play. */ if (audioMode === "music" && audioNeedsGesture) { cue.textContent = "🎵 Music selected — Press Play to hear"; cue.hidden = false; cue.classList.add("is-audio-prompt"); return; } cue.hidden = true; cue.classList.remove("is-audio-prompt"); }
+
 
     function openMusicPicker() {
 
