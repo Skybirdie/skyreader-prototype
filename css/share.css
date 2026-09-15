@@ -50,10 +50,24 @@ body.sky-share-mode {
     overflow: hidden;
 
     /*
-     * The actual slideshow/video/reader supplies the visual
-     * background. Do not paint another background over it.
+     * Share Mode used to rely on leaving this transparent so the
+     * normal app's #viewerBackground (assets/background.jpg) would
+     * show through from behind. That coupled Share Mode's look to
+     * whatever the underlying app happened to be showing at the
+     * time -- including sections that were never actually opened
+     * (the stray video/slideshow landing-behind-item bug).
+     *
+     * The shell now paints assets/background.jpg itself, matching
+     * the same center/cover treatment #viewerBackground uses. This
+     * keeps the identical backdrop while letting the rest of the
+     * normal application be hidden outright (see isolateApplication()
+     * in shareViewer.js) with no visual loss.
      */
-    background: transparent;
+    background-color: var(--panel2, #10161c);
+    background-image: url("../assets/background.jpg");
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: cover;
 
     color: var(--text-color, var(--text, #fff));
 }
@@ -775,6 +789,35 @@ body.sky-share-mode .sky-share-main {
             var(--sky-share-welcome-height, 22px) +
             env(safe-area-inset-bottom, 0px) +
             var(--sky-share-stage-gap, 8px)
+        ) !important;
+}
+
+
+/* =========================================================
+   VIDEO BOTTOM STACK — SAFE AREA
+   ========================================================= */
+
+/*
+ * video.css already anchors the welcome banner to
+ * env(safe-area-inset-bottom), so it correctly clears the
+ * device's bottom chrome/home-indicator on its own.
+ *
+ * The status bar directly above it, however, is normally
+ * anchored a fixed --video-welcome-height above the true
+ * bottom edge (there's no safe area to dodge in the normal
+ * app, since videoFocus mode hides the welcome banner and
+ * only Share Mode shows both rows at once). Without adding
+ * the same inset here, the status bar overlaps the welcome
+ * banner by the height of the device safe area instead of
+ * sitting cleanly above it.
+ */
+
+.sky-share-media-host
+#videoViewer > .video-status-bar {
+    bottom:
+        calc(
+            var(--video-welcome-height, 22px) +
+            env(safe-area-inset-bottom, 0px)
         ) !important;
 }
 
@@ -1860,6 +1903,617 @@ body.sky-share-mode .app-switch-button {
 .sky-share-media-host #videoPlayer {
     max-width: 100%;
     max-height: 100%;
+}
+
+
+/* =========================================================
+SKY SHARE MODE — FINAL VIEWER LAYOUT OVERRIDES
+----------------------------------------------
+
+Share Mode is deliberately isolated from the normal
+Reader / Video / Slideshow layout.
+
+BOOK:
+- real Reader toolbar restored
+- Previous / Next at screen sides
+- remaining Reader controls below Share header
+- Reader surface protected from header / toolbar / status
+
+VIDEO / SLIDESHOW:
+- Reader toolbar hidden
+- landing screens hidden
+- existing viewer controls remain untouched
+
+IMPORTANT:
+Keep this block at the END of share.css.
+========================================================= */
+
+/* ---------------------------------------------------------
+
+1. SHARE SHELL — DO NOT INHERIT READER PADDING
+   --------------------------------------------------------- */
+
+body.sky-share-mode,
+body.sky-share-mode .sky-share-shell,
+body.sky-share-mode .sky-share-main,
+body.sky-share-mode .sky-share-media-host {
+box-sizing:border-box;
+}
+
+body.sky-share-mode .sky-share-main {
+padding:0!important;
+margin:0!important;
+}
+
+body.sky-share-mode .sky-share-media-host {
+padding:0!important;
+margin:0!important;
+}
+
+/* ---------------------------------------------------------
+2. NEVER ALLOW NORMAL READER SECTION PADDING INTO SHARE
+--------------------------------------------------------- */
+
+/*
+ShareViewer physically moves #viewerArea into
+.sky-share-media-host.
+
+Therefore all normal Reader spacing must be neutralized
+here, rather than changing reader.css.
+*/
+
+body.sky-share-mode .sky-share-media-host #viewerArea {
+display:flex!important;
+position:relative!important;
+
+
+flex:1 1 auto!important;
+
+width:100%!important;
+height:100%!important;
+
+min-width:0!important;
+min-height:0!important;
+
+max-width:none!important;
+max-height:none!important;
+
+margin:0!important;
+padding:0!important;
+
+overflow:hidden!important;
+box-sizing:border-box!important;
+
+
+}
+
+body.sky-share-mode .sky-share-media-host #readerPanel {
+display:flex!important;
+position:relative!important;
+
+
+flex:1 1 auto!important;
+
+width:100%!important;
+height:100%!important;
+
+min-width:0!important;
+min-height:0!important;
+
+max-width:none!important;
+max-height:none!important;
+
+margin:0!important;
+padding:0!important;
+
+overflow:hidden!important;
+box-sizing:border-box!important;
+
+
+}
+
+/* ---------------------------------------------------------
+3. SHARE HEADING
+--------------------------------------------------------- */
+
+body.sky-share-mode .sky-share-heading {
+position:fixed!important;
+
+
+top:0!important;
+left:0!important;
+right:0!important;
+
+width:100%!important;
+height:clamp(44px,5.5vh,68px)!important;
+
+margin:0!important;
+
+display:flex!important;
+flex-direction:column!important;
+align-items:center!important;
+justify-content:center!important;
+
+padding:4px 90px!important;
+
+box-sizing:border-box!important;
+
+text-align:center!important;
+
+z-index:1000003!important;
+pointer-events:none!important;
+
+
+}
+
+body.sky-share-mode .sky-share-title,
+body.sky-share-mode .sky-share-subtitle {
+max-width:72vw!important;
+margin-left:auto!important;
+margin-right:auto!important;
+text-align:center!important;
+}
+
+/* ---------------------------------------------------------
+4. BOOK ONLY — READER VIEWER RECTANGLE
+--------------------------------------------------------- */
+
+/*
+The Share header occupies the top area.
+The status/welcome stack occupies the bottom area.
+
+The Reader itself therefore gets a protected middle
+rectangle.  This prevents the document from sitting
+underneath the Share header or bottom status stack.
+*/
+
+body.sky-share-mode .sky-share-media-host #viewerArea {
+padding-top:clamp(54px,7vh,76px)!important;
+
+
+padding-bottom:
+    calc(
+        var(--slideshow-status-height, 28px) +
+        var(--slideshow-welcome-height, 22px) +
+        env(safe-area-inset-bottom, 0px) +
+        6px
+    )!important;
+
+box-sizing:border-box!important;
+
+
+}
+
+/*
+Reader panel itself must NOT add another copy of the
+normal Reader section padding.
+*/
+
+body.sky-share-mode .sky-share-media-host #readerPanel {
+padding-top:0!important;
+padding-bottom:0!important;
+}
+
+/* ---------------------------------------------------------
+5. BOOK — REAL READER TOOLBAR
+--------------------------------------------------------- */
+
+/*
+IMPORTANT:
+Target the actual Reader #toolbar directly.
+
+Do NOT target #readerPanel #toolbar because the Reader
+hierarchy can change when ShareViewer reparents it.
+*/
+
+body.sky-share-mode .sky-share-media-host #toolbar {
+display:flex!important;
+visibility:visible!important;
+opacity:1!important;
+
+
+position:fixed!important;
+
+top:clamp(48px,5.5vh,72px)!important;
+right:8px!important;
+left:auto!important;
+bottom:auto!important;
+
+width:auto!important;
+min-width:0!important;
+max-width:calc(100vw - 112px)!important;
+
+height:46px!important;
+min-height:46px!important;
+
+margin:0!important;
+padding:3px 4px!important;
+
+box-sizing:border-box!important;
+
+align-items:center!important;
+justify-content:flex-end!important;
+
+gap:4px!important;
+
+transform:none!important;
+
+background:transparent!important;
+
+z-index:1000008!important;
+
+pointer-events:none!important;
+ 
+
+}
+
+/*
+The toolbar itself is only a positioning layer.
+The actual buttons remain clickable.
+*/
+
+body.sky-share-mode .sky-share-media-host #toolbar .iconButton {
+display:flex!important;
+visibility:visible!important;
+opacity:1!important;
+
+ 
+position:relative!important;
+
+width:40px!important;
+height:40px!important;
+
+min-width:40px!important;
+min-height:40px!important;
+
+margin:0!important;
+padding:0!important;
+
+box-sizing:border-box!important;
+
+align-items:center!important;
+justify-content:center!important;
+
+pointer-events:auto!important;
+z-index:1000009!important;
+ 
+
+}
+
+/* ---------------------------------------------------------
+6. BOOK — RESTORE INDIVIDUAL READER CONTROLS
+--------------------------------------------------------- */
+
+body.sky-share-mode .sky-share-media-host #previousButton,
+body.sky-share-mode .sky-share-media-host #nextButton,
+body.sky-share-mode .sky-share-media-host #rotateButton,
+body.sky-share-mode .sky-share-media-host #muteButton,
+body.sky-share-mode .sky-share-media-host #viewerFullscreenButton,
+body.sky-share-mode .sky-share-media-host #readerCloseButton,
+body.sky-share-mode .sky-share-media-host #readerShareButton {
+visibility:visible!important;
+opacity:1!important;
+}
+
+/*
+ * Bookmark features are not part of Share Mode for any media
+ * type, including books -- Share Mode has no signed-in reader
+ * state to attach a bookmark to. Unlike the controls above,
+ * #bookmarkAddButton must stay hidden here rather than being
+ * restored to visible.
+ */
+
+body.sky-share-mode .sky-share-media-host #bookmarkAddButton {
+display:none!important;
+visibility:hidden!important;
+opacity:0!important;
+pointer-events:none!important;
+}
+
+/* ---------------------------------------------------------
+7. BOOK — PREVIOUS / NEXT SIDE CONTROLS
+--------------------------------------------------------- */
+
+body.sky-share-mode .sky-share-media-host #previousButton,
+body.sky-share-mode .sky-share-media-host #nextButton {
+position:fixed!important;
+
+ 
+top:50%!important;
+bottom:auto!important;
+
+width:48px!important;
+height:48px!important;
+
+min-width:48px!important;
+min-height:48px!important;
+
+margin:0!important;
+padding:0!important;
+
+transform:translateY(-50%)!important;
+
+display:flex!important;
+align-items:center!important;
+justify-content:center!important;
+
+pointer-events:auto!important;
+
+z-index:1000010!important;
+ 
+
+}
+
+body.sky-share-mode .sky-share-media-host #previousButton {
+left:8px!important;
+right:auto!important;
+}
+
+body.sky-share-mode .sky-share-media-host #nextButton {
+right:8px!important;
+left:auto!important;
+}
+
+/* ---------------------------------------------------------
+8. BOOK — KEEP DOCUMENT AWAY FROM SIDE CONTROLS
+--------------------------------------------------------- */
+
+body.sky-share-mode .sky-share-media-host #viewerArea,
+body.sky-share-mode .sky-share-media-host #readerPanel {
+box-sizing:border-box!important;
+}
+
+/* ---------------------------------------------------------
+9. VIDEO SHARE — NEVER SHOW READER CONTROLS
+--------------------------------------------------------- */
+
+/*
+:has() is used against the actual mounted viewer.
+Since ShareViewer mounts only one viewer at a time,
+this is safely type-specific.
+*/
+
+body.sky-share-mode:has(.sky-share-media-host #videoViewer)
+.sky-share-media-host #toolbar,
+
+body.sky-share-mode:has(.sky-share-media-host #videoViewer)
+.sky-share-media-host #previousButton,
+
+body.sky-share-mode:has(.sky-share-media-host #videoViewer)
+.sky-share-media-host #nextButton,
+
+body.sky-share-mode:has(.sky-share-media-host #videoViewer)
+.sky-share-media-host #rotateButton,
+
+body.sky-share-mode:has(.sky-share-media-host #videoViewer)
+.sky-share-media-host #muteButton,
+
+body.sky-share-mode:has(.sky-share-media-host #videoViewer)
+.sky-share-media-host #viewerFullscreenButton,
+
+body.sky-share-mode:has(.sky-share-media-host #videoViewer)
+.sky-share-media-host #readerCloseButton,
+
+body.sky-share-mode:has(.sky-share-media-host #videoViewer)
+.sky-share-media-host #readerShareButton,
+
+body.sky-share-mode:has(.sky-share-media-host #videoViewer)
+.sky-share-media-host #bookmarkAddButton {
+display:none!important;
+}
+
+/* ---------------------------------------------------------
+10. SLIDESHOW SHARE — NEVER SHOW READER CONTROLS
+--------------------------------------------------------- */
+
+body.sky-share-mode:has(.sky-share-media-host #slideshowViewer)
+.sky-share-media-host #toolbar,
+
+body.sky-share-mode:has(.sky-share-media-host #slideshowViewer)
+.sky-share-media-host #previousButton,
+
+body.sky-share-mode:has(.sky-share-media-host #slideshowViewer)
+.sky-share-media-host #nextButton,
+
+body.sky-share-mode:has(.sky-share-media-host #slideshowViewer)
+.sky-share-media-host #rotateButton,
+
+body.sky-share-mode:has(.sky-share-media-host #slideshowViewer)
+.sky-share-media-host #muteButton,
+
+body.sky-share-mode:has(.sky-share-media-host #slideshowViewer)
+.sky-share-media-host #viewerFullscreenButton,
+
+body.sky-share-mode:has(.sky-share-media-host #slideshowViewer)
+.sky-share-media-host #readerCloseButton,
+
+body.sky-share-mode:has(.sky-share-media-host #slideshowViewer)
+.sky-share-media-host #readerShareButton,
+
+body.sky-share-mode:has(.sky-share-media-host #slideshowViewer)
+.sky-share-media-host #bookmarkAddButton {
+display:none!important;
+}
+
+/* ---------------------------------------------------------
+11. VIDEO / SLIDESHOW — HIDE THEIR LANDING SCREENS
+--------------------------------------------------------- */
+
+/*
+Share Mode opens the actual item directly.
+The library landing must never be visible in a share.
+*/
+
+body.sky-share-mode .sky-share-media-host #videoLanding,
+body.sky-share-mode .sky-share-media-host .video-landing,
+body.sky-share-mode .sky-share-media-host #slideshowLanding,
+body.sky-share-mode .sky-share-media-host .slideshow-landing {
+display:none!important;
+visibility:hidden!important;
+opacity:0!important;
+pointer-events:none!important;
+}
+
+/*
+Also suppress any generic landing container that the
+mounted viewer may expose.
+*/
+
+body.sky-share-mode .sky-share-media-host .video-library,
+body.sky-share-mode .sky-share-media-host .slideshow-library {
+display:none!important;
+}
+
+/* ---------------------------------------------------------
+12. VIDEO / SLIDESHOW — NO READER PADDING
+--------------------------------------------------------- */
+
+body.sky-share-mode .sky-share-media-host #videoViewer,
+body.sky-share-mode .sky-share-media-host #slideshowViewer {
+margin:0!important;
+box-sizing:border-box!important;
+}
+
+/*
+Do NOT add Reader padding to video or slideshow.
+Their existing Share Mode CSS controls their own safe
+display areas.
+*/
+
+body.sky-share-mode:has(.sky-share-media-host #videoViewer)
+.sky-share-media-host,
+
+body.sky-share-mode:has(.sky-share-media-host #slideshowViewer)
+.sky-share-media-host {
+padding:0!important;
+}
+
+/* ---------------------------------------------------------
+13. SLIDESHOW — PRESERVE EXISTING CONTROLS BUT PROTECT
+THE BOTTOM SAFE AREA
+--------------------------------------------------------- */
+
+body.sky-share-mode .sky-share-media-host #slideshowViewer {
+padding-bottom:
+calc(
+var(--slideshow-status-height, 28px) +
+var(--slideshow-welcome-height, 22px) +
+env(safe-area-inset-bottom, 0px)
+)!important;
+}
+
+body.sky-share-mode .sky-share-media-host
+.slideshow-status-bar {
+bottom:
+calc(
+var(--slideshow-welcome-height, 22px) +
+env(safe-area-inset-bottom, 0px)
+)!important;
+}
+
+body.sky-share-mode .sky-share-media-host
+.slideshow-viewer > .sr-welcome-banner {
+bottom:env(safe-area-inset-bottom, 0px)!important;
+}
+
+/* ---------------------------------------------------------
+14. SLIDESHOW — KEEP EXISTING MAIN CONTROLS ABOVE
+STATUS / WELCOME / DEVICE SAFE AREA
+--------------------------------------------------------- */
+
+body.sky-share-mode .sky-share-media-host
+.slideshow-viewer.has-slideshow
+.slideshow-toolbar-main {
+bottom:
+calc(
+var(--slideshow-status-height, 28px) +
+var(--slideshow-welcome-height, 22px) +
+env(safe-area-inset-bottom, 0px) +
+6px
+)!important;
+}
+
+/* ---------------------------------------------------------
+15. MOBILE BOOK SHARE
+--------------------------------------------------------- */
+
+@media (max-width:700px){
+
+ 
+body.sky-share-mode .sky-share-heading {
+    height:52px!important;
+    padding-left:62px!important;
+    padding-right:62px!important;
+}
+
+body.sky-share-mode .sky-share-title {
+    max-width:68vw!important;
+    font-size:clamp(14px,4vw,20px)!important;
+}
+
+body.sky-share-mode .sky-share-media-host #toolbar {
+    top:52px!important;
+    right:4px!important;
+
+    height:42px!important;
+    min-height:42px!important;
+
+    gap:2px!important;
+}
+
+body.sky-share-mode .sky-share-media-host #toolbar .iconButton {
+    width:36px!important;
+    height:36px!important;
+
+    min-width:36px!important;
+    min-height:36px!important;
+}
+
+body.sky-share-mode .sky-share-media-host #previousButton,
+body.sky-share-mode .sky-share-media-host #nextButton {
+    width:44px!important;
+    height:44px!important;
+
+    min-width:44px!important;
+    min-height:44px!important;
+}
+
+body.sky-share-mode .sky-share-media-host #previousButton {
+    left:4px!important;
+}
+
+body.sky-share-mode .sky-share-media-host #nextButton {
+    right:4px!important;
+}
+
+body.sky-share-mode .sky-share-media-host #viewerArea {
+    padding-top:60px!important;
+}
+
+
+}
+
+/* ---------------------------------------------------------
+16. VERY SMALL SCREENS
+--------------------------------------------------------- */
+
+@media (max-width:420px){
+
+
+body.sky-share-mode .sky-share-media-host #toolbar {
+    right:2px!important;
+    max-width:calc(100vw - 96px)!important;
+}
+
+body.sky-share-mode .sky-share-media-host #toolbar .iconButton {
+    width:34px!important;
+    height:34px!important;
+
+    min-width:34px!important;
+    min-height:34px!important;
+}
+
+
 }
 
 
