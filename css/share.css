@@ -158,6 +158,18 @@ body.sky-share-mode {
 }
 
 
+body.sky-share-mode #workspacePrimaryLogo {
+    position: fixed;
+    top: clamp(8px, 1.2vw, 18px);
+    left: clamp(8px, 1.2vw, 18px);
+    width: clamp(70px, 7vw, 120px);
+    height: auto;
+    display: block !important;
+    z-index: 1000001;
+    pointer-events: none;
+}
+
+
 /* =========================================================
    SHARE TITLE
    ========================================================= */
@@ -1141,7 +1153,7 @@ body.sky-share-mode .app-switch-button {
 
     padding: 0 !important;
 
-    border: 1px solid rgba(255,255,255,.32) !important;
+    border: 1px solid rgba(255,255,255,.55) !important;
 
     border-radius: clamp(8px, 1vw, 13px) !important;
 
@@ -1150,7 +1162,7 @@ body.sky-share-mode .app-switch-button {
     background-repeat: no-repeat !important;
     background-size: contain !important;
 
-    background-color: rgba(0,0,0,.10) !important;
+    background-color: rgba(216,239,238,.80) !important;
 
     box-sizing: border-box !important;
 
@@ -1581,4 +1593,23 @@ body.sky-share-mode #toolbar {
 body.sky-share-mode #workspace {
     padding: 0 !important;
     background: transparent !important;
+}
+
+/* =========================================================
+   SHARE MODE — 10 SECOND TOOLBAR TIMEOUT
+   ========================================================= */
+
+body.sky-share-mode .sky-share-header.share-toolbar-hidden {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    transition:
+        opacity .35s ease,
+        visibility .35s ease;
+}
+
+body.sky-share-mode .sky-share-header {
+    transition:
+        opacity .35s ease,
+        visibility .35s ease;
 }

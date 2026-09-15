@@ -179,6 +179,29 @@ html:fullscreen #topBar{
   background:var(--panel);
 }
 
+/* =========================================================
+   READER WORKSPACE — PRIMARY LOGO
+   ========================================================= */
+
+#workspace {
+    position: relative;
+}
+
+#workspacePrimaryLogo {
+    position: absolute;
+    top: clamp(8px, 1.2vw, 18px);
+    left: clamp(8px, 1.2vw, 18px);
+
+    width: clamp(70px, 7vw, 120px);
+    height: auto;
+
+    display: block;
+    z-index: 202;
+    pointer-events: none;
+}
+
+
+
 #readerPanel{
   flex:1 1 auto;
   min-width:0;
