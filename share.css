@@ -1,0 +1,2277 @@
+/* =========================================================
+   SkyMedia Share Mode
+   Version 1.5.0
+
+   Share Mode reuses the existing SkyMedia viewers while
+   removing application chrome.
+
+   Slideshow layout:
+
+   TOP
+   ┌─────────────────────────────────────────────┐
+   │ SkyMedia Share strip                        │
+   ├─────────────────────────────────────────────┤
+   │ title / secondary controls                  │
+   │                                             │
+   │        ┌─────────────────────────────┐      │
+   │        │                             │      │
+   │        │      SLIDESHOW STAGE        │      │
+   │        │                             │      │
+   │        └─────────────────────────────┘      │
+   │                                             │
+   │             main controls                   │
+   ├─────────────────────────────────────────────┤
+   │ status / slide indicator                   │
+   ├─────────────────────────────────────────────┤
+   │ welcome message                            │
+   └─────────────────────────────────────────────┘
+
+   The stage deliberately occupies only the safe area between
+   the upper controls/title and the lower playback/status rows.
+
+   IMPORTANT:
+   These rules only apply to body.sky-share-mode.
+   Normal Reader / Video / Slideshow operation is unchanged.
+   ========================================================= */
+
+
+/* =========================================================
+   SHARE PAGE
+   ========================================================= */
+
+body.sky-share-mode {
+    margin: 0;
+    padding: 0;
+    width: 100vw;
+    height: 100dvh;
+    overflow: hidden;
+}
+
+
+/* =========================================================
+   SHARE SHELL
+   ========================================================= */
+
+.sky-share-shell {
+    position: fixed;
+    inset: 0;
+
+    width: 100vw;
+    height: 100dvh;
+
+    z-index: 999999;
+
+    display: flex;
+    flex-direction: column;
+
+    min-width: 0;
+    min-height: 0;
+
+    overflow: hidden;
+
+    /*
+     * The actual slideshow/video/reader supplies the visual
+     * background. Do not paint another background over it.
+     */
+    background: transparent;
+
+    color: var(--text-color, var(--text, #fff));
+}
+
+
+/* =========================================================
+   SHARE TOP STRIP
+   ========================================================= */
+
+.sky-share-header {
+    flex: 0 0 auto;
+
+    width: 100%;
+    height: clamp(44px, 5.5vh, 68px);
+    min-height: clamp(44px, 5.5vh, 68px);
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    padding: 0 clamp(10px, 1.5vw, 18px);
+
+    box-sizing: border-box;
+
+    background: var(--panel);
+    backdrop-filter: blur(14px);
+
+    position: relative;
+    z-index: 200;
+}
+
+.sky-share-brand {
+    min-width: 0;
+
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: .02em;
+
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sky-share-section {
+    flex: 0 0 auto;
+
+    font-size: 13px;
+    opacity: .72;
+
+    white-space: nowrap;
+}
+
+
+/* =========================================================
+   SHARE MAIN WORKSPACE
+   ========================================================= */
+
+.sky-share-main {
+    position: relative;
+
+    flex: 1 1 auto;
+
+    min-width: 0;
+    min-height: 0;
+
+    width: 100%;
+    height: auto;
+
+    display: flex;
+    flex-direction: column;
+
+    padding: 0;
+
+    box-sizing: border-box;
+
+    overflow: hidden;
+
+    /*
+     * The viewer background is allowed to show through.
+     */
+    background: transparent;
+}
+
+
+body.sky-share-mode #workspacePrimaryLogo {
+    position: fixed;
+    top: clamp(35px, 4vw, 40px);
+    left: clamp(8px, 1.2vw, 18px);
+    width: clamp(70px, 7vw, 120px);
+    height: auto;
+    display: block !important;
+    z-index: 1000001;
+    pointer-events: none;
+}
+
+
+/* =========================================================
+   SHARE TITLE
+   ========================================================= */
+
+.sky-share-heading {
+    /*
+     * The title occupies a small reserved upper area.
+     *
+     * It is outside the slideshow stage, so the actual slide
+     * can never render underneath it.
+     */
+    position: absolute;
+
+    left: 0;
+    right: 0;
+    top: 0;
+
+    height: clamp(42px, 7vh, 64px);
+
+    padding: 7px 14px 5px;
+
+    text-align: center;
+    color:#fff;
+    box-sizing: border-box;
+
+    z-index: 80;
+
+    pointer-events: none;
+}
+
+.sky-share-title {
+    margin: 0;
+
+    font-size: clamp(17px, 2vw, 25px);
+    line-height: 1.2;
+
+    text-shadow: 0 1px 4px rgba(0,0,0,.75);
+}
+
+.sky-share-subtitle {
+    margin-top: 2px;
+
+    font-size: 12px;
+    opacity: .9;
+
+    text-shadow: 0 1px 4px rgba(0,0,0,.75);
+}
+
+
+/* =========================================================
+   MEDIA HOST
+   ========================================================= */
+
+.sky-share-media-host {
+    position: relative;
+
+    flex: 1 1 auto;
+
+    min-width: 0;
+    min-height: 0;
+
+    width: 100%;
+    height: 100%;
+
+    overflow: hidden;
+
+    display: flex;
+
+    align-items: stretch;
+    justify-content: stretch;
+
+    background: transparent;
+}
+
+
+/* =========================================================
+   GENERIC MOUNTED VIEWER
+   ========================================================= */
+
+.sky-share-mounted-viewer {
+    position: relative !important;
+
+    flex: 1 1 auto !important;
+
+    min-width: 0 !important;
+    min-height: 0 !important;
+
+    width: 100% !important;
+    height: 100% !important;
+
+    max-width: none !important;
+    max-height: none !important;
+
+    margin: 0 !important;
+
+    overflow: hidden !important;
+}
+
+
+/* =========================================================
+   REMOVE READER ARTIFACTS
+   ========================================================= */
+
+body.sky-share-mode #statusBar,
+body.sky-share-mode #bookmarkFlag {
+    display: none !important;
+}
+
+body.sky-share-mode #readerLibrary,
+body.sky-share-mode #library,
+body.sky-share-mode #libraryPanel,
+body.sky-share-mode #readerDrawer {
+    display: none !important;
+}
+
+body.sky-share-mode #viewerArea {
+    display: none !important;
+}
+
+body.sky-share-mode #topBar,
+body.sky-share-mode #topSearchGroup,
+body.sky-share-mode #topBarRightControls {
+    display: none !important;
+}
+
+
+/* =========================================================
+   REMOVE OTHER APPLICATION SURFACES
+   ========================================================= */
+
+body.sky-share-mode #frontPage,
+body.sky-share-mode #frontSection {
+    display: none !important;
+}
+
+
+/* Video application chrome */
+
+body.sky-share-mode #videoTopBar,
+body.sky-share-mode #videoLibrary,
+body.sky-share-mode .video-top-bar,
+body.sky-share-mode .video-library,
+body.sky-share-mode #videoSearchGroup,
+body.sky-share-mode #videoTopBarRightControls {
+    display: none !important;
+}
+
+
+/* Slideshow application chrome */
+
+body.sky-share-mode #slideshowLibrary,
+body.sky-share-mode .slideshow-library,
+body.sky-share-mode .slideshow-top-bar {
+    display: none !important;
+}
+
+
+/* Application navigation */
+
+body.sky-share-mode .app-switcher,
+body.sky-share-mode .responsive-app-menu,
+body.sky-share-mode .responsive-app-menu-button {
+    display: none !important;
+}
+
+
+/* Settings */
+
+body.sky-share-mode #settingsPanel,
+body.sky-share-mode #settingsOverlay {
+    display: none !important;
+}
+
+
+/* Other application navigation */
+
+body.sky-share-mode [data-app-target],
+body.sky-share-mode .app-switch-button {
+    display: none !important;
+}
+
+
+/*
+ * IMPORTANT:
+ *
+ * Do not hide .sr-welcome-banner globally here.
+ *
+ * The slideshow viewer owns the welcome banner and we want
+ * it at the bottom of the Share Mode screen.
+ */
+
+
+/* =========================================================
+   SLIDESHOW VIEWER
+   ========================================================= */
+
+.sky-share-media-host #slideshowViewer {
+    position: relative !important;
+
+    flex: 1 1 auto !important;
+
+    min-width: 0 !important;
+    min-height: 0 !important;
+
+    width: 100% !important;
+    height: 100% !important;
+
+    max-width: none !important;
+    max-height: none !important;
+
+    margin: 0 !important;
+    padding: 0 !important;
+
+    display: flex !important;
+    flex-direction: column !important;
+
+    align-items: stretch !important;
+    justify-content: stretch !important;
+
+    overflow: hidden !important;
+
+    background: transparent;
+
+    /*
+     * Coordinate system for:
+     *
+     *   title
+     *   stage
+     *   secondary controls
+     *   main controls
+     *   status
+     *   welcome banner
+     */
+    box-sizing: border-box;
+
+    /*
+     * Responsive safe-area dimensions.
+     *
+     * The viewer begins below the Share top strip.
+     */
+    --sky-share-upper-safe:
+        clamp(58px, 9vh, 86px);
+
+    /*
+     * Main playback controls need enough room so they never
+     * overlap the bottom of the slide.
+     */
+    --sky-share-control-safe:
+        clamp(54px, 7vh, 68px);
+
+    /*
+     * Existing status + welcome rows.
+     */
+    --sky-share-welcome-height: 22px;
+    --sky-share-status-height: clamp(22px, 3vh, 32px);
+
+    /*
+     * Small breathing room between stage and control rows.
+     */
+    --sky-share-stage-gap: clamp(6px, 1vh, 12px);
+}
+
+
+/* Never show slideshow landing after the shared item opens */
+
+.sky-share-media-host #slideshowLanding {
+    display: none !important;
+}
+
+
+/* =========================================================
+   SLIDESHOW VIEWER BOTTOM SPACE
+   ========================================================= */
+
+/*
+ * Reserve the lower rows inside the viewer itself.
+ *
+ * This guarantees the stage cannot occupy the status or
+ * welcome-banner area.
+ */
+
+.sky-share-media-host #slideshowViewer {
+    padding-bottom:
+        calc(
+            var(--sky-share-status-height) +
+            var(--sky-share-welcome-height)
+        ) !important;
+}
+
+
+/* =========================================================
+   SLIDESHOW STAGE
+   ========================================================= */
+
+/*
+ * The stage deliberately does NOT fill the entire viewer.
+ *
+ * Its top edge is below:
+ *
+ *   - the Share title
+ *   - the upper/secondary controls
+ *
+ * Its bottom edge is above:
+ *
+ *   - the main playback controls
+ *   - the status bar
+ *   - the welcome banner
+ *
+ * Therefore the controls cannot sit over the actual slide.
+ */
+
+.sky-share-media-host #slideshowStage,
+.sky-share-media-host .slideshow-stage {
+    position: absolute !important;
+
+    /*
+     * Leave a safe area at the top.
+     */
+    top:
+        calc(
+            var(--sky-share-upper-safe) +
+            var(--sky-share-stage-gap)
+        ) !important;
+
+    /*
+     * Leave a safe area above the main controls and bottom
+     * status/welcome rows.
+     */
+    bottom:
+        calc(
+            var(--sky-share-control-safe) +
+            var(--sky-share-stage-gap) +
+            var(--sky-share-status-height) +
+            var(--sky-share-welcome-height)
+        ) !important;
+
+    left: 8px !important;
+    right: 8px !important;
+
+    width: auto !important;
+    height: auto !important;
+
+    max-width: none !important;
+    max-height: none !important;
+
+    min-width: 0 !important;
+    min-height: 0 !important;
+
+    margin: 0 auto !important;
+
+    aspect-ratio: auto !important;
+
+    display: flex !important;
+
+    align-items: center !important;
+    justify-content: center !important;
+
+    overflow: hidden !important;
+
+    border-radius: 10px;
+
+    background: transparent;
+
+    /*
+     * Slides stay beneath the controls.
+     */
+    z-index: 1 !important;
+
+    box-sizing: border-box !important;
+}
+
+
+/* =========================================================
+   ACTUAL SLIDE
+   ========================================================= */
+
+.sky-share-media-host .slideshow-slide {
+    position: absolute;
+
+    inset: 0;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    opacity: 1;
+
+    z-index: 1;
+}
+
+.sky-share-media-host .slideshow-slide img {
+    display: block;
+
+    width: 100%;
+    height: 100%;
+
+    max-width: 100%;
+    max-height: 100%;
+
+    object-fit: contain;
+
+    user-select: none;
+}
+
+.sky-share-media-host .slideshow-slide canvas {
+    display: block;
+
+    width: auto;
+    height: auto;
+
+    max-width: 100%;
+    max-height: 100%;
+
+    user-select: none;
+}
+
+
+/* =========================================================
+   SLIDESHOW TITLE
+   ========================================================= */
+
+/*
+ * The Share Mode heading already identifies the item.
+ *
+ * Keep the viewer's internal title below the upper control
+ * area so it cannot sit directly on top of the slide.
+ */
+
+.sky-share-media-host .slideshow-viewer-title {
+    position: absolute !important;
+
+    left: 18px !important;
+    right: auto !important;
+
+    top: 4px !important;
+
+    max-width: 55% !important;
+
+    margin: 0 !important;
+
+    z-index: 20 !important;
+
+    white-space: nowrap;
+
+    overflow: hidden;
+
+    text-overflow: ellipsis;
+
+    font-size: clamp(14px, 1.6vw, 20px);
+
+    text-shadow: 0 1px 5px rgba(0,0,0,.8);
+
+    pointer-events: none;
+}
+
+
+/* =========================================================
+   SLIDESHOW PLAYBACK STATUS
+   ========================================================= */
+
+.sky-share-media-host .slideshow-playback-status {
+    position: absolute !important;
+
+    top: calc(
+        var(--sky-share-upper-safe) - 8px
+    ) !important;
+
+    left: 50% !important;
+
+    transform: translateX(-50%) !important;
+
+    z-index: 30 !important;
+
+    pointer-events: none !important;
+
+    font-size: 12px;
+
+    opacity: .72;
+
+    white-space: nowrap;
+}
+
+
+/* =========================================================
+   MAIN SLIDESHOW CONTROLS
+   ========================================================= */
+
+.sky-share-media-host .slideshow-toolbar {
+    position: absolute !important;
+
+    left: 50% !important;
+    right: auto !important;
+
+    top: auto !important;
+
+    /*
+     * Place the controls directly above the reserved
+     * status/welcome rows.
+     */
+    bottom:
+        calc(
+            var(--sky-share-status-height) +
+            var(--sky-share-welcome-height) +
+            var(--sky-share-stage-gap)
+        ) !important;
+
+    transform: translateX(-50%) !important;
+
+    width: max-content !important;
+
+    max-width: calc(100% - 20px) !important;
+
+    display: flex !important;
+
+    align-items: center !important;
+    justify-content: center !important;
+
+    gap: 6px;
+
+    padding: 6px 8px;
+
+    border-radius: 10px;
+
+    background: transparent;
+
+    color: var(--control-text);
+
+    z-index: 100 !important;
+
+    pointer-events: auto !important;
+}
+
+
+/* Main playback group */
+
+.sky-share-media-host .slideshow-toolbar-main {
+    position: absolute !important;
+
+    left: 50% !important;
+    right: auto !important;
+
+    bottom:
+        calc(
+            var(--sky-share-status-height) +
+            var(--sky-share-welcome-height) +
+            var(--sky-share-stage-gap)
+        ) !important;
+
+    top: auto !important;
+
+    transform: translateX(-50%) !important;
+
+    display: flex !important;
+
+    align-items: center !important;
+    justify-content: center !important;
+
+    z-index: 101 !important;
+
+    pointer-events: auto !important;
+}
+
+
+/*
+ * Secondary controls occupy the upper-right safe zone.
+ */
+
+.sky-share-media-host .slideshow-toolbar-secondary {
+    position: absolute !important;
+
+    top: 8px !important;
+    right: 12px !important;
+
+    left: auto !important;
+    bottom: auto !important;
+
+    transform: none !important;
+
+    display: flex !important;
+
+    align-items: center !important;
+    justify-content: flex-end !important;
+
+    gap: 6px;
+
+    z-index: 102 !important;
+
+    pointer-events: auto !important;
+}
+
+
+/* =========================================================
+   SLIDESHOW BUTTONS
+   ========================================================= */
+
+.sky-share-media-host .slideshow-control {
+    width: 42px !important;
+    height: 42px !important;
+
+    min-width: 42px !important;
+    min-height: 42px !important;
+
+    flex: 0 0 42px !important;
+
+    display: flex !important;
+
+    align-items: center;
+    justify-content: center;
+
+    padding: 0;
+
+    border: 1px solid color-mix(
+        in srgb,
+        var(--control-text) 22%,
+        transparent
+    );
+
+    border-radius: 50%;
+
+    background: color-mix(
+        in srgb,
+        var(--panel) 22%,
+        transparent
+    );
+
+    color: var(--control-text);
+
+    backdrop-filter: blur(7px);
+
+    box-shadow: 0 5px 18px rgba(0,0,0,.16);
+
+    cursor: pointer;
+
+    pointer-events: auto !important;
+
+    transition:
+        background .25s,
+        transform .25s,
+        box-shadow .25s;
+}
+
+.sky-share-media-host .slideshow-control .icon {
+    width: 20px;
+    height: 20px;
+
+    color: var(--control-text);
+
+    stroke: currentColor;
+}
+
+.sky-share-media-host .slideshow-control:hover {
+    background: rgba(255,255,255,.42) !important;
+
+    transform: translateY(-2px);
+
+    box-shadow: 0 6px 18px rgba(0,0,0,.18);
+}
+
+.sky-share-media-host .slideshow-control:active {
+    transform: scale(.96);
+}
+
+
+/* =========================================================
+   AUDIO MODE
+   ========================================================= */
+
+.sky-share-media-host .slideshow-audio-mode {
+    position: relative;
+
+    height: 42px;
+
+    display: flex !important;
+
+    align-items: center;
+
+    gap: 4px;
+
+    padding: 0 8px;
+
+    border: 1px solid color-mix(
+        in srgb,
+        var(--control-text) 22%,
+        transparent
+    );
+
+    border-radius: 21px;
+
+    background: color-mix(
+        in srgb,
+        var(--panel) 22%,
+        transparent
+    );
+
+    color: var(--control-text);
+
+    backdrop-filter: blur(7px);
+
+    box-shadow: 0 5px 18px rgba(0,0,0,.16);
+
+    pointer-events: auto;
+}
+
+.sky-share-media-host .slideshow-audio-mode .icon {
+    width: 19px;
+    height: 19px;
+
+    color: var(--control-text);
+}
+
+.sky-share-media-host .slideshow-audio-mode select {
+    max-width: 118px;
+
+    border: 0;
+    outline: 0;
+
+    background: transparent;
+
+    color: var(--control-text);
+
+    font-size: 11px;
+
+    pointer-events: auto;
+}
+
+.sky-share-media-host .slideshow-audio-mode option {
+    background: #20242a;
+    color: #fff;
+}
+
+
+/* =========================================================
+   STATUS / INDICATOR BAR
+   ========================================================= */
+
+.sky-share-media-host .slideshow-status-bar {
+    position: absolute !important;
+
+    left: 0 !important;
+    right: 0 !important;
+
+    bottom: var(--sky-share-welcome-height) !important;
+
+    width: 100% !important;
+
+    height: var(--sky-share-status-height) !important;
+
+    min-height: var(--sky-share-status-height) !important;
+    max-height: var(--sky-share-status-height) !important;
+
+    padding: 2px 8px !important;
+
+    box-sizing: border-box !important;
+
+    display: block !important;
+
+    background: var(--panel);
+
+    color: var(--text);
+
+    font-size: 13px;
+
+    line-height: 18px;
+
+    letter-spacing: .02em;
+
+    z-index: 150 !important;
+
+    pointer-events: auto;
+}
+
+.sky-share-media-host .slideshow-status-bar center {
+    width: 100%;
+    height: 100%;
+
+    margin: 0;
+
+    display: flex;
+
+    align-items: center;
+    justify-content: center;
+
+    gap: 14px;
+
+    font-size: 13px;
+    line-height: 18px;
+
+    text-align: center;
+}
+
+.sky-share-media-host .slideshow-status-bar span {
+    font-size: 13px;
+
+    line-height: 18px;
+
+    letter-spacing: .02em;
+}
+
+.sky-share-media-host .slideshow-status-bar #slideshowStatus {
+    max-width: 60vw;
+
+    overflow: hidden;
+
+    text-overflow: ellipsis;
+
+    white-space: nowrap;
+
+    font-weight: 600;
+
+    opacity: .85;
+}
+
+.sky-share-media-host .slideshow-status-indicator {
+    min-width: 50px;
+
+    text-align: center;
+
+    opacity: .7;
+}
+
+.sky-share-media-host .slideshow-status-indicator:empty {
+    display: none !important;
+}
+
+
+/* =========================================================
+   WELCOME MESSAGE BAR
+   ========================================================= */
+
+/*
+ * The welcome banner remains visible in Share Mode.
+ *
+ * It is the final bottom row and is included in the stage's
+ * reserved bottom geometry.
+ */
+
+.sky-share-media-host .sr-welcome-banner,
+.sky-share-media-host #slideshowViewer > .sr-welcome-banner {
+    position: absolute !important;
+
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+
+    width: 100% !important;
+
+    height: var(--sky-share-welcome-height) !important;
+
+    min-height: var(--sky-share-welcome-height) !important;
+    max-height: var(--sky-share-welcome-height) !important;
+
+    padding: 2px 8px !important;
+
+    box-sizing: border-box !important;
+
+    display: flex !important;
+
+    align-items: center;
+    justify-content: center;
+
+    overflow: hidden !important;
+
+    background: var(--panel);
+
+    color: var(--muted);
+
+    border-top: none;
+
+    font-size: 12px;
+
+    line-height: 18px;
+
+    letter-spacing: normal;
+
+    z-index: 151 !important;
+}
+
+.sky-share-media-host .sr-welcome-banner center,
+.sky-share-media-host #slideshowViewer > .sr-welcome-banner center {
+    display: block;
+
+    width: 100%;
+
+    margin: 0;
+    padding: 0;
+
+    line-height: 18px;
+
+    text-align: center;
+}
+
+
+/* =========================================================
+   SHARE STATUS MESSAGE
+   ========================================================= */
+
+.sky-share-status {
+    display: none !important;
+}
+
+
+/* =========================================================
+   SHARE ACTIONS
+   ========================================================= */
+
+/*
+ * Share Mode now uses the existing Open button as the
+ * Meditation Mornings logo.
+ *
+ * The Close button is hidden.
+ */
+
+.sky-share-actions {
+    position: absolute !important;
+
+    right: clamp(12px, 2vw, 24px) !important;
+
+    /*
+     * Keep the logo above the main playback controls and
+     * above the status/welcome rows.
+     */
+    bottom:
+        calc(
+            var(--sky-share-status-height, 28px) +
+            var(--sky-share-welcome-height, 22px) +
+            var(--sky-share-control-safe, 60px) +
+            8px
+        ) !important;
+
+    width: max-content;
+
+    max-width: calc(100vw - 24px);
+
+    display: flex;
+
+    justify-content: flex-end;
+    align-items: center;
+
+    gap: 8px;
+
+    padding: 0;
+    margin: 0;
+
+    z-index: 300 !important;
+
+    pointer-events: auto;
+}
+
+
+/*
+ * Hide the old Close action completely.
+ */
+
+.sky-share-close-button {
+    display: none !important;
+}
+
+
+/*
+ * The existing Open button becomes the small clickable
+ * Meditation Mornings logo.
+ *
+ * Its existing href remains:
+ *
+ * https://meditationmornings.glide.page/dl/media
+ */
+
+.sky-share-open-button {
+    display: block !important;
+
+    width: clamp(42px, 5vw, 64px) !important;
+    height: clamp(42px, 5vw, 64px) !important;
+
+    min-width: 42px !important;
+    min-height: 42px !important;
+
+    max-width: 64px !important;
+    max-height: 64px !important;
+
+    padding: 0 !important;
+
+    border: 1px solid rgba(255,255,255,.55) !important;
+
+    border-radius: clamp(8px, 1vw, 13px) !important;
+
+    background-image: url("../assets/logo.png") !important;
+    background-position: center !important;
+    background-repeat: no-repeat !important;
+    background-size: contain !important;
+
+    background-color: rgba(216,239,238,.80) !important;
+
+    box-sizing: border-box !important;
+
+    overflow: hidden !important;
+
+    /*
+     * Remove any visible button text.
+     */
+    font-size: 0 !important;
+    line-height: 0 !important;
+    text-indent: -9999px !important;
+
+    text-decoration: none !important;
+
+    cursor: pointer;
+
+    backdrop-filter: blur(7px);
+
+    /*
+     * Requested frontMenuGlow effect.
+     */
+    animation: frontMenuGlow 4s ease-in-out infinite;
+
+    transition:
+        transform .25s ease,
+        box-shadow .25s ease;
+}
+
+
+/*
+ * Prevent inherited button/link pseudo styling from
+ * introducing a second visual treatment.
+ */
+
+.sky-share-open-button::before,
+.sky-share-open-button::after {
+    display: none !important;
+    content: none !important;
+}
+
+.sky-share-open-button:hover {
+    transform: translateY(-2px);
+
+    animation-play-state: paused;
+
+    box-shadow:
+        0 0 7px #ACE1AF,
+        0 0 14px #00FA9A,
+        inset 0 0 12px #ACE1AF !important;
+}
+
+.sky-share-open-button:active {
+    transform: scale(.95);
+}
+
+
+/* =========================================================
+   LOGO GLOW
+   ========================================================= */
+
+@keyframes frontMenuGlow {
+
+    0%, 100% {
+        box-shadow:
+            0 0 4px #ACE1AF,
+            0 0 7px #ACE1AF,
+            inset 0 0 5px #ACE1AF;
+    }
+
+    45% {
+        box-shadow:
+            0 0 6px #ACE1AF,
+            0 0 7px #ACE1AF,
+            inset 0 0 20px #00FA9A;
+    }
+
+    52% {
+        box-shadow:
+            0 0 3px #ACE1AF,
+            0 0 5px #ACE1AF,
+            inset 0 0 6px #ACE1AF;
+    }
+
+    60% {
+        box-shadow:
+            0 0 8px #ACE1AF,
+            0 0 20px #00FA9A,
+            inset 0 0 8px #ACE1AF;
+    }
+}
+
+
+/* =========================================================
+   VIDEO SHARE MODE
+   ========================================================= */
+
+.sky-share-media-host #videoViewer {
+    position: relative !important;
+
+    flex: 1 1 auto !important;
+
+    min-width: 0 !important;
+    min-height: 0 !important;
+
+    width: 100% !important;
+    height: 100% !important;
+
+    max-width: none !important;
+    max-height: none !important;
+
+    margin: 0 !important;
+
+    display: flex !important;
+
+    flex-direction: column;
+
+    align-items: center;
+    justify-content: center;
+
+    overflow: hidden !important;
+}
+
+.sky-share-media-host #videoLanding {
+    display: none !important;
+}
+
+.sky-share-media-host #videoPlayer {
+    max-width: 100%;
+    max-height: 100%;
+}
+
+
+/* =========================================================
+   READER SHARE MODE
+   ========================================================= */
+
+.sky-share-media-host #viewerArea {
+    position: relative !important;
+
+    flex: 1 1 auto !important;
+
+    min-width: 0 !important;
+    min-height: 0 !important;
+
+    width: 100% !important;
+    height: 100% !important;
+
+    max-width: none !important;
+    max-height: none !important;
+
+    margin: 0 !important;
+}
+
+.sky-share-media-host #viewerArea {
+    display: block !important;
+}
+
+
+
+
+/* =========================================================
+   DESKTOP
+   ========================================================= */
+
+@media (min-width: 701px) {
+
+    .sky-share-media-host .slideshow-toolbar-secondary {
+        top: 8px !important;
+
+        right: 12px !important;
+
+        left: auto !important;
+    }
+
+}
+
+
+/* =========================================================
+   MOBILE
+   ========================================================= */
+
+@media (max-width: 700px) {
+
+    .sky-share-header {
+        height: clamp(44px, 5.5vh, 68px);
+
+        min-height: clamp(44px, 5.5vh, 68px);
+
+        padding-left: 8px;
+        padding-right: 8px;
+    }
+
+    .sky-share-brand {
+        font-size: 14px;
+    }
+
+    .sky-share-section {
+        font-size: 12px;
+    }
+
+    .sky-share-heading {
+        height: clamp(38px, 6vh, 52px);
+
+        padding: 4px 8px 4px;
+    }
+
+    .sky-share-title {
+        font-size: 18px;
+    }
+
+    .sky-share-subtitle {
+        font-size: 11px;
+    }
+
+
+    /*
+     * Tighter upper safe zone on mobile.
+     */
+
+    .sky-share-media-host #slideshowViewer {
+        --sky-share-upper-safe:
+            clamp(48px, 8vh, 64px);
+
+        --sky-share-control-safe:
+            clamp(46px, 7vh, 58px);
+
+        --sky-share-stage-gap:
+            clamp(5px, 1vh, 8px);
+    }
+
+
+    /*
+     * Secondary controls remain at the top, but are centered
+     * so they do not collide with narrow viewport edges.
+     */
+
+    .sky-share-media-host .slideshow-toolbar-secondary {
+        top: 6px !important;
+
+        left: 50% !important;
+        right: auto !important;
+
+        transform: translateX(-50%) !important;
+
+        max-width: calc(100vw - 16px);
+
+        justify-content: center !important;
+    }
+
+
+    /*
+     * Main controls remain centered immediately above the
+     * reserved bottom rows.
+     */
+
+    .sky-share-media-host .slideshow-toolbar-main {
+        left: 50% !important;
+
+        bottom:
+            calc(
+                var(--sky-share-status-height) +
+                var(--sky-share-welcome-height) +
+                var(--sky-share-stage-gap)
+            ) !important;
+
+        max-width: calc(100vw - 12px);
+
+        overflow-x: auto;
+
+        justify-content: center !important;
+    }
+
+
+    .sky-share-media-host .slideshow-control {
+        width: 34px !important;
+        height: 34px !important;
+
+        min-width: 34px !important;
+        min-height: 34px !important;
+
+        flex-basis: 34px !important;
+    }
+
+    .sky-share-media-host .slideshow-control .icon {
+        width: 17px;
+        height: 17px;
+    }
+
+
+    .sky-share-media-host .slideshow-audio-mode {
+        height: 34px;
+    }
+
+    .sky-share-media-host .slideshow-audio-mode select {
+        max-width: 100px;
+    }
+
+
+    /*
+     * The logo remains small and responsive.
+     *
+     * It sits above the main control row.
+     */
+
+    .sky-share-actions {
+        right: 8px !important;
+
+        bottom:
+            calc(
+                var(--sky-share-status-height, 28px) +
+                var(--sky-share-welcome-height, 22px) +
+                var(--sky-share-control-safe, 52px) +
+                6px
+            ) !important;
+
+        gap: 6px;
+    }
+
+
+    .sky-share-open-button {
+        width: clamp(38px, 11vw, 54px) !important;
+        height: clamp(38px, 11vw, 54px) !important;
+
+        min-width: 38px !important;
+        min-height: 38px !important;
+
+        max-width: 54px !important;
+        max-height: 54px !important;
+
+        border-radius: 10px !important;
+    }
+
+
+    /*
+     * Narrower stage margins.
+     */
+
+    .sky-share-media-host #slideshowStage,
+    .sky-share-media-host .slideshow-stage {
+        left: 4px !important;
+        right: 4px !important;
+    }
+
+
+    .sky-share-media-host .slideshow-viewer-title {
+        left: 10px !important;
+
+        top: 4px !important;
+
+        max-width: 50% !important;
+
+        font-size: 15px;
+    }
+
+}
+
+
+/* =========================================================
+   VERY SMALL SCREENS
+   ========================================================= */
+
+@media (max-width: 480px) {
+
+    .sky-share-header {
+        padding-left: 6px;
+        padding-right: 6px;
+    }
+
+    .sky-share-section {
+        display: none;
+    }
+
+
+    .sky-share-media-host #slideshowViewer {
+        --sky-share-upper-safe:
+            clamp(44px, 7vh, 56px);
+
+        --sky-share-control-safe:
+            clamp(44px, 6vh, 52px);
+    }
+
+
+    .sky-share-media-host .slideshow-toolbar-secondary {
+        gap: 3px;
+    }
+
+    .sky-share-media-host .slideshow-toolbar-main {
+        gap: 3px;
+    }
+
+
+    .sky-share-actions {
+        right: 6px !important;
+    }
+
+
+    .sky-share-open-button {
+        width: 42px !important;
+        height: 42px !important;
+
+        min-width: 42px !important;
+        min-height: 42px !important;
+
+        max-width: 42px !important;
+        max-height: 42px !important;
+
+        border-radius: 8px !important;
+    }
+
+}
+
+
+/* =========================================================
+   SHARE MODE — REMOVE NORMAL READER WORKSPACE BORDER
+
+   The normal Reader uses #workspace padding-right: 30px
+   to frame the reading area. In Share Mode that padding
+   should disappear so the Share background remains visible.
+========================================================= */
+
+body.sky-share-mode #workspace {
+    padding: 0 !important;
+    background: transparent !important;
+}
+
+/* =========================================================
+   SHARE MODE — 10 SECOND TOOLBAR TIMEOUT
+   ========================================================= */
+
+body.sky-share-mode .sky-share-header.share-toolbar-hidden, 
+body.sky-share-mode.sky-share-toolbar-hidden
+    .sky-share-actions,
+body.sky-share-mode.sky-share-toolbar-hidden
+    .slideshow-toolbar-main,
+body.sky-share-mode.sky-share-toolbar-hidden
+    .slideshow-toolbar-secondary,
+body.sky-share-mode.sky-share-toolbar-hidden
+    #toolbar {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    transition:
+        opacity .35s ease,
+        visibility .35s ease;
+}
+
+body.sky-share-mode .sky-share-header {
+    transition:
+        opacity .35s ease,
+        visibility .35s ease;
+}
+
+
+
+
+
+
+/* =========================================================
+   Share Mode — Reader sizing
+   Give the reparented Reader viewer a real flex-sized box.
+   Normal Reader layout is unchanged.
+========================================================= */
+
+body.sky-share-mode .sky-share-media-host #readerPanel {
+    position: relative !important;
+    display: flex !important;
+    flex: 1 1 auto !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+}
+
+body.sky-share-mode .sky-share-media-host #viewerBackground {
+    position: relative !important;
+    display: flex !important;
+    flex: 1 1 auto !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+}
+
+body.sky-share-mode .sky-share-media-host #viewerArea {
+    position: relative !important;
+    display: flex !important;
+    flex: 1 1 auto !important;
+    width: 100% !important;
+    height: auto !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+}
+
+body.sky-share-mode .sky-share-media-host #pageContainer {
+    position: relative !important;
+    display: flex !important;
+    flex: 1 1 auto !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    max-width: none !important;
+    max-height: none !important;
+    overflow: hidden !important;
+}
+
+
+
+
+/* Explicitly restore the Reader navigation controls */
+
+body.sky-share-mode #previousButton,
+body.sky-share-mode #nextButton,
+body.sky-share-mode #rotateButton,
+body.sky-share-mode #muteButton,
+body.sky-share-mode #viewerFullscreenButton,
+body.sky-share-mode #readerCloseButton,
+body.sky-share-mode #readerShareButton,
+body.sky-share-mode #bookmarkAddButton {
+    display: flex !important;
+
+    visibility: visible !important;
+    opacity: 1 !important;
+
+    pointer-events: auto !important;
+}
+
+/* =========================================================
+   Share Mode — Reader viewing clearance
+========================================================= */
+
+body.sky-share-mode .sky-share-media-host #viewerArea {
+    padding: 12px 16px 48px !important;
+    box-sizing: border-box !important;
+}
+
+/* =========================================================
+   Share Mode — Reader Toolbar
+   The normal Reader toolbar is reused in Share Mode.
+   ========================================================= */
+
+
+body.sky-share-mode .sky-share-media-host #previousButton,
+body.sky-share-mode .sky-share-media-host #nextButton,
+body.sky-share-mode .sky-share-media-host #rotateButton,
+body.sky-share-mode .sky-share-media-host #muteButton,
+body.sky-share-mode .sky-share-media-host #viewerFullscreenButton,
+body.sky-share-mode .sky-share-media-host #readerCloseButton,
+body.sky-share-mode .sky-share-media-host #readerShareButton,
+body.sky-share-mode .sky-share-media-host #bookmarkAddButton {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+}
+
+
+
+/* =========================================================
+   SHARE MODE — READER CONTROLS
+   ========================================================= */
+
+/*
+ * IMPORTANT:
+ *
+ * The actual Reader toolbar is #toolbar.
+ * Do NOT require #readerPanel to be its parent.
+ *
+ * In Share Mode the toolbar becomes a full-screen positioning
+ * layer. The toolbar itself does not intercept clicks.
+ * Its individual buttons do.
+ */
+
+body.sky-share-mode #toolbar {
+    display: flex !important;
+
+    position: absolute !important;
+
+    top: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    left: 0 !important;
+
+    width: 100% !important;
+    height: 100% !important;
+
+    min-width: 0 !important;
+    min-height: 0 !important;
+
+    max-width: none !important;
+    max-height: none !important;
+
+    margin: 0 !important;
+    padding: 8px 12px !important;
+
+    box-sizing: border-box !important;
+
+    flex: none !important;
+
+    flex-direction: row !important;
+    align-items: flex-start !important;
+    justify-content: flex-end !important;
+
+    gap: 6px !important;
+
+    overflow: visible !important;
+
+    transform: none !important;
+
+    writing-mode: horizontal-tb !important;
+
+    background: transparent !important;
+
+    pointer-events: none !important;
+
+    z-index: 500 !important;
+}
+
+
+/* =========================================================
+   READER BUTTON BASE
+   ========================================================= */
+
+body.sky-share-mode #toolbar .iconButton {
+    position: relative !important;
+
+    top: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    left: auto !important;
+    inset: auto !important;
+
+    width: 40px !important;
+    height: 40px !important;
+
+    min-width: 40px !important;
+    min-height: 40px !important;
+
+    max-width: 40px !important;
+    max-height: 40px !important;
+
+    flex: 0 0 40px !important;
+
+    margin: 0 !important;
+    padding: 0 !important;
+
+    transform: none !important;
+
+    writing-mode: horizontal-tb !important;
+
+    pointer-events: auto !important;
+
+    z-index: 501 !important;
+}
+
+
+/* =========================================================
+   PREVIOUS — MIDDLE LEFT
+   ========================================================= */
+
+body.sky-share-mode #toolbar #previousButton {
+    position: fixed !important;
+
+    left: clamp(8px, 1.5vw, 24px) !important;
+    top: 50% !important;
+
+    right: auto !important;
+    bottom: auto !important;
+
+    width: 44px !important;
+    height: 44px !important;
+
+    min-width: 44px !important;
+    min-height: 44px !important;
+
+    max-width: 44px !important;
+    max-height: 44px !important;
+
+    margin: 0 !important;
+
+    transform: translateY(-50%) !important;
+
+    z-index: 510 !important;
+
+    pointer-events: auto !important;
+}
+
+
+/* =========================================================
+   NEXT — MIDDLE RIGHT
+   ========================================================= */
+
+body.sky-share-mode #toolbar #nextButton {
+    position: fixed !important;
+
+    right: clamp(8px, 1.5vw, 24px) !important;
+    top: 50% !important;
+
+    left: auto !important;
+    bottom: auto !important;
+
+    width: 44px !important;
+    height: 44px !important;
+
+    min-width: 44px !important;
+    min-height: 44px !important;
+
+    max-width: 44px !important;
+    max-height: 44px !important;
+
+    margin: 0 !important;
+
+    transform: translateY(-50%) !important;
+
+    z-index: 510 !important;
+
+    pointer-events: auto !important;
+}
+
+
+/* =========================================================
+   OTHER READER CONTROLS — TOP RIGHT
+   ========================================================= */
+
+body.sky-share-mode #toolbar #rotateButton,
+body.sky-share-mode #toolbar #muteButton,
+body.sky-share-mode #toolbar #viewerFullscreenButton,
+body.sky-share-mode #toolbar #readerCloseButton,
+body.sky-share-mode #toolbar #readerShareButton,
+body.sky-share-mode #toolbar #bookmarkAddButton {
+    position: relative !important;
+
+    top: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    left: auto !important;
+    inset: auto !important;
+
+    width: 40px !important;
+    height: 40px !important;
+
+    min-width: 40px !important;
+    min-height: 40px !important;
+
+    max-width: 40px !important;
+    max-height: 40px !important;
+
+    flex: 0 0 40px !important;
+
+    margin: 0 !important;
+    padding: 0 !important;
+
+    transform: none !important;
+
+    pointer-events: auto !important;
+
+    z-index: 502 !important;
+}
+
+
+/* =========================================================
+   READER CONTROL VISIBILITY
+   ========================================================= */
+
+body.sky-share-mode #toolbar #previousButton,
+body.sky-share-mode #toolbar #nextButton,
+body.sky-share-mode #toolbar #rotateButton,
+body.sky-share-mode #toolbar #muteButton,
+body.sky-share-mode #toolbar #viewerFullscreenButton,
+body.sky-share-mode #toolbar #readerCloseButton,
+body.sky-share-mode #toolbar #readerShareButton,
+body.sky-share-mode #toolbar #bookmarkAddButton {
+    display: flex !important;
+
+    visibility: visible !important;
+    opacity: 1 !important;
+
+    pointer-events: auto !important;
+}
+
+
+/* =========================================================
+   READER ICONS
+   ========================================================= */
+
+body.sky-share-mode #toolbar .iconButton .icon {
+    pointer-events: none !important;
+}
+
+
+/* =========================================================
+   SHARE MODE — CENTER ITEM TITLE
+   ========================================================= */
+
+/*
+ * The title belongs visually to the Share header.
+ *
+ * It is centered against the ENTIRE viewport, not merely
+ * centered in the remaining space between the brand and
+ * section labels.
+ */
+
+body.sky-share-mode .sky-share-heading {
+    position: fixed !important;
+
+    top: 0 !important;
+    left: 50% !important;
+
+    right: auto !important;
+
+    width: min(
+        60vw,
+        calc(100vw - 280px)
+    ) !important;
+
+    height: clamp(44px, 5.5vh, 68px) !important;
+
+    min-height: clamp(44px, 5.5vh, 68px) !important;
+
+    padding: 4px 8px !important;
+
+    box-sizing: border-box !important;
+
+    display: flex !important;
+
+    flex-direction: column !important;
+
+    align-items: center !important;
+    justify-content: center !important;
+
+    text-align: center !important;
+
+    /*
+     * THIS is what was missing in the previous version.
+     */
+    transform: translateX(-50%) !important;
+
+    z-index: 205 !important;
+
+    pointer-events: none !important;
+
+    overflow: hidden !important;
+}
+
+
+/* =========================================================
+   SHARE TITLE
+   ========================================================= */
+
+body.sky-share-mode .sky-share-heading .sky-share-title {
+    width: 100% !important;
+
+    margin: 0 !important;
+    padding: 0 !important;
+
+    font-size: clamp(16px, 1.8vw, 23px) !important;
+
+    line-height: 1.2 !important;
+
+    font-weight: 600 !important;
+
+    text-align: center !important;
+
+    white-space: nowrap !important;
+
+    overflow: hidden !important;
+
+    text-overflow: ellipsis !important;
+
+    color: #fff !important;
+
+    text-shadow:
+        0 1px 4px rgba(0,0,0,.75) !important;
+}
+
+
+/* =========================================================
+   SHARE SUBTITLE
+   ========================================================= */
+
+body.sky-share-mode .sky-share-heading .sky-share-subtitle {
+    width: 100% !important;
+
+    margin: 2px 0 0 !important;
+    padding: 0 !important;
+
+    font-size: 11px !important;
+
+    line-height: 1.15 !important;
+
+    text-align: center !important;
+
+    white-space: nowrap !important;
+
+    overflow: hidden !important;
+
+    text-overflow: ellipsis !important;
+
+    opacity: .85 !important;
+
+    color: #fff !important;
+
+    text-shadow:
+        0 1px 4px rgba(0,0,0,.75) !important;
+}
+
+
+/* =========================================================
+   DESKTOP
+   ========================================================= */
+
+@media (min-width: 701px) {
+
+    body.sky-share-mode #toolbar #previousButton {
+        left: clamp(10px, 1.5vw, 24px) !important;
+    }
+
+    body.sky-share-mode #toolbar #nextButton {
+        right: clamp(10px, 1.5vw, 24px) !important;
+    }
+
+}
+
+
+/* =========================================================
+   MOBILE
+   ========================================================= */
+
+@media (max-width: 700px) {
+
+    body.sky-share-mode #toolbar {
+        padding: 6px 6px !important;
+        gap: 4px !important;
+    }
+
+
+    body.sky-share-mode #toolbar .iconButton {
+        width: 36px !important;
+        height: 36px !important;
+
+        min-width: 36px !important;
+        min-height: 36px !important;
+
+        max-width: 36px !important;
+        max-height: 36px !important;
+
+        flex-basis: 36px !important;
+    }
+
+
+    body.sky-share-mode #toolbar #previousButton {
+        left: 4px !important;
+        top: 50% !important;
+
+        width: 40px !important;
+        height: 40px !important;
+
+        min-width: 40px !important;
+        min-height: 40px !important;
+
+        max-width: 40px !important;
+        max-height: 40px !important;
+
+        transform: translateY(-50%) !important;
+    }
+
+
+    body.sky-share-mode #toolbar #nextButton {
+        right: 4px !important;
+        top: 50% !important;
+
+        width: 40px !important;
+        height: 40px !important;
+
+        min-width: 40px !important;
+        min-height: 40px !important;
+
+        max-width: 40px !important;
+        max-height: 40px !important;
+
+        transform: translateY(-50%) !important;
+    }
+
+
+    /*
+     * Center title between the viewport edges.
+     */
+
+    body.sky-share-mode .sky-share-heading {
+        width: calc(100vw - 150px) !important;
+
+        left: 50% !important;
+
+        transform: translateX(-50%) !important;
+    }
+
+
+    body.sky-share-mode .sky-share-heading .sky-share-title {
+        font-size: 16px !important;
+    }
+
+
+    body.sky-share-mode .sky-share-heading .sky-share-subtitle {
+        font-size: 10px !important;
+    }
+}
+
+
+/* =========================================================
+   VERY SMALL SCREENS
+   ========================================================= */
+
+@media (max-width: 480px) {
+
+    body.sky-share-mode #toolbar {
+        padding-left: 3px !important;
+        padding-right: 3px !important;
+        gap: 2px !important;
+    }
+
+
+    body.sky-share-mode #toolbar .iconButton {
+        width: 34px !important;
+        height: 34px !important;
+
+        min-width: 34px !important;
+        min-height: 34px !important;
+
+        max-width: 34px !important;
+        max-height: 34px !important;
+
+        flex-basis: 34px !important;
+    }
+
+
+    body.sky-share-mode #toolbar #previousButton {
+        left: 2px !important;
+
+        width: 38px !important;
+        height: 38px !important;
+
+        min-width: 38px !important;
+        min-height: 38px !important;
+
+        max-width: 38px !important;
+        max-height: 38px !important;
+    }
+
+
+    body.sky-share-mode #toolbar #nextButton {
+        right: 2px !important;
+
+        width: 38px !important;
+        height: 38px !important;
+
+        min-width: 38px !important;
+        min-height: 38px !important;
+
+        max-width: 38px !important;
+        max-height: 38px !important;
+    }
+
+
+    body.sky-share-mode .sky-share-heading {
+        width: calc(100vw - 110px) !important;
+    }
+
+
+    body.sky-share-mode .sky-share-heading .sky-share-title {
+        font-size: 14px !important;
+    }
+
+
+    body.sky-share-mode .sky-share-heading .sky-share-subtitle {
+        display: none !important;
+    }
+}
+
+
+/* =========================================================
+   SHARE MODE — 10 SECOND TOOLBAR TIMEOUT
+   ========================================================= */
+
+/*
+ * Preserve the existing Share Mode timeout behavior.
+ */
+
+body.sky-share-mode.sky-share-toolbar-hidden #toolbar {
+    opacity: 0 !important;
+
+    visibility: hidden !important;
+
+    pointer-events: none !important;
+}
+
+
+/*
+ * The toolbar remains a non-clickable positioning layer.
+ * Its buttons remain clickable.
+ */
+
+body.sky-share-mode #toolbar:not(.share-toolbar-hidden) {
+    pointer-events: none !important;
+}
+
+body.sky-share-mode #toolbar:not(.share-toolbar-hidden) .iconButton {
+    pointer-events: auto !important;
+}
+
