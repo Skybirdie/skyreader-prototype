@@ -273,7 +273,6 @@ body.sky-share-mode #workspacePrimaryLogo {
    REMOVE READER ARTIFACTS
    ========================================================= */
 
-body.sky-share-mode #toolbar,
 body.sky-share-mode #statusBar,
 body.sky-share-mode #bookmarkFlag {
     display: none !important;
@@ -1674,65 +1673,6 @@ body.sky-share-mode .sky-share-media-host #pageContainer {
 }
 
 
-/* =========================================================
-   Share Mode — Reader Toolbar
-   The Reader toolbar remains attached to #readerPanel,
-   not to the reparented #viewerArea.
-   ========================================================= */
-
-body.sky-share-mode #toolbar {
-    display: flex !important;
-
-    position: absolute !important;
-
-    left: 50% !important;
-    bottom: 12px !important;
-
-    transform: translateX(-50%) !important;
-
-    width: max-content !important;
-    height: auto !important;
-
-    min-width: 0 !important;
-    min-height: 0 !important;
-
-    padding: 6px 10px !important;
-    margin: 0 !important;
-
-    align-items: center !important;
-    justify-content: center !important;
-
-    gap: 6px !important;
-
-    visibility: visible !important;
-    opacity: 1 !important;
-
-    pointer-events: auto !important;
-
-    z-index: 500 !important;
-
-    box-sizing: border-box !important;
-}
-
-
-/* Reader toolbar buttons */
-
-body.sky-share-mode #toolbar .iconButton {
-    display: flex !important;
-
-    flex: 0 0 auto !important;
-
-    width: 40px !important;
-    height: 40px !important;
-
-    min-width: 40px !important;
-    min-height: 40px !important;
-
-    visibility: visible !important;
-    opacity: 1 !important;
-
-    pointer-events: auto !important;
-}
 
 
 /* Explicitly restore the Reader navigation controls */
@@ -1779,5 +1719,84 @@ body.sky-share-mode .sky-share-media-host #bookmarkAddButton {
     display: flex !important;
     visibility: visible !important;
     opacity: 1 !important;
+    pointer-events: auto !important;
+}
+
+/* =========================================================
+   Share Mode — Reader toolbar
+   Convert the Reader's normal vertical dock into a
+   horizontal Share Mode control bar.
+   ========================================================= */
+
+body.sky-share-mode #readerPanel #toolbar {
+    display: flex !important;
+    position: absolute !important;
+
+    top: auto !important;
+    right: auto !important;
+    bottom: 12px !important;
+    left: 50% !important;
+
+    width: 376px !important;
+    height: 48px !important;
+
+    min-width: 376px !important;
+    min-height: 48px !important;
+    max-width: none !important;
+    max-height: none !important;
+
+    margin: 0 !important;
+    padding: 4px 8px !important;
+
+    box-sizing: border-box !important;
+
+    flex: none !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: center !important;
+
+    gap: 6px !important;
+
+    overflow: visible !important;
+
+    transform: translateX(-50%) !important;
+
+    writing-mode: horizontal-tb !important;
+
+    z-index: 500 !important;
+}
+
+
+/* Reset the Reader's original absolute button positioning */
+
+body.sky-share-mode #readerPanel #toolbar .iconButton {
+    position: relative !important;
+
+    top: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    left: auto !important;
+
+    inset: auto !important;
+
+    flex: 0 0 40px !important;
+
+    width: 40px !important;
+    height: 40px !important;
+
+    min-width: 40px !important;
+    min-height: 40px !important;
+
+    margin: 0 !important;
+    padding: 0 !important;
+
+    transform: none !important;
+}
+
+
+/* Keep the Share toolbar above the Reader page */
+
+body.sky-share-mode #readerPanel #toolbar,
+body.sky-share-mode #readerPanel #toolbar .iconButton {
     pointer-events: auto !important;
 }
