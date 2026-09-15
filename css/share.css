@@ -1321,13 +1321,6 @@ body.sky-share-mode .app-switch-button {
 }
 
 
-/*
- * Reader toolbar remains suppressed in Share Mode.
- */
-
-body.sky-share-mode #toolbar {
-    display: none !important;
-}
 
 
 /* =========================================================
@@ -1607,7 +1600,7 @@ body.sky-share-mode.sky-share-toolbar-hidden
 body.sky-share-mode.sky-share-toolbar-hidden
     .slideshow-toolbar-secondary,
 body.sky-share-mode.sky-share-toolbar-hidden
-    .sky-share-media-host #toolbar {
+    #toolbar {
     opacity: 0 !important;
     visibility: hidden !important;
     pointer-events: none !important;
@@ -1682,24 +1675,82 @@ body.sky-share-mode .sky-share-media-host #pageContainer {
 
 
 /* =========================================================
-   Share Mode — Reader navigation
-========================================================= */
+   Share Mode — Reader Toolbar
+   The Reader toolbar remains attached to #readerPanel,
+   not to the reparented #viewerArea.
+   ========================================================= */
 
-body.sky-share-mode #previousButton,
-body.sky-share-mode #nextButton {
+body.sky-share-mode #toolbar {
     display: flex !important;
+
+    position: absolute !important;
+
+    left: 50% !important;
+    bottom: 12px !important;
+
+    transform: translateX(-50%) !important;
+
+    width: max-content !important;
+    height: auto !important;
+
+    min-width: 0 !important;
+    min-height: 0 !important;
+
+    padding: 6px 10px !important;
+    margin: 0 !important;
+
+    align-items: center !important;
+    justify-content: center !important;
+
+    gap: 6px !important;
+
     visibility: visible !important;
     opacity: 1 !important;
+
     pointer-events: auto !important;
-    z-index: 300 !important;
+
+    z-index: 500 !important;
+
+    box-sizing: border-box !important;
 }
 
-body.sky-share-mode .sr-control-dock {
+
+/* Reader toolbar buttons */
+
+body.sky-share-mode #toolbar .iconButton {
     display: flex !important;
+
+    flex: 0 0 auto !important;
+
+    width: 40px !important;
+    height: 40px !important;
+
+    min-width: 40px !important;
+    min-height: 40px !important;
+
     visibility: visible !important;
     opacity: 1 !important;
+
     pointer-events: auto !important;
-    z-index: 300 !important;
+}
+
+
+/* Explicitly restore the Reader navigation controls */
+
+body.sky-share-mode #previousButton,
+body.sky-share-mode #nextButton,
+body.sky-share-mode #rotateButton,
+body.sky-share-mode #muteButton,
+body.sky-share-mode #viewerFullscreenButton,
+body.sky-share-mode #readerCloseButton,
+body.sky-share-mode #readerShareButton,
+body.sky-share-mode #bookmarkAddButton {
+    display: flex !important;
+
+    visibility: visible !important;
+    opacity: 1 !important;
+
+    pointer-events: auto !important;
 }
 
 /* =========================================================
@@ -1716,40 +1767,6 @@ body.sky-share-mode .sky-share-media-host #viewerArea {
    The normal Reader toolbar is reused in Share Mode.
    ========================================================= */
 
-body.sky-share-mode .sky-share-media-host #toolbar {
-    display: flex !important;
-    position: absolute !important;
-
-    left: 50% !important;
-    bottom: 12px !important;
-    transform: translateX(-50%) !important;
-
-    width: auto !important;
-    height: auto !important;
-
-    min-width: 0 !important;
-    min-height: 0 !important;
-
-    padding: 6px 10px !important;
-    margin: 0 !important;
-
-    align-items: center !important;
-    justify-content: center !important;
-    gap: 6px !important;
-
-    z-index: 500 !important;
-
-    visibility: visible !important;
-    opacity: 1 !important;
-
-    pointer-events: auto !important;
-}
-
-body.sky-share-mode .sky-share-media-host #toolbar .iconButton {
-    flex: 0 0 auto !important;
-    width: 40px !important;
-    height: 40px !important;
-}
 
 body.sky-share-mode .sky-share-media-host #previousButton,
 body.sky-share-mode .sky-share-media-host #nextButton,
