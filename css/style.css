@@ -2720,3 +2720,31 @@ max-width:35vw;
 .skymedia-share-toast[data-kind="error"]{
   border-color:rgba(180,60,60,.45);
 }
+
+
+/* =========================================================
+   Primary logo — visible over Video and Slideshow
+========================================================= */
+
+#workspacePrimaryLogo {
+    position: fixed !important;
+    top: clamp(10px, 1.5vw, 20px) !important;
+    left: clamp(10px, 1.5vw, 20px) !important;
+    width: clamp(70px, 7vw, 120px) !important;
+    height: auto !important;
+    display: block !important;
+    z-index: 10000 !important;
+    pointer-events: none !important;
+}
+
+
+@media (max-width:700px) {
+
+    #workspacePrimaryLogo {
+        top: 8px !important;
+        left: 8px !important;
+        width: 72px !important;
+        z-index: 10000 !important;
+    }
+
+}

@@ -1667,3 +1667,34 @@ body.sky-share-mode .sky-share-media-host #pageContainer {
     max-height: none !important;
     overflow: hidden !important;
 }
+
+
+/* =========================================================
+   Share Mode — Reader navigation
+========================================================= */
+
+body.sky-share-mode #previousButton,
+body.sky-share-mode #nextButton {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    z-index: 300 !important;
+}
+
+body.sky-share-mode .sr-control-dock {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    z-index: 300 !important;
+}
+
+/* =========================================================
+   Share Mode — Reader viewing clearance
+========================================================= */
+
+body.sky-share-mode .sky-share-media-host #viewerArea {
+    padding: 12px 16px 48px !important;
+    box-sizing: border-box !important;
+}
