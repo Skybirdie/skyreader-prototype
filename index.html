@@ -204,7 +204,11 @@ window.dispatchEvent(new Event("skyreader-pdfjs-ready"));
 </header>
 
 <main id="workspace">
-
+<img
+    id="workspacePrimaryLogo"
+    src="assets/primary-logo.png"
+    alt=""
+    aria-hidden="true">
 <aside id="libraryPanel">
 
 
@@ -1463,8 +1467,6 @@ SlideshowLibrary.load(manifestSlideshows);
         <div id="slideshowStage" class="slideshow-stage" aria-live="polite"></div>
         <div id="slideshowPlaybackStatus" class="slideshow-playback-status"></div>
         <audio id="slideshowAudio" preload="auto"></audio>
-
-<div id="slideshowViewerTitle" class="slideshow-viewer-title"></div>
 
 <div
     id="slideshowAudioCue"
