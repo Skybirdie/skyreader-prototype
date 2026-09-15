@@ -2728,12 +2728,12 @@ max-width:35vw;
 
 #workspacePrimaryLogo {
     position: fixed !important;
-    top: clamp(10px, 1.5vw, 20px) !important;
+    top: clamp(35px, 4vw, 40px) !important;
     left: clamp(10px, 1.5vw, 20px) !important;
     width: clamp(70px, 7vw, 120px) !important;
     height: auto !important;
     display: block !important;
-    z-index: 10000 !important;
+    z-index: 1500 !important;
     pointer-events: none !important;
 }
 
