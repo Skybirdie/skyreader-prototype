@@ -248,6 +248,29 @@ window.ShareViewer = (function () {
             "#frontPage",
             "#frontSection",
 
+            /*
+             * Root containers for the three normal app sections.
+             *
+             * AppSwitcher normally toggles ".app-section-hidden" on
+             * whichever of these is not active, but AppSwitcher.init()
+             * is intentionally never called in Share Mode. Left alone,
+             * #workspace (Reader/library home), #videoSection, and
+             * #slideshowSection all stay visible in their default
+             * state and bleed through the Share shell's transparent
+             * background -- this is the "landing visible behind the
+             * item" bug.
+             *
+             * By the time this runs, prepareVideo()/prepareSlideshow()/
+             * prepareBook() have already reparented the one viewer
+             * actually being shared out of its section (see
+             * detachExistingViewer()), so hiding all three root
+             * containers here is always safe: the active viewer no
+             * longer lives inside any of them.
+             */
+            "#workspace",
+            "#videoSection",
+            "#slideshowSection",
+
             "#videoTopBar",
             "#videoLibrary",
             "#videoSearchGroup",
