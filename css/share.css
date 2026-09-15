@@ -160,7 +160,7 @@ body.sky-share-mode {
 
 body.sky-share-mode #workspacePrimaryLogo {
     position: fixed;
-    top: clamp(25px, 3vw, 30px);
+    top: clamp(35px, 4vw, 40px);
     left: clamp(8px, 1.2vw, 18px);
     width: clamp(70px, 7vw, 120px);
     height: auto;
