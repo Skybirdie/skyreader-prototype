@@ -2316,4 +2316,1161 @@ body.sky-share-mode #toolbar .iconButton {
 
 }
 
+#skyShareViewer:fullscreen #skyShareTopbar,
+#skyShareViewer:-webkit-full-screen #skyShareTopbar {
+    display: none !important;
+}
+
+#skyShareViewer:fullscreen,
+#skyShareViewer:-webkit-full-screen {
+    width: 100vw !important;
+    height: 100vh !important;
+    max-width: none !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* =========================================================
+SKYMEDIA SHARE BOOK — FINAL CLEAN OVERRIDE
+==========================================
+
+This block MUST remain at the very end of share.css.
+
+BOOK SHARE:
+• Rotate hidden.
+• Mute / Share / Fullscreen / X in upper-right.
+• Equal control gaps.
+• Previous / Next at page edges.
+• Previous hidden on page 1.
+• Next hidden on final page.
+• Status + Welcome visible.
+• Equal upper/lower page clearance.
+• Fullscreen hides Share header.
+• Closed state shows large Open button.
+========================================================= */
+
+/* =========================================================
+
+1. SHARE BOOK GEOMETRY
+   ========================================================= */
+
+body.sky-share-mode.sky-share-book {
+
+ 
+/*
+ * This is the amount of vertical space reserved above
+ * and below the actual page surface.
+ *
+ * The upper portion accommodates the four-button toolbar.
+ * The exact same value is reserved below the page before
+ * the status bar.
+ */
+--sky-share-book-edge-gap:
+    clamp(48px, 7vh, 64px);
+
+--sky-share-book-control-size:
+    clamp(38px, 4.5vw, 44px);
+
+--sky-share-book-control-gap:
+    clamp(8px, 1vw, 14px);
+
+--sky-share-book-nav-size:
+    clamp(44px, 5vw, 52px);
+ 
+
+}
+
+/* =========================================================
+2. SHARE SHELL
+========================================================= */
+
+body.sky-share-mode .sky-share-shell {
+
+ 
+width: 100vw !important;
+height: 100dvh !important;
+
+min-width: 0 !important;
+min-height: 0 !important;
+
+overflow: hidden !important;
+
+box-sizing: border-box !important;
+ 
+
+}
+
+/* =========================================================
+3. SHARE HEADER
+========================================================= */
+
+body.sky-share-mode .sky-share-header {
+
+ 
+flex: 0 0 auto !important;
+
+width: 100% !important;
+
+height:
+    clamp(44px, 5.5vh, 68px) !important;
+
+min-height:
+    clamp(44px, 5.5vh, 68px) !important;
+
+box-sizing: border-box !important;
+
+z-index: 100000 !important;
+ 
+
+}
+
+/*
+
+* The item heading remains available in normal Share Mode.
+  */
+  body.sky-share-mode .sky-share-heading {
+
+  pointer-events: none !important;
+
+  z-index: 100001 !important;
+  }
+
+/* =========================================================
+4. MAIN SHARE AREA
+========================================================= */
+
+body.sky-share-mode .sky-share-main {
+
+ 
+position: relative !important;
+
+flex: 1 1 auto !important;
+
+min-width: 0 !important;
+min-height: 0 !important;
+
+width: 100% !important;
+height: auto !important;
+
+margin: 0 !important;
+padding: 0 !important;
+
+display: flex !important;
+flex-direction: column !important;
+
+overflow: hidden !important;
+
+box-sizing: border-box !important;
+ 
+
+}
+
+/* =========================================================
+5. MEDIA HOST
+========================================================= */
+
+body.sky-share-mode .sky-share-media-host {
+
+ 
+position: relative !important;
+
+flex: 1 1 auto !important;
+
+min-width: 0 !important;
+min-height: 0 !important;
+
+width: 100% !important;
+height: 100% !important;
+
+margin: 0 !important;
+padding: 0 !important;
+
+display: flex !important;
+flex-direction: column !important;
+
+align-items: stretch !important;
+justify-content: stretch !important;
+
+overflow: hidden !important;
+
+box-sizing: border-box !important;
+
+background: transparent !important;
+ 
+
+}
+
+/* =========================================================
+6. BOOK VIEWER
+========================================================= */
+
+body.sky-share-mode.sky-share-book
+.sky-share-media-host #viewerArea {
+
+ 
+position: relative !important;
+
+flex: 1 1 auto !important;
+
+min-width: 0 !important;
+min-height: 0 !important;
+
+width: 100% !important;
+height: auto !important;
+
+max-width: none !important;
+max-height: none !important;
+
+margin: 0 !important;
+
+/*
+ * TOP:
+ * Same physical clearance that is available to the
+ * upper-right Share toolbar.
+ *
+ * BOTTOM:
+ * EXACTLY the same clearance before #statusBar.
+ */
+padding-top:
+    var(--sky-share-book-edge-gap) !important;
+
+padding-bottom:
+    var(--sky-share-book-edge-gap) !important;
+
+padding-left:
+    clamp(12px, 2vw, 28px) !important;
+
+padding-right:
+    clamp(12px, 2vw, 28px) !important;
+
+box-sizing: border-box !important;
+
+display: flex !important;
+
+align-items: center !important;
+justify-content: center !important;
+
+overflow: hidden !important;
+
+z-index: 1 !important;
+ 
+
+}
+
+/* =========================================================
+7. READER PANEL / BACKGROUND / PAGE CONTAINER
+========================================================= */
+
+body.sky-share-mode.sky-share-book
+.sky-share-media-host #readerPanel {
+
+ 
+position: relative !important;
+
+flex: 1 1 auto !important;
+
+min-width: 0 !important;
+min-height: 0 !important;
+
+width: 100% !important;
+height: 100% !important;
+
+margin: 0 !important;
+padding: 0 !important;
+
+display: flex !important;
+
+overflow: hidden !important;
+
+box-sizing: border-box !important;
+ 
+
+}
+
+body.sky-share-mode.sky-share-book
+.sky-share-media-host #viewerBackground {
+
+ 
+position: relative !important;
+
+flex: 1 1 auto !important;
+
+min-width: 0 !important;
+min-height: 0 !important;
+
+width: 100% !important;
+height: 100% !important;
+
+margin: 0 !important;
+padding: 0 !important;
+
+display: flex !important;
+
+align-items: center !important;
+justify-content: center !important;
+
+overflow: hidden !important;
+
+box-sizing: border-box !important;
+
+z-index: 1 !important;
+ 
+
+}
+
+body.sky-share-mode.sky-share-book
+.sky-share-media-host #pageContainer {
+
+ 
+position: relative !important;
+
+flex: 1 1 auto !important;
+
+min-width: 0 !important;
+min-height: 0 !important;
+
+width: 100% !important;
+height: 100% !important;
+
+max-width: none !important;
+max-height: none !important;
+
+margin: 0 !important;
+padding: 0 !important;
+
+display: flex !important;
+
+align-items: center !important;
+justify-content: center !important;
+
+overflow: hidden !important;
+
+box-sizing: border-box !important;
+
+z-index: 1 !important;
+ 
+
+}
+
+/* =========================================================
+8. READER TOOLBAR
+========================================================= */
+
+/*
+
+* The toolbar is now inside .sky-share-media-host.
+*
+* It occupies the upper-right safe zone.
+  */
+  body.sky-share-mode.sky-share-book
+  .sky-share-media-host #toolbar {
+
+  position: absolute !important;
+
+  top: 0 !important;
+  right: 0 !important;
+  left: auto !important;
+  bottom: auto !important;
+
+  width: auto !important;
+  height:
+  var(--sky-share-book-edge-gap) !important;
+
+  min-width: 0 !important;
+  min-height:
+  var(--sky-share-book-edge-gap) !important;
+
+  max-width:
+  calc(100% - 24px) !important;
+
+  margin: 0 !important;
+
+  padding:
+  4px clamp(10px, 1.5vw, 18px) !important;
+
+  display: flex !important;
+
+  flex-direction: row !important;
+
+  align-items: center !important;
+  justify-content: flex-end !important;
+
+  gap:
+  var(--sky-share-book-control-gap) !important;
+
+  box-sizing: border-box !important;
+
+  background: transparent !important;
+
+  border: 0 !important;
+  box-shadow: none !important;
+
+  transform: none !important;
+
+  overflow: visible !important;
+
+  visibility: visible !important;
+  opacity: 1 !important;
+
+  pointer-events: none !important;
+
+  z-index: 1000008 !important;
+  }
+
+/*
+
+* All Share Book toolbar buttons.
+  */
+  body.sky-share-mode.sky-share-book
+  .sky-share-media-host #toolbar .iconButton {
+
+  position: relative !important;
+
+  top: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  left: auto !important;
+  inset: auto !important;
+
+  flex:
+  0 0 var(--sky-share-book-control-size) !important;
+
+  width:
+  var(--sky-share-book-control-size) !important;
+
+  height:
+  var(--sky-share-book-control-size) !important;
+
+  min-width:
+  var(--sky-share-book-control-size) !important;
+
+  min-height:
+  var(--sky-share-book-control-size) !important;
+
+  max-width:
+  var(--sky-share-book-control-size) !important;
+
+  max-height:
+  var(--sky-share-book-control-size) !important;
+
+  margin: 0 !important;
+  padding: 0 !important;
+
+  display: flex !important;
+
+  align-items: center !important;
+  justify-content: center !important;
+
+  transform: none !important;
+
+  visibility: visible !important;
+  opacity: 1 !important;
+
+  pointer-events: auto !important;
+
+  box-sizing: border-box !important;
+
+  z-index: 1000009 !important;
+  }
+
+/* =========================================================
+9. REMOVE ROTATE
+========================================================= */
+
+body.sky-share-mode.sky-share-book
+.sky-share-media-host #rotateButton {
+
+ 
+display: none !important;
+
+visibility: hidden !important;
+opacity: 0 !important;
+
+pointer-events: none !important;
+
+width: 0 !important;
+min-width: 0 !important;
+
+height: 0 !important;
+min-height: 0 !important;
+
+margin: 0 !important;
+padding: 0 !important;
+ 
+
+}
+
+/* =========================================================
+10. REMOVE BOOKMARK
+========================================================= */
+
+body.sky-share-mode.sky-share-book
+.sky-share-media-host #bookmarkAddButton {
+
+ 
+display: none !important;
+
+visibility: hidden !important;
+opacity: 0 !important;
+
+pointer-events: none !important;
+ 
+
+}
+
+/* =========================================================
+11. UPPER-RIGHT CONTROL ORDER
+========================================================= */
+
+/*
+
+* Because the DOM order is:
+
+   
+  previous
+  rotate
+  mute
+  fullscreen
+  X
+  share
+  bookmark
+  next
+   
+
+* flex positioning cannot be relied on once Previous/Next are
+
+* independently positioned.
+
+* Give the four Share controls explicit order values.
+  */
+  body.sky-share-mode.sky-share-book
+  .sky-share-media-host #muteButton {
+  order: 10 !important;
+  }
+
+body.sky-share-mode.sky-share-book
+.sky-share-media-host #readerShareButton {
+order: 20 !important;
+}
+
+body.sky-share-mode.sky-share-book
+.sky-share-media-host #viewerFullscreenButton {
+order: 30 !important;
+}
+
+body.sky-share-mode.sky-share-book
+.sky-share-media-host #readerCloseButton {
+order: 40 !important;
+}
+
+/* =========================================================
+12. PREVIOUS / NEXT
+========================================================= */
+
+body.sky-share-mode.sky-share-book
+.sky-share-media-host #toolbar #previousButton,
+
+body.sky-share-mode.sky-share-book
+.sky-share-media-host #toolbar #nextButton {
+
+ 
+position: absolute !important;
+
+top: 50% !important;
+bottom: auto !important;
+
+width:
+    var(--sky-share-book-nav-size) !important;
+
+height:
+    var(--sky-share-book-nav-size) !important;
+
+min-width:
+    var(--sky-share-book-nav-size) !important;
+
+min-height:
+    var(--sky-share-book-nav-size) !important;
+
+max-width:
+    var(--sky-share-book-nav-size) !important;
+
+max-height:
+    var(--sky-share-book-nav-size) !important;
+
+margin: 0 !important;
+padding: 0 !important;
+
+display: flex !important;
+
+align-items: center !important;
+justify-content: center !important;
+
+transform: translateY(-50%) !important;
+
+visibility: visible !important;
+opacity: 1 !important;
+
+pointer-events: auto !important;
+
+z-index: 1000010 !important;
+
+box-sizing: border-box !important;
+ 
+
+}
+
+body.sky-share-mode.sky-share-book
+.sky-share-media-host #toolbar #previousButton {
+
+ 
+left: 4px !important;
+right: auto !important;
+
+order: 1 !important;
+ 
+
+}
+
+body.sky-share-mode.sky-share-book
+.sky-share-media-host #toolbar #nextButton {
+
+ 
+right: 4px !important;
+left: auto !important;
+
+order: 2 !important;
+ 
+
+}
+
+/*
+
+* JS controls actual visibility according to current page.
+* These rules provide the visual hidden state.
+  */
+  body.sky-share-mode.sky-share-book
+  .sky-share-media-host #previousButton[hidden],
+
+body.sky-share-mode.sky-share-book
+.sky-share-media-host #nextButton[hidden] {
+
+ 
+display: none !important;
+ 
+
+}
+
+/* =========================================================
+13. STATUS BAR
+========================================================= */
+
+body.sky-share-mode.sky-share-book
+.sky-share-media-host #statusBar {
+
+ 
+position: relative !important;
+
+flex: 0 0 auto !important;
+
+width: 100% !important;
+
+height:
+    clamp(24px, 3vh, 32px) !important;
+
+min-height:
+    clamp(24px, 3vh, 32px) !important;
+
+max-height:
+    clamp(24px, 3vh, 32px) !important;
+
+margin: 0 !important;
+padding: 2px 8px !important;
+
+display: block !important;
+
+box-sizing: border-box !important;
+
+background: var(--panel) !important;
+
+color: var(--text) !important;
+
+z-index: 200 !important;
+
+visibility: visible !important;
+opacity: 1 !important;
+
+overflow: hidden !important;
+ 
+
+}
+
+body.sky-share-mode.sky-share-book
+.sky-share-media-host #statusBar center {
+
+ 
+width: 100% !important;
+height: 100% !important;
+
+margin: 0 !important;
+
+display: flex !important;
+
+align-items: center !important;
+justify-content: center !important;
+
+gap: 14px !important;
+
+text-align: center !important;
+ 
+
+}
+
+/* =========================================================
+14. WELCOME BAR
+========================================================= */
+
+body.sky-share-mode.sky-share-book
+.sky-share-media-host .sr-welcome-banner {
+
+ 
+position: relative !important;
+
+flex: 0 0 auto !important;
+
+left: auto !important;
+right: auto !important;
+top: auto !important;
+bottom: auto !important;
+
+width: 100% !important;
+
+height: 22px !important;
+min-height: 22px !important;
+max-height: 22px !important;
+
+margin: 0 !important;
+padding: 2px 8px !important;
+
+display: flex !important;
+
+align-items: center !important;
+justify-content: center !important;
+
+box-sizing: border-box !important;
+
+background: var(--panel) !important;
+
+color: var(--muted) !important;
+
+z-index: 201 !important;
+
+visibility: visible !important;
+opacity: 1 !important;
+
+overflow: hidden !important;
+ 
+
+}
+
+body.sky-share-mode.sky-share-book
+.sky-share-media-host .sr-welcome-banner center {
+
+ 
+display: block !important;
+
+width: 100% !important;
+
+margin: 0 !important;
+padding: 0 !important;
+
+line-height: 18px !important;
+
+text-align: center !important;
+ 
+
+}
+
+/* =========================================================
+15. HIDE NORMAL SHARE FOOTER ACTIONS FOR BOOKS
+========================================================= */
+
+body.sky-share-mode.sky-share-book
+.sky-share-actions {
+
+ 
+display: none !important;
+ 
+
+}
+
+/* =========================================================
+16. FULLSCREEN
+========================================================= */
+
+body.sky-share-mode
+.sky-share-shell:fullscreen {
+
+ 
+width: 100vw !important;
+height: 100vh !important;
+
+max-width: none !important;
+max-height: none !important;
+
+margin: 0 !important;
+padding: 0 !important;
+
+background: transparent !important;
+ 
+
+}
+
+/*
+
+* Hide the Share header in fullscreen.
+*
+* The book and its four controls remain.
+  */
+  body.sky-share-mode
+  .sky-share-shell:fullscreen
+  .sky-share-header {
+
+  display: none !important;
+  }
+
+/*
+
+* The fullscreen Share main area gets the complete viewport.
+  */
+  body.sky-share-mode
+  .sky-share-shell:fullscreen
+  .sky-share-main {
+
+  width: 100vw !important;
+  height: 100vh !important;
+
+  min-width: 0 !important;
+  min-height: 0 !important;
+
+  flex: 1 1 auto !important;
+  }
+
+/*
+
+* Recalculate the book's available space after the header
+* disappears. The same upper/lower clearance remains.
+  */
+  body.sky-share-mode
+  .sky-share-shell:fullscreen
+  .sky-share-media-host {
+
+  width: 100vw !important;
+  height: 100vh !important;
+
+  min-width: 0 !important;
+  min-height: 0 !important;
+  }
+
+/* =========================================================
+17. CLOSED SHARE DOCUMENT
+========================================================= */
+
+body.sky-share-mode
+.sky-share-shell.sky-share-document-closed
+.sky-share-header,
+
+body.sky-share-mode
+.sky-share-shell.sky-share-document-closed
+.sky-share-heading,
+
+body.sky-share-mode
+.sky-share-shell.sky-share-document-closed
+.sky-share-status {
+
+ 
+display: none !important;
+
+visibility: hidden !important;
+opacity: 0 !important;
+
+pointer-events: none !important;
+ 
+
+}
+
+body.sky-share-mode
+.sky-share-media-host.sky-share-document-closed {
+
+ 
+display: none !important;
+
+visibility: hidden !important;
+opacity: 0 !important;
+
+pointer-events: none !important;
+ 
+
+}
+
+/*
+
+* Large navigation panel.
+  */
+  body.sky-share-mode
+  .sky-share-closed-panel {
+
+  position: absolute !important;
+
+  inset: 0 !important;
+
+  width: 100% !important;
+  height: 100% !important;
+
+  display: flex !important;
+
+  flex-direction: column !important;
+
+  align-items: center !important;
+  justify-content: center !important;
+
+  gap: clamp(18px, 3vh, 30px) !important;
+
+  padding:
+  30px !important;
+
+  box-sizing: border-box !important;
+
+  background: transparent !important;
+
+  z-index: 10000000 !important;
+  }
+
+/*
+
+* Small explanatory message above the button.
+  */
+  body.sky-share-mode
+  .sky-share-closed-message {
+
+  max-width: 90vw !important;
+
+  font-size:
+  clamp(14px, 1.5vw, 20px) !important;
+
+  line-height: 1.4 !important;
+
+  text-align: center !important;
+
+  color: var(--text, #fff) !important;
+
+  text-shadow:
+  0 2px 8px rgba(0,0,0,.5) !important;
+  }
+
+/*
+
+* Big navigation button.
+  */
+  body.sky-share-mode
+  .sky-share-big-open-button {
+
+  display: inline-flex !important;
+
+  align-items: center !important;
+  justify-content: center !important;
+
+  width:
+  min(420px, 82vw) !important;
+
+  min-height:
+  clamp(58px, 8vh, 82px) !important;
+
+  padding:
+  14px 30px !important;
+
+  box-sizing: border-box !important;
+
+  border-radius: 18px !important;
+
+  text-decoration: none !important;
+
+  font-size:
+  clamp(17px, 2vw, 24px) !important;
+
+  font-weight: 700 !important;
+
+  letter-spacing: .01em !important;
+
+  color: #fff !important;
+
+  background:
+  rgba(25,25,25,.72) !important;
+
+  border:
+  1px solid rgba(255,255,255,.30) !important;
+
+  backdrop-filter:
+  blur(12px) !important;
+
+  box-shadow:
+  0 12px 35px rgba(0,0,0,.32) !important;
+
+  cursor: pointer !important;
+
+  transition:
+  transform .2s ease,
+  box-shadow .2s ease,
+  background .2s ease !important;
+  }
+
+body.sky-share-mode
+.sky-share-big-open-button:hover {
+
+ 
+transform: translateY(-2px) !important;
+
+background:
+    rgba(35,35,35,.84) !important;
+
+box-shadow:
+    0 16px 42px rgba(0,0,0,.40) !important;
+ 
+
+}
+
+body.sky-share-mode
+.sky-share-big-open-button:active {
+
+ 
+transform: scale(.97) !important;
+ 
+
+}
+
+/* =========================================================
+18. PREVENT NORMAL READER UI FROM REAPPEARING AFTER X
+========================================================= */
+
+body.sky-share-mode
+#workspace,
+
+body.sky-share-mode
+#topBar,
+
+body.sky-share-mode
+#libraryPanel,
+
+body.sky-share-mode
+#readerLibrary,
+
+body.sky-share-mode
+#readerDrawer,
+
+body.sky-share-mode
+#toolbar:not(.sky-share-media-host #toolbar),
+
+body.sky-share-mode
+[data-app-target],
+
+body.sky-share-mode
+.app-switcher,
+
+body.sky-share-mode
+.responsive-app-menu,
+
+body.sky-share-mode
+.responsive-app-menu-button {
+
+ 
+/*
+ * The ShareViewer JS re-isolates these after Reader.close().
+ * !important is intentional because Reader.close() can
+ * restore the normal Reader landing inline.
+ */
+ 
+
+}
+
+/* =========================================================
+19. MOBILE
+========================================================= */
+
+@media (max-width: 700px) {
+
+ 
+body.sky-share-mode.sky-share-book {
+
+    --sky-share-book-edge-gap:
+        clamp(48px, 7vh, 58px);
+
+    --sky-share-book-control-size:
+        40px;
+
+    --sky-share-book-control-gap:
+        7px;
+
+    --sky-share-book-nav-size:
+        44px;
+}
+
+
+body.sky-share-mode.sky-share-book
+.sky-share-media-host #toolbar {
+
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+
+    max-width:
+        calc(100% - 16px) !important;
+}
+
+
+body.sky-share-mode.sky-share-book
+.sky-share-media-host #toolbar
+.iconButton {
+
+    flex-basis:
+        var(--sky-share-book-control-size) !important;
+
+    width:
+        var(--sky-share-book-control-size) !important;
+
+    height:
+        var(--sky-share-book-control-size) !important;
+
+    min-width:
+        var(--sky-share-book-control-size) !important;
+
+    min-height:
+        var(--sky-share-book-control-size) !important;
+}
+
+
+body.sky-share-mode.sky-share-book
+.sky-share-media-host #toolbar
+#previousButton {
+
+    left: 2px !important;
+}
+
+
+body.sky-share-mode.sky-share-book
+.sky-share-media-host #toolbar
+#nextButton {
+
+    right: 2px !important;
+}
+
+
+body.sky-share-mode
+.sky-share-shell:fullscreen
+.sky-share-media-host
+#toolbar {
+
+    padding-top: 4px !important;
+}
+
+
+}
 
