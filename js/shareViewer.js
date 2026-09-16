@@ -1,6 +1,6 @@
 "use strict";
 
-# /*
+/*
 
 SkyMedia Share Viewer
 Version 1.1.0
@@ -25,7 +25,7 @@ Share Mode intentionally does NOT expose:
 • Search
 • Normal section navigation
 
-## BOOK SHARE CONTROL FIX
+BOOK SHARE CONTROL FIX
 
 Share Mode mounts #viewerArea into the Share shell, but the
 normal Reader toolbar remains in #workspace.
@@ -33,16 +33,10 @@ normal Reader toolbar remains in #workspace.
 This version explicitly prepares the existing Reader controls
 for Share Mode instead of creating duplicate Reader controls.
 
-The existing Reader event handlers are preserved. We do not
-replace Reader navigation logic; we make sure the existing
-controls remain visible, above the Share shell, and clickable.
-==============================================================
-
 */
 
 window.ShareViewer = (function () {
 
- 
 let started = false;
 let activeItem = null;
 let activeTarget = null;
@@ -1337,6 +1331,5 @@ return {
     }
 
 };
-
 
 })();
