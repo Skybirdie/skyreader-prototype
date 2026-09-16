@@ -724,96 +724,98 @@ window.ShareViewer = (function () {
 
     async function enterShareFullscreen() {
 
+    /*
+     * Share Mode needs the ENTIRE Share Viewer shell
+     * to become the browser fullscreen element.
+     *
+     * This keeps:
+     *   - the actual book
+     *   - Reader toolbar
+     *   - Reader controls
+     *   - Share Viewer layout
+     *
+     * together in fullscreen.
+     *
+     * Do NOT fullscreen #viewerBackground because in the
+     * current Reader layout that element is the background
+     * layer rather than the complete Reader surface.
+     */
+
+    const target =
+        document.getElementById("skyShareViewer") ||
+        document.getElementById("sky-share-media-host") ||
+        document.getElementById("viewerArea");
+
+
+    if (!target) {
+
+        console.warn(
+            "[ShareViewer] No Share fullscreen target found."
+        );
+
+        return;
+
+    }
+
+
+    try {
+
         /*
-         * Use the existing Reader viewer/background as the
-         * fullscreen element.
-         *
-         * The toolbar is inside the viewer, so the Reader
-         * controls remain available in browser fullscreen.
+         * Already fullscreen → exit fullscreen.
          */
-        const target =
-            document.getElementById(
-                "viewerBackground"
-            ) ||
-            document.getElementById(
-                "viewerArea"
-            ) ||
-            mediaHost;
+        if (document.fullscreenElement) {
+
+            if (
+                typeof document.exitFullscreen ===
+                "function"
+            ) {
+
+                await document.exitFullscreen();
+
+            }
+
+            return;
+        }
 
 
-        if (!target) {
+        if (
+            typeof target.requestFullscreen ===
+            "function"
+        ) {
 
-            console.warn(
-                "[ShareViewer] No fullscreen target found."
-            );
-
+            await target.requestFullscreen();
 
             return;
 
         }
 
 
-        try {
+        if (
+            typeof target.webkitRequestFullscreen ===
+            "function"
+        ) {
 
-            if (
-                document.fullscreenElement
-            ) {
+            target.webkitRequestFullscreen();
 
-                if (
-                    typeof document.exitFullscreen ===
-                    "function"
-                ) {
-
-                    await document.exitFullscreen();
-
-                }
-
-
-                return;
-            }
-
-
-            if (
-                typeof target.requestFullscreen ===
-                "function"
-            ) {
-
-                await target.requestFullscreen();
-
-                return;
-
-            }
-
-
-            /*
-             * Safari / older WebKit fallback.
-             */
-            if (
-                typeof target.webkitRequestFullscreen ===
-                "function"
-            ) {
-
-                target.webkitRequestFullscreen();
-
-                return;
-
-            }
-
-
-            console.warn(
-                "[ShareViewer] Browser fullscreen API unavailable."
-            );
-
-        } catch (error) {
-
-            console.warn(
-                "[ShareViewer] Fullscreen request failed:",
-                error
-            );
+            return;
 
         }
 
+
+        console.warn(
+            "[ShareViewer] Browser fullscreen API unavailable."
+        );
+
+
+    } catch (error) {
+
+        console.warn(
+            "[ShareViewer] Fullscreen request failed:",
+            error
+        );
+
     }
+}
 
 
     /* --------------------------------------------------
@@ -2088,187 +2090,251 @@ window.ShareViewer = (function () {
 
     function close() {
 
-        /*
-         * Leave browser fullscreen first if Share Mode
-         * is currently fullscreen.
-         */
-        try {
+    /*
+     * Leave browser fullscreen if necessary.
+     */
+    try {
 
-            if (
-                document.fullscreenElement &&
-                typeof document.exitFullscreen ===
-                "function"
-            ) {
+        if (
+            document.fullscreenElement &&
+            typeof document.exitFullscreen ===
+            "function"
+        ) {
 
-                document.exitFullscreen()
-                    .catch(function () {});
+            document.exitFullscreen()
+                .catch(function () {});
 
-            }
-
-        } catch (error) {
-            /* Ignore fullscreen cleanup errors */
         }
 
-
-        /*
-         * Remove ShareViewer-specific listeners.
-         */
-        removeShareReaderHandlers();
+    } catch (error) {
+        /* Ignore fullscreen cleanup errors */
+    }
 
 
-        wheelBusy = false;
+    /*
+     * Remove ShareViewer-specific event listeners.
+     */
+    removeShareReaderHandlers();
 
 
-        try {
+    wheelBusy = false;
 
-            if (
-                activeTarget &&
+
+    /*
+     * Close the underlying viewer.
+     *
+     * We deliberately DO NOT restore the normal Reader
+     * interface afterward.
+     */
+    try {
+
+        if (
+            activeTarget &&
+            (
                 String(
                     activeTarget.section
-                ).toLowerCase() ===
-                "video" &&
-                typeof window.VideoViewer !==
-                "undefined" &&
-                VideoViewer
-            ) {
+                ).toLowerCase() === "book" ||
 
-                if (
-                    typeof VideoViewer.closeVideo ===
-                    "function"
-                ) {
-
-                    VideoViewer.closeVideo();
-
-                } else if (
-                    typeof VideoViewer.close ===
-                    "function"
-                ) {
-
-                    VideoViewer.close();
-
-                }
-
-            }
-
-
-            if (
-                activeTarget &&
                 String(
                     activeTarget.section
-                ).toLowerCase() ===
-                "slideshow" &&
-                typeof window.SlideshowViewer !==
-                "undefined" &&
-                SlideshowViewer
-            ) {
+                ).toLowerCase() === "reader"
+            ) &&
+            typeof window.Reader !==
+            "undefined" &&
+            Reader &&
+            typeof Reader.close ===
+            "function"
+        ) {
 
-                if (
-                    typeof SlideshowViewer.close ===
-                    "function"
-                ) {
-
-                    SlideshowViewer.close();
-
-                }
-
-            }
-
-
-            if (
-                activeTarget &&
-                (
-                    String(
-                        activeTarget.section
-                    ).toLowerCase() ===
-                    "book" ||
-
-                    String(
-                        activeTarget.section
-                    ).toLowerCase() ===
-                    "reader"
-                ) &&
-                typeof window.Reader !==
-                "undefined" &&
-                Reader &&
-                typeof Reader.close ===
-                "function"
-            ) {
-
-                Reader.close({
-                    playSound: false
-                });
-
-            }
-
-        } catch (error) {
-
-            console.warn(
-                "[ShareViewer] Viewer close error:",
-                error
-            );
+            Reader.close({
+                playSound: false
+            });
 
         }
 
 
-        restoreBookControls();
+        if (
+            activeTarget &&
+            String(
+                activeTarget.section
+            ).toLowerCase() === "video" &&
+            typeof window.VideoViewer !==
+            "undefined" &&
+            VideoViewer
+        ) {
+
+            if (
+                typeof VideoViewer.closeVideo ===
+                "function"
+            ) {
+
+                VideoViewer.closeVideo();
+
+            } else if (
+                typeof VideoViewer.close ===
+                "function"
+            ) {
+
+                VideoViewer.close();
+
+            }
+
+        }
 
 
-        document.body.classList.remove(
-            "sky-share-mode"
+        if (
+            activeTarget &&
+            String(
+                activeTarget.section
+            ).toLowerCase() === "slideshow" &&
+            typeof window.SlideshowViewer !==
+            "undefined" &&
+            SlideshowViewer
+        ) {
+
+            if (
+                typeof SlideshowViewer.close ===
+                "function"
+            ) {
+
+                SlideshowViewer.close();
+
+            }
+
+        }
+
+    } catch (error) {
+
+        console.warn(
+            "[ShareViewer] Viewer close error:",
+            error
         );
 
+    }
+
+
+    /*
+     * IMPORTANT:
+     *
+     * Do NOT call restoreBookControls().
+     *
+     * The normal Reader UI must remain hidden while this
+     * standalone Share Viewer remains on screen.
+     */
+
+
+    document.body.classList.add(
+        "sky-share-mode"
+    );
+
+
+    /*
+     * Keep all normal application areas hidden.
+     */
+    document
+        .querySelectorAll(
+            ".sky-share-hidden-app"
+        )
+        .forEach(function (el) {
+
+            el.classList.add(
+                "sky-share-hidden-app"
+            );
+
+        });
+
+
+    /*
+     * Explicitly keep the ordinary Reader interface hidden.
+     */
+    [
+        "#workspace",
+        "#toolbar",
+        "#statusBar",
+        ".sr-welcome-banner",
+        "#librarySection",
+        "#landingSection",
+        "#mainNav",
+        "#appSwitcher",
+        "nav"
+    ].forEach(function (selector) {
 
         document
-            .querySelectorAll(
-                ".sky-share-hidden-app"
-            )
+            .querySelectorAll(selector)
             .forEach(function (el) {
 
-                el.classList.remove(
-                    "sky-share-hidden-app"
+                /*
+                 * Don't hide anything belonging to the
+                 * Share Viewer shell itself.
+                 */
+                if (
+                    shell &&
+                    shell.contains(el)
+                ) {
+
+                    return;
+
+                }
+
+
+                el.classList.add(
+                    "sky-share-hidden-after-close"
                 );
 
             });
 
-
-        const viewerArea =
-            document.getElementById(
-                "viewerArea"
-            );
+    });
 
 
-        if (viewerArea) {
-
-            viewerArea.classList.remove(
-                "sky-share-mounted-viewer"
-            );
-
-        }
-
-
-        if (shell) {
-
-            shell.remove();
-            shell = null;
-
-        }
+    /*
+     * Remove the shared book from the Share media area,
+     * but KEEP the Share shell itself.
+     */
+    const viewerArea =
+        document.getElementById(
+            "viewerArea"
+        );
 
 
-        started = false;
-        activeItem = null;
-        activeTarget = null;
+    if (viewerArea) {
 
+        viewerArea.style.display =
+            "none";
 
-        /*
-         * IMPORTANT:
-         *
-         * There is deliberately NO redirect here.
-         *
-         * The large decorated "Open in Meditation
-         * Mornings" button retains the Glide navigation.
-         */
+        viewerArea.classList.remove(
+            "sky-share-mounted-viewer"
+        );
 
     }
+
+
+    /*
+     * Leave the Share shell available for the future
+     * decorated navigation button.
+     */
+    if (statusElement) {
+
+        statusElement.textContent =
+            "";
+
+    }
+
+
+    started = true;
+
+    /*
+     * Do NOT:
+     *
+     *   started = false
+     *   activeItem = null
+     *   activeTarget = null
+     *   shell.remove()
+     *   window.location.href = ...
+     *
+     * because Share Viewer remains the current page.
+     */
+
+}
 
 
     /* --------------------------------------------------
