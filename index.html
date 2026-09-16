@@ -213,7 +213,18 @@ window.dispatchEvent(new Event("skyreader-pdfjs-ready"));
     alt=""
     aria-hidden="true"
     width="120"
-    style="width:clamp(70px, 7vw, 120px);height:auto;display:block;">
+    height="auto"
+    style="
+        position:fixed;
+        top:40px;
+        left:20px;
+        width:120px;
+        height:auto;
+        max-width:120px;
+        display:block;
+        z-index:1000001;
+        pointer-events:none;
+    ">
 
 <aside id="libraryPanel">
 
