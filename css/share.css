@@ -1800,9 +1800,6 @@ body.sky-share-mode .app-switch-button {
 
     overflow: hidden !important;
 
-    /*
-     * Remove any visible button text.
-     */
     font-size: 0 !important;
     line-height: 0 !important;
     text-indent: -9999px !important;
@@ -1813,21 +1810,12 @@ body.sky-share-mode .app-switch-button {
 
     backdrop-filter: blur(7px);
 
-    /*
-     * Requested frontMenuGlow effect.
-     */
     animation: frontMenuGlow 4s ease-in-out infinite;
 
     transition:
         transform .25s ease,
         box-shadow .25s ease;
 }
-
-
-/*
- * Prevent inherited button/link pseudo styling from
- * introducing a second visual treatment.
- */
 
 .sky-share-open-button::before,
 .sky-share-open-button::after {
@@ -1849,7 +1837,6 @@ body.sky-share-mode .app-switch-button {
 .sky-share-open-button:active {
     transform: scale(.95);
 }
-
 
 /* =========================================================
    LOGO GLOW
@@ -3419,4 +3406,96 @@ body.sky-share-mode .sky-share-big-open-button:focus-visible {
         width: 100% !important;
         max-width: 360px !important;
     }
+}
+
+/* =========================================================
+   CLOSED SHARE VIEW — CENTER OPEN BUTTON
+   This is a SECOND button.
+   The original .sky-share-open-button remains bottom-right.
+   ========================================================= */
+
+body.sky-share-mode.sky-share-document-closed
+.sky-share-closed-panel {
+    position: absolute !important;
+
+    inset: 0 !important;
+
+    width: 100% !important;
+    height: 100% !important;
+
+    display: flex !important;
+
+    align-items: center !important;
+    justify-content: center !important;
+
+    pointer-events: auto !important;
+
+    z-index: 5000 !important;
+}
+
+body.sky-share-mode.sky-share-document-closed
+.sky-share-closed-open-button {
+    display: flex !important;
+
+    align-items: center !important;
+    justify-content: center !important;
+
+    width: clamp(230px, 28vw, 360px) !important;
+    min-height: clamp(64px, 8vh, 88px) !important;
+
+    padding: 14px 28px !important;
+
+    box-sizing: border-box !important;
+
+    border: 1px solid rgba(255,255,255,.65) !important;
+
+    border-radius: 18px !important;
+
+    background: rgba(216,239,238,.88) !important;
+
+    color: #24504b !important;
+
+    font-family:
+        Inter,
+        Arial,
+        sans-serif !important;
+
+    font-size: clamp(18px, 2vw, 28px) !important;
+    font-weight: 700 !important;
+
+    line-height: 1.2 !important;
+
+    text-align: center !important;
+
+    text-decoration: none !important;
+
+    box-shadow:
+        0 6px 24px rgba(0,0,0,.25),
+        inset 0 0 18px rgba(255,255,255,.35) !important;
+
+    backdrop-filter: blur(8px);
+
+    cursor: pointer;
+
+    transition:
+        transform .25s ease,
+        box-shadow .25s ease,
+        background .25s ease;
+}
+
+body.sky-share-mode.sky-share-document-closed
+.sky-share-closed-open-button:hover {
+    transform: translateY(-3px) !important;
+
+    background: rgba(216,239,238,.96) !important;
+
+    box-shadow:
+        0 0 10px #ACE1AF,
+        0 0 24px #00FA9A,
+        0 8px 28px rgba(0,0,0,.30) !important;
+}
+
+body.sky-share-mode.sky-share-document-closed
+.sky-share-closed-open-button:active {
+    transform: scale(.97) !important;
 }
