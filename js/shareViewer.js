@@ -196,17 +196,14 @@ window.ShareViewer = (function () {
 
 
         /*
-         * Share Mode has its own shell, so the normal workspace
-         * primary logo cannot remain visible after #workspace is
-         * isolated.  Use a separate image in the Share shell.
-         * This does NOT move or modify #workspacePrimaryLogo.
+         * Reuse the existing primary logo from index.html.
+         * Do NOT create a second logo for Share Mode.
          */
-        const primaryLogo = document.createElement("img");
+        const primaryLogo = document.getElementById("workspacePrimaryLogo");
 
-        primaryLogo.className = "sky-share-primary-logo";
-        primaryLogo.src = "assets/primary-logo.png";
-        primaryLogo.alt = "";
-        primaryLogo.setAttribute("aria-hidden", "true");
+        if (primaryLogo) {
+            primaryLogo.style.display = "block";
+        }
 
 
         /*
@@ -251,7 +248,7 @@ window.ShareViewer = (function () {
 
         shell.appendChild(header);
         shell.appendChild(main);
-        shell.appendChild(primaryLogo);
+
         shell.appendChild(actions);
 
         document.body.appendChild(shell);
