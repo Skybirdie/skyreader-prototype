@@ -204,6 +204,7 @@ body.sky-share-mode #workspacePrimaryLogo {
 }
 
 .sky-share-subtitle {
+    display: none;
     margin-top: 2px;
 
     font-size: 12px;
@@ -238,6 +239,9 @@ body.sky-share-mode #workspacePrimaryLogo {
     background: transparent;
 }
 
+body.sky-share-mode .sky-share-media-host #viewerLibrary {
+    display: none;
+}
 
 /* =========================================================
    GENERIC MOUNTED VIEWER
@@ -261,6 +265,10 @@ body.sky-share-mode #workspacePrimaryLogo {
 
     overflow: hidden !important;
 }
+
+
+
+
 
 
 /* =========================================================
