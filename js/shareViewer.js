@@ -7,11 +7,12 @@
  Share-mode shell for directly shared media.
 
  IMPORTANT:
- - Normal Reader controls are preserved.
- - Normal Reader button handlers are preserved.
- - Share Mode initializes SRNavigation against the
-   shared Reader book after Reader.open().
- - No duplicate Reader navigation handlers are installed.
+ - Normal Reader engine is preserved.
+ - Normal Reader rendering is preserved.
+ - Share Mode explicitly wires the existing Reader
+   navigation controls after Reader.open().
+ - No changes are made to Reader / Renderer /
+   SRNavigation / Sky180FlipEngine.
 =========================================================
 */
 
@@ -31,6 +32,17 @@ window.ShareViewer = (function () {
 
     let bookControls = [];
     let bookControlState = [];
+
+    /*
+     * Share-mode listeners that WE add.
+     *
+     * These are removed when Share Mode closes.
+     *
+     * We deliberately keep them separate from the
+     * Reader's own normal listeners.
+     */
+    let shareReaderHandlers = [];
+
 
     const GLIDE_MEDIA_URL =
         "https://meditationmornings.glide.page/dl/media";
@@ -106,28 +118,37 @@ window.ShareViewer = (function () {
             return;
         }
 
-        shell = createElement("section", "sky-share-shell");
+        shell = createElement(
+            "section",
+            "sky-share-shell"
+        );
+
         shell.id = "skyShareViewer";
+
 
         const header = createElement(
             "header",
             "sky-share-header"
         );
 
+
         titleElement = createElement(
             "div",
             "sky-share-title"
         );
+
 
         subtitleElement = createElement(
             "div",
             "sky-share-subtitle"
         );
 
+
         const titleWrap = createElement(
             "div",
             "sky-share-title-wrap"
         );
+
 
         titleWrap.appendChild(titleElement);
         titleWrap.appendChild(subtitleElement);
@@ -140,6 +161,7 @@ window.ShareViewer = (function () {
             "sky-share-main"
         );
 
+
         mediaHost = createElement(
             "div",
             "sky-share-media-host"
@@ -147,12 +169,14 @@ window.ShareViewer = (function () {
 
         mediaHost.id = "sky-share-media-host";
 
+
         statusElement = createElement(
             "div",
             "sky-share-status"
         );
 
         statusElement.id = "sky-share-status";
+
 
         main.appendChild(mediaHost);
         main.appendChild(statusElement);
@@ -163,6 +187,7 @@ window.ShareViewer = (function () {
             "sky-share-actions"
         );
 
+
         openButton = createElement(
             "button",
             "sky-share-open-button",
@@ -171,11 +196,13 @@ window.ShareViewer = (function () {
 
         openButton.type = "button";
 
+
         openButton.addEventListener(
             "click",
             function () {
 
-                window.location.href = GLIDE_MEDIA_URL;
+                window.location.href =
+                    GLIDE_MEDIA_URL;
 
             }
         );
@@ -188,6 +215,7 @@ window.ShareViewer = (function () {
         );
 
         closeButton.type = "button";
+
 
         closeButton.addEventListener(
             "click",
@@ -202,6 +230,7 @@ window.ShareViewer = (function () {
         shell.appendChild(header);
         shell.appendChild(main);
         shell.appendChild(actions);
+
 
         document.body.appendChild(shell);
     }
@@ -225,10 +254,6 @@ window.ShareViewer = (function () {
 
             "#readerShareButton",
 
-            /*
-             * This is the actual fullscreen control used
-             * by the current Reader.
-             */
             "#viewerFullscreenButton",
 
             "#readerCloseButton",
@@ -249,6 +274,7 @@ window.ShareViewer = (function () {
             const nodes =
                 document.querySelectorAll(selector);
 
+
             for (const node of nodes) {
 
                 if (!seen.has(node)) {
@@ -257,7 +283,9 @@ window.ShareViewer = (function () {
                     result.push(node);
 
                 }
+
             }
+
         }
 
 
@@ -265,48 +293,88 @@ window.ShareViewer = (function () {
     }
 
 
+    /*
+     * IMPORTANT:
+     *
+     * Capture the original state only once.
+     *
+     * The previous version recaptured state every time
+     * exposeBookControls() was called. Since Share Mode
+     * calls this several times, that could save Share Mode
+     * values as the supposed "original" values.
+     */
     function exposeBookControls() {
 
-        bookControls = collectBookControls();
+        const newlyCollected =
+            collectBookControls();
 
 
-        bookControlState =
-            bookControls.map(function (el) {
+        if (!bookControlState.length) {
 
-                return {
+            bookControls =
+                newlyCollected;
 
-                    element: el,
 
-                    display: el.style.display,
+            bookControlState =
+                bookControls.map(function (el) {
 
-                    visibility: el.style.visibility,
+                    return {
 
-                    pointerEvents: el.style.pointerEvents,
+                        element: el,
 
-                    zIndex: el.style.zIndex
+                        display:
+                            el.style.display,
 
-                };
+                        visibility:
+                            el.style.visibility,
 
-            });
+                        pointerEvents:
+                            el.style.pointerEvents,
+
+                        zIndex:
+                            el.style.zIndex
+
+                    };
+
+                });
+
+        } else {
+
+            /*
+             * Keep the original saved state, but refresh
+             * the current list in case Reader created a
+             * control after the first collection.
+             */
+            bookControls =
+                newlyCollected;
+
+        }
 
 
         bookControls.forEach(function (el) {
 
-            el.dataset.skyShareReaderControl = "true";
+            el.dataset.skyShareReaderControl =
+                "true";
+
+
+            el.style.pointerEvents =
+                "auto";
+
 
             /*
-             * Do not replace the Reader's event handlers.
+             * Explicitly restore visibility for controls
+             * that Share CSS may have suppressed.
              */
-            el.style.pointerEvents = "auto";
-
-
             if (
                 el.id === "toolbar" ||
                 el.id === "statusBar" ||
-                el.classList.contains("sr-welcome-banner")
+                el.classList.contains(
+                    "sr-welcome-banner"
+                )
             ) {
 
-                el.style.zIndex = "1000002";
+                el.style.zIndex =
+                    "1000002";
 
             }
 
@@ -338,10 +406,17 @@ window.ShareViewer = (function () {
             }
 
 
-            el.style.display = state.display;
-            el.style.visibility = state.visibility;
-            el.style.pointerEvents = state.pointerEvents;
-            el.style.zIndex = state.zIndex;
+            el.style.display =
+                state.display;
+
+            el.style.visibility =
+                state.visibility;
+
+            el.style.pointerEvents =
+                state.pointerEvents;
+
+            el.style.zIndex =
+                state.zIndex;
 
 
             delete el.dataset.skyShareReaderControl;
@@ -387,7 +462,9 @@ window.ShareViewer = (function () {
 
         ids.forEach(function (id) {
 
-            const el = document.getElementById(id);
+            const el =
+                document.getElementById(id);
+
 
             if (!el) {
 
@@ -400,27 +477,36 @@ window.ShareViewer = (function () {
             const rect =
                 el.getBoundingClientRect();
 
+
             const style =
                 window.getComputedStyle(el);
 
 
             result[id] = {
 
-                display: style.display,
+                display:
+                    style.display,
 
-                visibility: style.visibility,
+                visibility:
+                    style.visibility,
 
-                pointerEvents: style.pointerEvents,
+                pointerEvents:
+                    style.pointerEvents,
 
-                zIndex: style.zIndex,
+                zIndex:
+                    style.zIndex,
 
-                width: rect.width,
+                width:
+                    rect.width,
 
-                height: rect.height,
+                height:
+                    rect.height,
 
-                left: rect.left,
+                left:
+                    rect.left,
 
-                top: rect.top
+                top:
+                    rect.top
 
             };
 
@@ -434,6 +520,381 @@ window.ShareViewer = (function () {
 
 
         return result;
+    }
+
+
+    /* --------------------------------------------------
+       Share Reader control wiring
+    -------------------------------------------------- */
+
+    function removeShareReaderHandlers() {
+
+        shareReaderHandlers.forEach(
+            function (entry) {
+
+                try {
+
+                    entry.element.removeEventListener(
+                        entry.type,
+                        entry.handler,
+                        entry.options
+                    );
+
+                } catch (error) {
+
+                    console.warn(
+                        "[ShareViewer] Could not remove Share Reader handler:",
+                        error
+                    );
+
+                }
+
+            }
+        );
+
+
+        shareReaderHandlers = [];
+    }
+
+
+    function addShareReaderHandler(
+        element,
+        type,
+        handler,
+        options
+    ) {
+
+        if (!element) {
+            return;
+        }
+
+
+        /*
+         * Do not accidentally install duplicates.
+         */
+        element.addEventListener(
+            type,
+            handler,
+            options
+        );
+
+
+        shareReaderHandlers.push({
+
+            element,
+            type,
+            handler,
+            options
+
+        });
+
+    }
+
+
+    function wireShareReaderNavigation() {
+
+        /*
+         * Remove only handlers installed by ShareViewer.
+         * We do NOT remove Reader's own handlers.
+         */
+        removeShareReaderHandlers();
+
+
+        const previousButton =
+            document.getElementById(
+                "previousButton"
+            );
+
+
+        const nextButton =
+            document.getElementById(
+                "nextButton"
+            );
+
+
+        const fullscreenButton =
+            document.getElementById(
+                "viewerFullscreenButton"
+            );
+
+
+        const readerCloseButton =
+            document.getElementById(
+                "readerCloseButton"
+            );
+
+
+        /*
+         * ------------------------------------------------
+         * PREVIOUS
+         * ------------------------------------------------
+         */
+
+        if (previousButton) {
+
+            addShareReaderHandler(
+                previousButton,
+                "click",
+                function (event) {
+
+                    event.preventDefault();
+                    event.stopPropagation();
+
+
+                    try {
+
+                        if (
+                            typeof window.pinching !==
+                            "undefined" &&
+                            window.pinching
+                        ) {
+
+                            return;
+
+                        }
+
+                    } catch (error) {
+                        /* Ignore */
+                    }
+
+
+                    /*
+                     * Preserve the normal Reader bookmark
+                     * turn behavior if that helper exists.
+                     */
+                    try {
+
+                        if (
+                            typeof window.resetBookmarkFlagForTurn ===
+                            "function"
+                        ) {
+
+                            window.resetBookmarkFlagForTurn();
+
+                        }
+
+                    } catch (error) {
+                        /* Ignore */
+                    }
+
+
+                    if (
+                        window.SRNavigation &&
+                        typeof SRNavigation.previous ===
+                        "function"
+                    ) {
+
+                        console.log(
+                            "[ShareViewer] Previous → SRNavigation.previous()"
+                        );
+
+
+                        SRNavigation.previous();
+
+                    } else if (
+                        window.Reader &&
+                        typeof Reader.previous ===
+                        "function"
+                    ) {
+
+                        /*
+                         * Fallback only. Normally SRNavigation
+                         * should be available.
+                         */
+                        console.log(
+                            "[ShareViewer] Previous → Reader.previous() fallback"
+                        );
+
+
+                        Reader.previous();
+
+                    }
+
+                },
+                false
+            );
+
+        }
+
+
+        /*
+         * ------------------------------------------------
+         * NEXT
+         * ------------------------------------------------
+         */
+
+        if (nextButton) {
+
+            addShareReaderHandler(
+                nextButton,
+                "click",
+                function (event) {
+
+                    event.preventDefault();
+                    event.stopPropagation();
+
+
+                    try {
+
+                        if (
+                            typeof window.pinching !==
+                            "undefined" &&
+                            window.pinching
+                        ) {
+
+                            return;
+
+                        }
+
+                    } catch (error) {
+                        /* Ignore */
+                    }
+
+
+                    try {
+
+                        if (
+                            typeof window.resetBookmarkFlagForTurn ===
+                            "function"
+                        ) {
+
+                            window.resetBookmarkFlagForTurn();
+
+                        }
+
+                    } catch (error) {
+                        /* Ignore */
+                    }
+
+
+                    if (
+                        window.SRNavigation &&
+                        typeof SRNavigation.next ===
+                        "function"
+                    ) {
+
+                        console.log(
+                            "[ShareViewer] Next → SRNavigation.next()"
+                        );
+
+
+                        SRNavigation.next();
+
+                    } else if (
+                        window.Reader &&
+                        typeof Reader.next ===
+                        "function"
+                    ) {
+
+                        /*
+                         * Fallback only.
+                         */
+                        console.log(
+                            "[ShareViewer] Next → Reader.next() fallback"
+                        );
+
+
+                        Reader.next();
+
+                    }
+
+                },
+                false
+            );
+
+        }
+
+
+        /*
+         * ------------------------------------------------
+         * FULLSCREEN / FOCUS
+         * ------------------------------------------------
+         *
+         * The current Reader uses toggleViewerFocus().
+         */
+        if (fullscreenButton) {
+
+            addShareReaderHandler(
+                fullscreenButton,
+                "click",
+                function (event) {
+
+                    event.preventDefault();
+                    event.stopPropagation();
+
+
+                    if (
+                        typeof window.toggleViewerFocus ===
+                        "function"
+                    ) {
+
+                        window.toggleViewerFocus();
+
+                    } else {
+
+                        /*
+                         * Safe fallback matching the Reader's
+                         * current focus-mode mechanism.
+                         */
+                        const app =
+                            document.getElementById("app");
+
+
+                        if (app) {
+
+                            app.classList.toggle(
+                                "viewerFocus"
+                            );
+
+                        }
+
+                    }
+
+                },
+                false
+            );
+
+        }
+
+
+        /*
+         * ------------------------------------------------
+         * READER CLOSE
+         * ------------------------------------------------
+         *
+         * In Share Mode this closes the Reader content
+         * and returns through ShareViewer.close().
+         */
+        if (readerCloseButton) {
+
+            addShareReaderHandler(
+                readerCloseButton,
+                "click",
+                function (event) {
+
+                    event.preventDefault();
+                    event.stopPropagation();
+
+
+                    close();
+
+                },
+                false
+            );
+
+        }
+
+
+        console.log(
+            "[ShareViewer] Share Reader controls wired:",
+            {
+                previous: !!previousButton,
+                next: !!nextButton,
+                fullscreen: !!fullscreenButton,
+                readerClose: !!readerCloseButton
+            }
+        );
+
     }
 
 
@@ -492,8 +953,11 @@ window.ShareViewer = (function () {
                         shell &&
                         shell.contains(el)
                     ) {
+
                         return;
+
                     }
+
 
                     el.classList.add(
                         "sky-share-hidden-app"
@@ -509,6 +973,7 @@ window.ShareViewer = (function () {
             exposeBookControls();
 
         }
+
     }
 
 
@@ -532,9 +997,11 @@ window.ShareViewer = (function () {
 
         viewer.style.display = "";
 
+
         viewer.classList.add(
             "sky-share-mounted-viewer"
         );
+
     }
 
 
@@ -545,7 +1012,8 @@ window.ShareViewer = (function () {
     function initializeShareReaderNavigation(item) {
 
         if (
-            typeof window.SRNavigation === "undefined" ||
+            typeof window.SRNavigation ===
+            "undefined" ||
             !window.SRNavigation
         ) {
 
@@ -553,27 +1021,27 @@ window.ShareViewer = (function () {
                 "[ShareViewer] SRNavigation is unavailable."
             );
 
+
             return false;
+
         }
 
 
-        /*
-         * SRNavigation.initialize() is intentionally safe
-         * to call more than once; its own implementation
-         * exits when already initialized.
-         */
         try {
 
             if (
-                typeof SRNavigation.initialized === "function" &&
+                typeof SRNavigation.initialized ===
+                "function" &&
                 !SRNavigation.initialized()
             ) {
 
                 SRNavigation.initialize();
 
+
                 console.log(
                     "[ShareViewer] SRNavigation initialized."
                 );
+
             }
 
         } catch (error) {
@@ -583,26 +1051,24 @@ window.ShareViewer = (function () {
                 error
             );
 
+
             return false;
+
         }
 
 
-        /*
-         * Reader.open() has already established the actual
-         * current Reader book. Use that object whenever
-         * possible so navigation points at the same object
-         * Reader is using.
-         */
         let book = null;
 
 
         try {
 
             if (
-                typeof Reader.currentBook === "function"
+                typeof Reader.currentBook ===
+                "function"
             ) {
 
-                book = Reader.currentBook();
+                book =
+                    Reader.currentBook();
 
             }
 
@@ -617,7 +1083,9 @@ window.ShareViewer = (function () {
 
 
         if (!book) {
+
             book = item;
+
         }
 
 
@@ -628,7 +1096,9 @@ window.ShareViewer = (function () {
                 "function"
             ) {
 
-                SRNavigation.setCurrentBook(book);
+                SRNavigation.setCurrentBook(
+                    book
+                );
 
             }
 
@@ -639,7 +1109,9 @@ window.ShareViewer = (function () {
                 error
             );
 
+
             return false;
+
         }
 
 
@@ -650,6 +1122,7 @@ window.ShareViewer = (function () {
 
 
         return true;
+
     }
 
 
@@ -660,9 +1133,11 @@ window.ShareViewer = (function () {
     async function prepareBook(item) {
 
         if (
-            typeof window.Reader === "undefined" ||
+            typeof window.Reader ===
+            "undefined" ||
             !Reader ||
-            typeof Reader.open !== "function"
+            typeof Reader.open !==
+            "function"
         ) {
 
             throw new Error(
@@ -673,7 +1148,9 @@ window.ShareViewer = (function () {
 
 
         const viewerArea =
-            document.getElementById("viewerArea");
+            document.getElementById(
+                "viewerArea"
+            );
 
 
         if (!viewerArea) {
@@ -689,32 +1166,46 @@ window.ShareViewer = (function () {
          * Move the existing Reader viewer into the Share
          * Viewer before opening the book.
          */
-        detachExistingViewer(viewerArea);
+        detachExistingViewer(
+            viewerArea
+        );
+
 
         viewerArea.style.display = "";
 
 
         /*
-         * Let the normal Reader open the book. Do not
-         * replace Reader's own rendering/navigation logic.
+         * Let the normal Reader open the book.
          */
         await Reader.open(item);
 
 
         /*
-         * This is the critical Share Mode fix.
-         *
-         * Reader is now open, so synchronize the separate
-         * SRNavigation module with that Reader instance.
+         * Reader is now fully open.
          */
-        initializeShareReaderNavigation(item);
+        initializeShareReaderNavigation(
+            item
+        );
 
 
         /*
-         * Reader.open() may create/show controls, so expose
-         * them again after opening.
+         * Reader.open() may have changed control
+         * visibility, so expose them again.
          */
         exposeBookControls();
+
+
+        /*
+         * CRITICAL FIX:
+         *
+         * Explicitly attach Share Mode handlers to the
+         * existing Reader buttons.
+         *
+         * The physical button click was reaching
+         * #nextButton, but the application's normal
+         * listener was not invoking SRNavigation.next().
+         */
+        wireShareReaderNavigation();
 
 
         verifyBookControls();
@@ -728,21 +1219,28 @@ window.ShareViewer = (function () {
         try {
 
             if (
-                typeof Reader.refresh === "function"
+                typeof Reader.refresh ===
+                "function"
             ) {
 
-                requestAnimationFrame(function () {
+                requestAnimationFrame(
+                    function () {
 
-                    try {
-                        Reader.refresh();
-                    } catch (error) {
-                        console.warn(
-                            "[ShareViewer] Reader.refresh() failed:",
-                            error
-                        );
+                        try {
+
+                            Reader.refresh();
+
+                        } catch (error) {
+
+                            console.warn(
+                                "[ShareViewer] Reader.refresh() failed:",
+                                error
+                            );
+
+                        }
+
                     }
-
-                });
+                );
 
             }
 
@@ -754,6 +1252,7 @@ window.ShareViewer = (function () {
             );
 
         }
+
     }
 
 
@@ -764,30 +1263,37 @@ window.ShareViewer = (function () {
     async function prepareVideo(item) {
 
         if (
-            typeof window.VideoViewer !== "undefined" &&
+            typeof window.VideoViewer !==
+            "undefined" &&
             VideoViewer &&
-            typeof VideoViewer.open === "function"
+            typeof VideoViewer.open ===
+            "function"
         ) {
 
             await VideoViewer.open(item);
             return;
+
         }
 
 
         if (
-            typeof window.VideoViewer !== "undefined" &&
+            typeof window.VideoViewer !==
+            "undefined" &&
             VideoViewer &&
-            typeof VideoViewer.openVideo === "function"
+            typeof VideoViewer.openVideo ===
+            "function"
         ) {
 
             await VideoViewer.openVideo(item);
             return;
+
         }
 
 
         throw new Error(
             "Video viewer is unavailable."
         );
+
     }
 
 
@@ -798,30 +1304,37 @@ window.ShareViewer = (function () {
     async function prepareSlideshow(item) {
 
         if (
-            typeof window.SlideshowViewer !== "undefined" &&
+            typeof window.SlideshowViewer !==
+            "undefined" &&
             SlideshowViewer &&
-            typeof SlideshowViewer.open === "function"
+            typeof SlideshowViewer.open ===
+            "function"
         ) {
 
             await SlideshowViewer.open(item);
             return;
+
         }
 
 
         if (
-            typeof window.SlideshowViewer !== "undefined" &&
+            typeof window.SlideshowViewer !==
+            "undefined" &&
             SlideshowViewer &&
-            typeof SlideshowViewer.openSlideshow === "function"
+            typeof SlideshowViewer.openSlideshow ===
+            "function"
         ) {
 
             await SlideshowViewer.openSlideshow(item);
             return;
+
         }
 
 
         throw new Error(
             "Slideshow viewer is unavailable."
         );
+
     }
 
 
@@ -845,7 +1358,10 @@ window.ShareViewer = (function () {
 
 
         titleElement.textContent =
-            escapeText(item.title || "Shared Media");
+            escapeText(
+                item.title ||
+                "Shared Media"
+            );
 
 
         subtitleElement.textContent =
@@ -869,18 +1385,21 @@ window.ShareViewer = (function () {
                 case "reader":
 
                     await prepareBook(item);
+
                     break;
 
 
                 case "video":
 
                     await prepareVideo(item);
+
                     break;
 
 
                 case "slideshow":
 
                     await prepareSlideshow(item);
+
                     break;
 
 
@@ -890,10 +1409,12 @@ window.ShareViewer = (function () {
                         "Unsupported shared media type: " +
                         section
                     );
+
             }
 
 
             statusElement.textContent = "";
+
 
         } catch (error) {
 
@@ -908,7 +1429,9 @@ window.ShareViewer = (function () {
 
 
             throw error;
+
         }
+
     }
 
 
@@ -918,13 +1441,23 @@ window.ShareViewer = (function () {
 
     function close() {
 
+        /*
+         * Remove only ShareViewer-installed Reader
+         * listeners before restoring the normal state.
+         */
+        removeShareReaderHandlers();
+
+
         try {
 
             if (
                 activeTarget &&
-                String(activeTarget.section).toLowerCase() ===
+                String(
+                    activeTarget.section
+                ).toLowerCase() ===
                 "video" &&
-                typeof window.VideoViewer !== "undefined" &&
+                typeof window.VideoViewer !==
+                "undefined" &&
                 VideoViewer
             ) {
 
@@ -949,7 +1482,9 @@ window.ShareViewer = (function () {
 
             if (
                 activeTarget &&
-                String(activeTarget.section).toLowerCase() ===
+                String(
+                    activeTarget.section
+                ).toLowerCase() ===
                 "slideshow" &&
                 typeof window.SlideshowViewer !==
                 "undefined" &&
@@ -971,14 +1506,21 @@ window.ShareViewer = (function () {
             if (
                 activeTarget &&
                 (
-                    String(activeTarget.section).toLowerCase() ===
+                    String(
+                        activeTarget.section
+                    ).toLowerCase() ===
                     "book" ||
-                    String(activeTarget.section).toLowerCase() ===
+
+                    String(
+                        activeTarget.section
+                    ).toLowerCase() ===
                     "reader"
                 ) &&
-                typeof window.Reader !== "undefined" &&
+                typeof window.Reader !==
+                "undefined" &&
                 Reader &&
-                typeof Reader.close === "function"
+                typeof Reader.close ===
+                "function"
             ) {
 
                 Reader.close({
@@ -1006,7 +1548,9 @@ window.ShareViewer = (function () {
 
 
         document
-            .querySelectorAll(".sky-share-hidden-app")
+            .querySelectorAll(
+                ".sky-share-hidden-app"
+            )
             .forEach(function (el) {
 
                 el.classList.remove(
@@ -1014,6 +1558,25 @@ window.ShareViewer = (function () {
                 );
 
             });
+
+
+        /*
+         * Remove the Share-mounted class from the
+         * existing Reader viewer.
+         */
+        const viewerArea =
+            document.getElementById(
+                "viewerArea"
+            );
+
+
+        if (viewerArea) {
+
+            viewerArea.classList.remove(
+                "sky-share-mounted-viewer"
+            );
+
+        }
 
 
         if (shell) {
@@ -1031,6 +1594,7 @@ window.ShareViewer = (function () {
 
         window.location.href =
             GLIDE_MEDIA_URL;
+
     }
 
 
@@ -1048,15 +1612,16 @@ window.ShareViewer = (function () {
                     !started ||
                     event.key !== "Escape"
                 ) {
+
                     return;
+
                 }
 
 
                 /*
                  * Do not close the Share Viewer if the normal
                  * Reader is currently in its own focus/fullscreen
-                 * mode. Let the existing Reader control handle
-                 * that first.
+                 * mode.
                  */
                 if (
                     document
@@ -1066,6 +1631,7 @@ window.ShareViewer = (function () {
                 ) {
 
                     return;
+
                 }
 
 
@@ -1076,6 +1642,7 @@ window.ShareViewer = (function () {
                 once: true
             }
         );
+
     }
 
 
@@ -1096,19 +1663,26 @@ window.ShareViewer = (function () {
                 "[ShareViewer] No item supplied."
             );
 
+
             return;
+
         }
 
 
         started = true;
 
+
         activeItem = item;
-        activeTarget = target || {
-            section: item.type
-        };
+
+
+        activeTarget =
+            target || {
+                section: item.type
+            };
 
 
         createShell();
+
 
         bindEscape();
 
@@ -1121,7 +1695,9 @@ window.ShareViewer = (function () {
             ).toLowerCase();
 
 
-        isolateApplication(section);
+        isolateApplication(
+            section
+        );
 
 
         try {
@@ -1136,7 +1712,9 @@ window.ShareViewer = (function () {
              * Re-isolate after the viewer has opened because
              * Reader/Video/Slideshow may have changed visibility.
              */
-            isolateApplication(section);
+            isolateApplication(
+                section
+            );
 
 
             if (
@@ -1145,6 +1723,15 @@ window.ShareViewer = (function () {
             ) {
 
                 exposeBookControls();
+
+
+                /*
+                 * Ensure Share Mode navigation remains
+                 * wired even if a later Reader initialization
+                 * changed the controls.
+                 */
+                wireShareReaderNavigation();
+
 
                 verifyBookControls();
 
@@ -1157,8 +1744,11 @@ window.ShareViewer = (function () {
                 error
             );
 
+
             started = false;
+
         }
+
     }
 
 
