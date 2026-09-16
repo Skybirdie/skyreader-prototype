@@ -153,14 +153,23 @@ body.sky-share-mode {
 
 
 body.sky-share-mode #workspacePrimaryLogo {
-    position: fixed;
-    top: clamp(35px, 4vw, 40px);
-    left: clamp(8px, 1.2vw, 18px);
-    width: clamp(70px, 7vw, 120px);
-    height: auto;
+    position: fixed !important;
+    top: clamp(35px, 4vw, 40px) !important;
+    left: clamp(10px, 1.5vw, 20px) !important;
+    right: auto !important;
+
+    width: clamp(70px, 7vw, 120px) !important;
+    max-width: 120px !important;
+    height: auto !important;
+
+    opacity: 0.5 !important;
+    filter: drop-shadow(0 5px 18px rgba(0,0,0,.16)) !important;
+
     display: block !important;
-    z-index: 1000001;
-    pointer-events: none;
+    visibility: visible !important;
+
+    z-index: 1000001 !important;
+    pointer-events: none !important;
 }
 
 
