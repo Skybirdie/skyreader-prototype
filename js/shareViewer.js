@@ -1323,63 +1323,53 @@ window.ShareViewer = (function () {
 
     function showClosedPanel() {
 
-        if (!shell) {
-            return;
-        }
+    if (!shell) {
+        return;
+    }
 
+    shell.classList.add(
+        "sky-share-document-closed"
+    );
 
-        shell.classList.add(
-            "sky-share-document-closed"
+    if (!closedPanel) {
+
+        closedPanel = createElement(
+            "div",
+            "sky-share-closed-panel"
         );
 
+        const centerButton = createElement(
+            "a",
+            "sky-share-closed-open-button",
+            "Open Meditation Mornings"
+        );
 
-        if (!closedPanel) {
+        centerButton.href =
+            GLIDE_MEDIA_URL;
 
-            closedPanel =
-                createElement(
-                    "div",
-                    "sky-share-closed-panel"
-                );
+        centerButton.target =
+            "_blank";
 
+        centerButton.rel =
+            "noopener noreferrer";
 
-            const button =
-                createElement(
-                    "a",
-                    "sky-share-big-open-button",
-                    "Open Meditation Mornings"
-                );
+        closedPanel.appendChild(
+            centerButton
+        );
 
-
-            button.href =
-                GLIDE_MEDIA_URL;
-
-            button.target =
-                "_blank";
-
-            button.rel =
-                "noopener noreferrer";
-
-
-            closedPanel.appendChild(
-                button
+        shell
+            .querySelector(
+                ".sky-share-main"
+            )
+            ?.appendChild(
+                closedPanel
             );
-
-
-            shell
-                .querySelector(
-                    ".sky-share-main"
-                )
-                ?.appendChild(
-                    closedPanel
-                );
-        }
-
-
-        closedPanel.hidden = false;
-
-        closedPanel.style.display =
-            "flex";
     }
+
+    closedPanel.hidden = false;
+
+    closedPanel.style.display = "flex";
+}
 
 
     /* =====================================================
