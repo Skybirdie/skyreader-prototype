@@ -119,9 +119,10 @@ window.ShareViewer = (function () {
         );
 
         const brand = createElement(
-            "div",
+            "img",
             "sky-share-brand",
-            "Meditation Mornings"
+            null,
+            {src:"assets/primary-logo.png", alt:"MMicj Logo"}
         );
 
         const section = createElement(
