@@ -78,7 +78,7 @@ window.ShareViewer = (function () {
 
             case "slideshow":
             case "slides":
-                return "Images/ Graphics";
+                return "Images / Graphics";
 
             default:
                 return "Media";
@@ -121,7 +121,7 @@ window.ShareViewer = (function () {
         const brand = createElement(
             "div",
             "sky-share-brand",
-            ""
+            "Meditation Mornings"
         );
 
         const section = createElement(
@@ -231,7 +231,7 @@ window.ShareViewer = (function () {
       Normal application shell isolation
     -------------------------------------------------------*/
 
-    function isolateApplication() {
+    function isolateApplication(section) {
 
         document.body.classList.add("sky-share-mode");
 
@@ -242,6 +242,10 @@ window.ShareViewer = (function () {
          * elements. Existing Viewer/Renderer code can therefore still
          * use the DOM it was designed for.
          */
+
+        const isBookShare =
+            section === "reader" ||
+            section === "book";
 
         const selectors = [
 
@@ -254,20 +258,35 @@ window.ShareViewer = (function () {
              * AppSwitcher normally toggles ".app-section-hidden" on
              * whichever of these is not active, but AppSwitcher.init()
              * is intentionally never called in Share Mode. Left alone,
-             * #workspace (Reader/library home), #videoSection, and
-             * #slideshowSection all stay visible in their default
-             * state and bleed through the Share shell's transparent
+             * #videoSection and #slideshowSection stay visible in
+             * their default state and bleed through the Share shell's
              * background -- this is the "landing visible behind the
              * item" bug.
              *
-             * By the time this runs, prepareVideo()/prepareSlideshow()/
-             * prepareBook() have already reparented the one viewer
-             * actually being shared out of its section (see
-             * detachExistingViewer()), so hiding all three root
-             * containers here is always safe: the active viewer no
-             * longer lives inside any of them.
+             * By the time this runs, prepareVideo()/prepareSlideshow()
+             * have already reparented the one viewer actually being
+             * shared out of its section (see detachExistingViewer()),
+             * so hiding these two root containers here is always safe
+             * when they are not the active share: the active viewer no
+             * longer lives inside either of them.
+             *
+             * #workspace (the Reader/library home) is deliberately
+             * NOT unconditionally hidden here. Unlike #videoViewer and
+             * #slideshowViewer, the Reader's #toolbar, #statusBar and
+             * .sr-welcome-banner are never moved into the Share host
+             * -- only #viewerArea is (see detachExistingViewer()). If
+             * a book is being shared and #workspace is hidden outright,
+             * those controls end up trapped inside a display:none
+             * ancestor and cannot be shown by any CSS, fixed-position
+             * or not. So for a book share we leave #workspace visible;
+             * the opaque Share shell (its own assets/background.jpg
+             * background, see .sky-share-shell) fully covers whatever
+             * of #workspace is left behind #viewerArea, and share.css
+             * pulls #toolbar/#previousButton/#nextButton/#statusBar/
+             * .sr-welcome-banner on top of it with position:fixed and
+             * a z-index above the shell's.
              */
-            "#workspace",
+            ...(isBookShare ? [] : ["#workspace"]),
             "#videoSection",
             "#slideshowSection",
 
@@ -759,7 +778,7 @@ window.ShareViewer = (function () {
          * while it is still initializing.
          */
 
-        isolateApplication();
+        isolateApplication(target.section);
 
         console.log("[SkyMedia Share] Application isolated.");
 
