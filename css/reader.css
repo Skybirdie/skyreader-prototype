@@ -1259,7 +1259,7 @@ font-style:italic;
 @media(max-width:480px){
   .sky180Page .skyreaderMediaAnnotationLayer .mediaAnnotation .skyreaderMediaControls{
     top:auto;
-    bottom:6px;
+    bottom:-45px;
     gap:4px;
     padding:4px 5px;
   }
