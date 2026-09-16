@@ -96,6 +96,29 @@ window.dispatchEvent(new Event("skyreader-pdfjs-ready"));
 #reloadScreen .reloadFallback{font:600 16px/1.4 Inter,Arial,sans-serif;color:#66707a;text-align:center;padding:24px;}
 </style>
 
+<style>
+/* =========================================================
+   PRIMARY LOGO — CRITICAL FIRST-PAINT SIZE
+   Prevents primary-logo.png from appearing at natural size
+   during the initial Share Mode paint.
+   ========================================================= */
+
+#workspacePrimaryLogo {
+    position: fixed !important;
+    top: 40px !important;
+    left: 20px !important;
+    right: auto !important;
+
+    width: 120px !important;
+    max-width: 120px !important;
+    height: auto !important;
+
+    display: block !important;
+
+    z-index: 1000001 !important;
+    pointer-events: none !important;
+}
+</style>
 
 </head>
 
