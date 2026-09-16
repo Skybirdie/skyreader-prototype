@@ -3249,32 +3249,6 @@ body.sky-share-mode.sky-share-document-closed .sky-share-header {
     }
 }
 
-/* =========================================================
-   19. FINAL GUARANTEE — BOOK TOOLBAR BUTTONS
-   (mute / share / fullscreen / X)
-
-   Appended last on purpose: earlier sections in this file have
-   accumulated overlapping !important rules for #toolbar across
-   several edits. This block is the single source of truth for
-   whether the four persistent controls are visible, sized and
-   clickable, so it cannot be silently defeated by cascade order
-   or specificity from anything above it.
-   ========================================================= */
-
-body.sky-share-mode.sky-share-book #toolbar {
-    display: flex !important;
-    visibility: visible !important;
-}
-
-body.sky-share-mode.sky-share-book #toolbar #muteButton,
-body.sky-share-mode.sky-share-book #toolbar #readerShareButton,
-body.sky-share-mode.sky-share-book #toolbar #viewerFullscreenButton,
-body.sky-share-mode.sky-share-book #toolbar #readerCloseButton {
-    display: flex !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    pointer-events: auto !important;
-}
 
 
 /* =========================================================
@@ -3515,8 +3489,8 @@ body.sky-share-mode.sky-share-document-closed
 body.sky-share-mode .sky-share-primary-logo {
     position: fixed !important;
     top: clamp(35px, 4vw, 40px) !important;
-    right: clamp(10px, 1.5vw, 20px) !important;
-    left: auto !important;
+    left: clamp(10px, 1.5vw, 20px) !important;
+    right: auto !important;
     width: clamp(70px, 7vw, 120px) !important;
     height: auto !important;
     opacity: 0.5 !important;
