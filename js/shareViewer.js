@@ -78,7 +78,7 @@ window.ShareViewer = (function () {
 
             case "slideshow":
             case "slides":
-                return "Images / Graphics";
+                return "Images/Graphics";
 
             default:
                 return "Media";
@@ -119,10 +119,9 @@ window.ShareViewer = (function () {
         );
 
         const brand = createElement(
-            "img",
+            "div",
             "sky-share-brand",
-            null,
-            {src:"assets/primary-logo.png", alt:"MMicj Logo"}
+             createElement("img", "brand-logo", null, { src: "assets/primary-logo.png", alt:"MMicj Logo" })
         );
 
         const section = createElement(
