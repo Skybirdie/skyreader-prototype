@@ -152,16 +152,6 @@ body.sky-share-mode {
 }
 
 
-body.sky-share-mode #workspacePrimaryLogo {
-    position: fixed;
-    top: clamp(35px, 4vw, 40px);
-    left: clamp(8px, 1.2vw, 18px);
-    width: clamp(70px, 7vw, 120px);
-    height: auto;
-    display: block !important;
-    z-index: 1000001;
-    pointer-events: none;
-}
 
 
 /* =========================================================
@@ -3486,7 +3476,7 @@ body.sky-share-mode.sky-share-document-closed
    button and is intentionally styled separately.
    ========================================================= */
 
-body.sky-share-mode .sky-share-primary-logo {
+body.sky-share-mode #workspacePrimaryLogo {
     position: fixed !important;
     top: clamp(35px, 4vw, 40px) !important;
     left: clamp(10px, 1.5vw, 20px) !important;
@@ -3500,6 +3490,9 @@ body.sky-share-mode .sky-share-primary-logo {
     z-index: 1000001 !important;
     pointer-events: none !important;
 }
+
+
+
 
 /*
  * Reassert the original persistent bottom-right button at the
