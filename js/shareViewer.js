@@ -1847,6 +1847,18 @@ window.ShareViewer = (function () {
         updateMuteIcon();
         updatePageButtons();
 
+/*
+ * Re-run the existing Reader page indicator after the
+ * Share Viewer has mounted the Reader.
+ *
+ * ui.js owns the actual page count and page-jump behavior.
+ */
+if (
+    typeof updatePageIndicator === "function"
+) {
+    updatePageIndicator();
+}
+
 
         requestAnimationFrame(() => {
 
