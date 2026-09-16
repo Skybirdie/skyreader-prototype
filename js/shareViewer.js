@@ -195,6 +195,55 @@ window.ShareViewer = (function () {
         );
 
 
+        /*
+         * Share Mode has its own shell, so the normal workspace
+         * primary logo cannot remain visible after #workspace is
+         * isolated.  Use a separate image in the Share shell.
+         * This does NOT move or modify #workspacePrimaryLogo.
+         */
+        const primaryLogo = document.createElement("img");
+
+        primaryLogo.className = "sky-share-primary-logo";
+        primaryLogo.src = "assets/primary-logo.png";
+        primaryLogo.alt = "";
+        primaryLogo.setAttribute("aria-hidden", "true");
+
+
+        /*
+         * This is the original persistent bottom-right Share
+         * button.  It is deliberately separate from the central
+         * button created later by showClosedPanel().
+         */
+        const actions = createElement(
+            "div",
+            "sky-share-actions"
+        );
+
+        const openButton = createElement(
+            "a",
+            "sky-share-open-button",
+            "Open Meditation Mornings"
+        );
+
+        openButton.href = GLIDE_MEDIA_URL;
+        openButton.target = "_blank";
+        openButton.rel = "noopener noreferrer";
+
+        const closeButton = createElement(
+            "button",
+            "sky-share-close-button",
+            "×"
+        );
+
+        closeButton.type = "button";
+        closeButton.setAttribute("aria-label", "Close");
+        closeButton.title = "Close";
+        closeButton.addEventListener("click", close);
+
+        actions.appendChild(openButton);
+        actions.appendChild(closeButton);
+
+
         main.appendChild(heading);
         main.appendChild(mediaHost);
         main.appendChild(statusElement);
@@ -202,6 +251,8 @@ window.ShareViewer = (function () {
 
         shell.appendChild(header);
         shell.appendChild(main);
+        shell.appendChild(primaryLogo);
+        shell.appendChild(actions);
 
         document.body.appendChild(shell);
     }
@@ -617,9 +668,6 @@ window.ShareViewer = (function () {
             return;
         }
 
-        bookControlsBound = true;
-
-
         const toolbar =
             document.getElementById(
                 "toolbar"
@@ -628,6 +676,8 @@ window.ShareViewer = (function () {
         if (!toolbar) {
             return;
         }
+
+        bookControlsBound = true;
 
 
         /*
@@ -1338,6 +1388,16 @@ window.ShareViewer = (function () {
             "sky-share-closed-panel"
         );
 
+        /*
+         * This is the SECOND, central button.
+         * The persistent bottom-right .sky-share-open-button is
+         * created by createShell() and remains untouched.
+         *
+         * The central button intentionally has its own class so
+         * its appearance can later be replaced by an image-backed
+         * floating design without changing the persistent logo
+         * button.
+         */
         const centerButton = createElement(
             "a",
             "sky-share-closed-open-button",
@@ -1710,6 +1770,36 @@ window.ShareViewer = (function () {
 
         if (status) {
             moveIntoShareHost(status);
+
+            /*
+             * Restore the ACTUAL Reader status bar.  We do not
+             * recreate the page count or page-jump controls here;
+             * #pageIndicator, #pageJump, #pageJumpInput and
+             * #pageJumpButton remain the original Reader controls
+             * and ui.js continues to operate them.
+             */
+            status.hidden = false;
+            status.removeAttribute("aria-hidden");
+            status.style.removeProperty("visibility");
+            status.style.removeProperty("opacity");
+            status.style.removeProperty("display");
+
+            const pageIndicator =
+                document.getElementById("pageIndicator");
+
+            if (pageIndicator) {
+                pageIndicator.style.removeProperty("display");
+                pageIndicator.style.removeProperty("visibility");
+            }
+
+            const pageJump =
+                document.getElementById("pageJump");
+
+            if (pageJump) {
+                /* ui.js owns the hidden/open state. */
+                pageJump.style.removeProperty("display");
+                pageJump.style.removeProperty("visibility");
+            }
         }
 
 
