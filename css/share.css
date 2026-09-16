@@ -513,8 +513,14 @@ body.sky-share-mode .sky-share-media-host #toolbar #previousButton {
     justify-content: center !important;
 
     visibility: visible !important;
-    opacity: 1 !important;
-    backdrop-filter:blur(10px);
+
+    border: 1px solid 
+color-mix(in srgb, var(--control-text) 22%, transparent);
+    background: rgba(255, 255, 255, .30) !important;
+    color: var(--control-text);
+    backdrop-filter: blur(7px);
+    box-shadow: 0 5px 18px rgba(0, 0, 0, .16);
+
     border-radius:50%;
     pointer-events: auto !important;
 
@@ -547,13 +553,19 @@ body.sky-share-mode .sky-share-media-host #toolbar #nextButton {
     transform: translateY(-50%) !important;
 
     display: flex !important;
-    backdrop-filter:blur(10px);
+
+    border: 1px solid 
+color-mix(in srgb, var(--control-text) 22%, transparent);
+    background: rgba(255, 255, 255, .30) !important;
+    color: var(--control-text);
+    backdrop-filter: blur(7px);
+    box-shadow: 0 5px 18px rgba(0, 0, 0, .16);
+
     border-radius:50%;
     align-items: center !important;
     justify-content: center !important;
 
     visibility: visible !important;
-    opacity: 1 !important;
 
     pointer-events: auto !important;
 
@@ -2933,6 +2945,13 @@ body.sky-share-mode.sky-share-book #toolbar > button {
     padding: 0 !important;
     flex: 0 0 var(--sky-share-book-control-size) !important;
     pointer-events: auto !important;
+
+    border: 1px solid 
+color-mix(in srgb, var(--control-text) 22%, transparent);
+    background: rgba(255, 255, 255, .30) !important;
+    color: var(--control-text);
+    backdrop-filter: blur(7px);
+    box-shadow: 0 5px 18px rgba(0, 0, 0, .16);
 }
 
 body.sky-share-mode.sky-share-book #toolbar #muteButton,
