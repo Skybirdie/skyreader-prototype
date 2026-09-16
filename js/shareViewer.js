@@ -197,12 +197,20 @@ window.ShareViewer = (function () {
 
         /*
          * Reuse the existing primary logo from index.html.
-         * Do NOT create a second logo for Share Mode.
+         * Move the existing element into the Share shell so it
+         * remains visible when #workspace is isolated.
          */
-        const primaryLogo = document.getElementById("workspacePrimaryLogo");
+        const primaryLogo =
+            document.getElementById("workspacePrimaryLogo");
 
         if (primaryLogo) {
+            primaryLogo.classList.add(
+                "sky-share-primary-logo"
+            );
+
             primaryLogo.style.display = "block";
+
+            shell.appendChild(primaryLogo);
         }
 
 
