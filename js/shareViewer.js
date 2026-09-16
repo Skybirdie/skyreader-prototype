@@ -1,1335 +1,1189 @@
 "use strict";
 
 /*
+=========================================================
+ SkyMedia Share Viewer
+ --------------------------------------------------------
+ Share-mode shell for directly shared media.
 
-SkyMedia Share Viewer
-Version 1.1.0
-
-Standalone one-item viewer for social/share links.
-
-Responsibilities
-• Detect the requested section + item
-• Present exactly one item
-• Reuse existing SkyMedia rendering engines
-• Remove/hide normal application navigation
-• Provide a simple "Open Meditation Mornings" button
-• Keep normal SkyMedia application behavior untouched
-
-Share Mode intentionally does NOT expose:
-• Front Page
-• AppSwitcher
-• Libraries
-• Favorites
-• Bookmarks
-• Settings
-• Search
-• Normal section navigation
-
-BOOK SHARE CONTROL FIX
-
-Share Mode mounts #viewerArea into the Share shell, but the
-normal Reader toolbar remains in #workspace.
-
-This version explicitly prepares the existing Reader controls
-for Share Mode instead of creating duplicate Reader controls.
-
+ IMPORTANT:
+ - Normal Reader controls are preserved.
+ - Normal Reader button handlers are preserved.
+ - Share Mode initializes SRNavigation against the
+   shared Reader book after Reader.open().
+ - No duplicate Reader navigation handlers are installed.
+=========================================================
 */
 
 window.ShareViewer = (function () {
 
-let started = false;
-let activeItem = null;
-let activeTarget = null;
+    let started = false;
+    let activeItem = null;
+    let activeTarget = null;
 
-let shell = null;
-let titleElement = null;
-let subtitleElement = null;
-let mediaHost = null;
-let openButton = null;
-let closeButton = null;
-let statusElement = null;
+    let shell = null;
+    let titleElement = null;
+    let subtitleElement = null;
+    let mediaHost = null;
+    let statusElement = null;
+    let openButton = null;
+    let closeButton = null;
 
-/*
- * Reader controls temporarily exposed while a book is in
- * Share Mode.
- */
-let bookControls = [];
-let bookControlState = [];
+    let bookControls = [];
+    let bookControlState = [];
 
-
-const GLIDE_MEDIA_URL =
-    "https://meditationmornings.glide.page/dl/media";
+    const GLIDE_MEDIA_URL =
+        "https://meditationmornings.glide.page/dl/media";
 
 
-/*-------------------------------------------------------
-  Utilities
--------------------------------------------------------*/
+    /* --------------------------------------------------
+       Utilities
+    -------------------------------------------------- */
 
-function createElement(tag, className, text) {
+    function createElement(tag, className, text) {
 
-    const element = document.createElement(tag);
+        const el = document.createElement(tag);
 
-    if (className) {
-        element.className = className;
+        if (className) {
+            el.className = className;
+        }
+
+        if (text !== undefined) {
+            el.textContent = text;
+        }
+
+        return el;
     }
 
-    if (text !== undefined) {
-        element.textContent = text;
+
+    function escapeText(value) {
+
+        return String(value == null ? "" : value);
     }
 
-    return element;
-}
 
+    function getSectionLabel(section) {
 
-function getSectionLabel(section) {
+        switch (String(section || "").toLowerCase()) {
 
-    switch (String(section || "").toLowerCase()) {
+            case "book":
+                return "Book";
 
-        case "reader":
-        case "book":
-            return "Book";
+            case "video":
+                return "Video";
 
-        case "video":
-            return "Video";
+            case "slideshow":
+                return "Slideshow";
 
-        case "slideshow":
-        case "slides":
-            return "Images / Graphics";
-
-        default:
-            return "Media";
-    }
-
-}
-
-
-function escapeText(value) {
-    return String(value || "").trim();
-}
-
-
-/*-------------------------------------------------------
-  Shell
--------------------------------------------------------*/
-
-function createShell() {
-
-    if (shell) {
-        return;
-    }
-
-    shell = createElement(
-        "div",
-        "sky-share-shell"
-    );
-
-    shell.id = "skyShareShell";
-
-
-    /*
-     * Header
-     */
-
-    const header = createElement(
-        "header",
-        "sky-share-header"
-    );
-
-    const brand = createElement(
-        "div",
-        "sky-share-brand",
-        "Meditation Mornings"
-    );
-
-    const section = createElement(
-        "div",
-        "sky-share-section"
-    );
-
-    header.appendChild(brand);
-    header.appendChild(section);
-
-
-    /*
-     * Main
-     */
-
-    const main = createElement(
-        "main",
-        "sky-share-main"
-    );
-
-    const heading = createElement(
-        "div",
-        "sky-share-heading"
-    );
-
-    titleElement = createElement(
-        "h1",
-        "sky-share-title"
-    );
-
-    subtitleElement = createElement(
-        "div",
-        "sky-share-subtitle"
-    );
-
-    heading.appendChild(titleElement);
-    heading.appendChild(subtitleElement);
-
-
-    /*
-     * Media host
-     */
-
-    mediaHost = createElement(
-        "div",
-        "sky-share-media-host"
-    );
-
-    statusElement = createElement(
-        "div",
-        "sky-share-status"
-    );
-
-
-    /*
-     * Footer actions
-     */
-
-    const actions = createElement(
-        "div",
-        "sky-share-actions"
-    );
-
-    openButton = createElement(
-        "a",
-        "sky-share-open-button",
-        "Open Meditation Mornings"
-    );
-
-    openButton.href = GLIDE_MEDIA_URL;
-    openButton.target = "_blank";
-    openButton.rel = "noopener noreferrer";
-
-
-    closeButton = createElement(
-        "button",
-        "sky-share-close-button",
-        "Close"
-    );
-
-    closeButton.type = "button";
-
-    closeButton.addEventListener(
-        "click",
-        close
-    );
-
-    actions.appendChild(openButton);
-    actions.appendChild(closeButton);
-
-
-    main.appendChild(heading);
-    main.appendChild(mediaHost);
-    main.appendChild(statusElement);
-    main.appendChild(actions);
-
-
-    shell.appendChild(header);
-    shell.appendChild(main);
-
-    document.body.appendChild(shell);
-
-    section.textContent = "";
-    section.dataset.section = "";
-}
-
-
-/*-------------------------------------------------------
-  Reader control helpers
--------------------------------------------------------*/
-
-function findFirst(selectors) {
-
-    for (const selector of selectors) {
-
-        const element =
-            document.querySelector(selector);
-
-        if (element) {
-            return element;
+            default:
+                return "Media";
         }
     }
 
-    return null;
-}
 
+    function findFirst(selectors) {
 
-/*
- * Locate the actual Reader controls already used by the
- * normal SkyMedia Reader.
- *
- * We deliberately use the existing elements rather than
- * creating duplicate buttons.
- */
-function collectBookControls() {
+        for (const selector of selectors) {
 
-    const candidates = [
+            const el = document.querySelector(selector);
 
-        findFirst([
-            "#toolbar"
-        ]),
-
-        findFirst([
-            "#previousButton",
-            "#prevButton",
-            "[data-reader-action='previous']",
-            "[data-action='previous']"
-        ]),
-
-        findFirst([
-            "#nextButton",
-            "[data-reader-action='next']",
-            "[data-action='next']"
-        ]),
-
-        findFirst([
-            "#fullscreenButton",
-            "#readerFullscreenButton",
-            "[data-reader-action='fullscreen']",
-            "[data-action='fullscreen']"
-        ]),
-
-        findFirst([
-            "#muteButton",
-            "#readerMuteButton",
-            "[data-reader-action='mute']",
-            "[data-action='mute']"
-        ]),
-
-        findFirst([
-            "#shareButton",
-            "#readerShareButton",
-            "[data-reader-action='share']",
-            "[data-action='share']"
-        ]),
-
-        findFirst([
-            "#statusBar"
-        ]),
-
-        ...Array.from(
-            document.querySelectorAll(
-                ".sr-welcome-banner"
-            )
-        )
-    ];
-
-
-    const unique = [];
-
-    candidates.forEach(element => {
-
-        if (
-            element &&
-            !unique.includes(element)
-        ) {
-            unique.push(element);
+            if (el) {
+                return el;
+            }
         }
 
-    });
-
-    return unique;
-}
+        return null;
+    }
 
 
-/*
- * Prepare the existing Reader controls for Share Mode.
- *
- * Important:
- * We do NOT attach replacement Reader logic here.
- *
- * Existing click handlers installed by Reader/UI remain
- * attached to the original DOM elements.
- */
-function exposeBookControls() {
+    /* --------------------------------------------------
+       Share shell
+    -------------------------------------------------- */
 
-    bookControls = collectBookControls();
+    function createShell() {
 
-    bookControlState = bookControls.map(element => ({
-        element,
-        display: element.style.display,
-        visibility: element.style.visibility,
-        pointerEvents: element.style.pointerEvents,
-        position: element.style.position,
-        zIndex: element.style.zIndex,
-        opacity: element.style.opacity
-    }));
-
-
-    bookControls.forEach(element => {
-
-        element.dataset.skyShareReaderControl = "true";
-
-        /*
-         * The Share shell can sit over the normal application
-         * workspace. Give the existing Reader controls a
-         * guaranteed interaction layer.
-         */
-        element.style.pointerEvents = "auto";
-
-        /*
-         * Do not force everything to fixed positioning here.
-         * share.css already controls the Reader toolbar layout.
-         *
-         * We only establish a stacking layer if necessary.
-         */
-        if (
-            element.id === "toolbar" ||
-            element.id === "statusBar" ||
-            element.classList.contains("sr-welcome-banner")
-        ) {
-            element.style.zIndex = "1000002";
-        }
-
-    });
-
-
-    /*
-     * The Share shell itself must not become a transparent
-     * click shield over the Reader controls.
-     *
-     * Its normal content remains interactive; only the areas
-     * occupied by Reader controls are allowed to receive the
-     * Reader events through their higher z-index.
-     */
-    document.body.classList.add(
-        "sky-share-book-controls-active"
-    );
-
-
-    /*
-     * Diagnostic information. This is intentionally useful
-     * when testing a share link in browser DevTools.
-     */
-    console.log(
-        "[SkyMedia Share] Reader controls exposed:",
-        bookControls.map(element => ({
-            id: element.id,
-            className: element.className,
-            tag: element.tagName
-        }))
-    );
-}
-
-
-/*
- * Restore only the inline styles changed by Share Mode.
- *
- * Normally Share Mode closes by navigating back to Glide,
- * but this keeps the module clean if close/cleanup is called
- * before navigation.
- */
-function restoreBookControls() {
-
-    bookControlState.forEach(state => {
-
-        const element = state.element;
-
-        if (!element) {
+        if (shell) {
             return;
         }
 
-        element.style.display = state.display;
-        element.style.visibility = state.visibility;
-        element.style.pointerEvents = state.pointerEvents;
-        element.style.position = state.position;
-        element.style.zIndex = state.zIndex;
-        element.style.opacity = state.opacity;
+        shell = createElement("section", "sky-share-shell");
+        shell.id = "skyShareViewer";
 
-        delete element.dataset.skyShareReaderControl;
-    });
+        const header = createElement(
+            "header",
+            "sky-share-header"
+        );
 
+        titleElement = createElement(
+            "div",
+            "sky-share-title"
+        );
 
-    bookControls = [];
-    bookControlState = [];
+        subtitleElement = createElement(
+            "div",
+            "sky-share-subtitle"
+        );
 
-    document.body.classList.remove(
-        "sky-share-book-controls-active"
-    );
-}
+        const titleWrap = createElement(
+            "div",
+            "sky-share-title-wrap"
+        );
 
+        titleWrap.appendChild(titleElement);
+        titleWrap.appendChild(subtitleElement);
 
-/*
- * Verify that the controls are actually connected to the
- * Reader DOM after Reader.open() has completed.
- *
- * This does NOT replace their event handlers.
- *
- * It simply reports the exact elements and whether they are
- * currently disabled/hidden.
- */
-function verifyBookControls() {
-
-    const ids = [
-        "toolbar",
-        "previousButton",
-        "nextButton",
-        "fullscreenButton",
-        "muteButton",
-        "shareButton",
-        "statusBar"
-    ];
+        header.appendChild(titleWrap);
 
 
-    const result = {};
+        const main = createElement(
+            "main",
+            "sky-share-main"
+        );
 
-    ids.forEach(id => {
+        mediaHost = createElement(
+            "div",
+            "sky-share-media-host"
+        );
 
-        const element =
-            document.getElementById(id);
+        mediaHost.id = "sky-share-media-host";
 
-        result[id] = element
-            ? {
-                exists: true,
-                display: getComputedStyle(element).display,
-                visibility: getComputedStyle(element).visibility,
-                pointerEvents: getComputedStyle(element).pointerEvents,
-                disabled: !!element.disabled
+        statusElement = createElement(
+            "div",
+            "sky-share-status"
+        );
+
+        statusElement.id = "sky-share-status";
+
+        main.appendChild(mediaHost);
+        main.appendChild(statusElement);
+
+
+        const actions = createElement(
+            "div",
+            "sky-share-actions"
+        );
+
+        openButton = createElement(
+            "button",
+            "sky-share-open-button",
+            "Open in Meditation Mornings"
+        );
+
+        openButton.type = "button";
+
+        openButton.addEventListener(
+            "click",
+            function () {
+
+                window.location.href = GLIDE_MEDIA_URL;
+
             }
-            : {
-                exists: false
-            };
-
-    });
+        );
 
 
-    console.log(
-        "[SkyMedia Share] Reader control state:",
-        result
-    );
-}
+        closeButton = createElement(
+            "button",
+            "sky-share-close-button",
+            "Close"
+        );
+
+        closeButton.type = "button";
+
+        closeButton.addEventListener(
+            "click",
+            close
+        );
 
 
-/*-------------------------------------------------------
-  Normal application shell isolation
--------------------------------------------------------*/
-
-function isolateApplication(section) {
-
-    document.body.classList.add("sky-share-mode");
+        actions.appendChild(openButton);
+        actions.appendChild(closeButton);
 
 
-    /*
-     * Hide normal application sections/chrome.
-     */
+        shell.appendChild(header);
+        shell.appendChild(main);
+        shell.appendChild(actions);
 
-    const isBookShare =
-        section === "reader" ||
-        section === "book";
-
-
-    const selectors = [
-
-        "#frontPage",
-        "#frontSection",
-
-        /*
-         * IMPORTANT:
-         *
-         * Do not hide #workspace for a book share.
-         *
-         * The Reader toolbar/status/welcome elements live
-         * there even though #viewerArea is moved into the
-         * Share host.
-         */
-        ...(isBookShare ? [] : ["#workspace"]),
-
-        "#videoSection",
-        "#slideshowSection",
-
-        "#videoTopBar",
-        "#videoLibrary",
-        "#videoSearchGroup",
-        "#videoTopBarRightControls",
-
-        "#slideshowLibrary",
-        ".slideshow-top-bar",
-
-        ".app-switcher",
-        ".responsive-app-menu",
-
-        "#readerLibrary",
-        "#library",
-        "#libraryPanel",
-
-        "#settingsPanel",
-        "#settingsOverlay",
-
-        ".video-library",
-        ".slideshow-library"
-
-    ];
+        document.body.appendChild(shell);
+    }
 
 
-    selectors.forEach(selector => {
+    /* --------------------------------------------------
+       Existing Reader controls
+    -------------------------------------------------- */
 
-        document
-            .querySelectorAll(selector)
-            .forEach(element => {
+    function collectBookControls() {
 
-                element.dataset.skyShareHidden = "true";
-                element.style.display = "none";
+        const selectors = [
+
+            "#toolbar",
+
+            "#previousButton",
+            "#nextButton",
+            "#rotateButton",
+
+            "#muteButton",
+
+            "#readerShareButton",
+
+            /*
+             * This is the actual fullscreen control used
+             * by the current Reader.
+             */
+            "#viewerFullscreenButton",
+
+            "#readerCloseButton",
+
+            "#statusBar",
+
+            ".sr-welcome-banner"
+
+        ];
+
+
+        const result = [];
+        const seen = new Set();
+
+
+        for (const selector of selectors) {
+
+            const nodes =
+                document.querySelectorAll(selector);
+
+            for (const node of nodes) {
+
+                if (!seen.has(node)) {
+
+                    seen.add(node);
+                    result.push(node);
+
+                }
+            }
+        }
+
+
+        return result;
+    }
+
+
+    function exposeBookControls() {
+
+        bookControls = collectBookControls();
+
+
+        bookControlState =
+            bookControls.map(function (el) {
+
+                return {
+
+                    element: el,
+
+                    display: el.style.display,
+
+                    visibility: el.style.visibility,
+
+                    pointerEvents: el.style.pointerEvents,
+
+                    zIndex: el.style.zIndex
+
+                };
 
             });
 
-    });
 
+        bookControls.forEach(function (el) {
 
-    /*
-     * Hide the normal Front Page.
-     */
+            el.dataset.skyShareReaderControl = "true";
 
-    document
-        .querySelectorAll(
-            "#frontPage, #frontSection"
-        )
-        .forEach(element => {
-            element.style.display = "none";
-        });
+            /*
+             * Do not replace the Reader's event handlers.
+             */
+            el.style.pointerEvents = "auto";
 
-
-    /*
-     * Disable ordinary navigation controls.
-     */
-
-    document
-        .querySelectorAll(
-            "[data-app-target], .app-switch-button, .responsive-app-menu-button"
-        )
-        .forEach(element => {
-
-            element.dataset.skyShareHidden = "true";
-            element.style.display = "none";
-
-        });
-
-
-    /*
-     * IMPORTANT:
-     *
-     * Do not hide .sr-welcome-banner here for book shares.
-     *
-     * It may be part of the Reader presentation that the
-     * current Share CSS intentionally exposes.
-     */
-    if (!isBookShare) {
-
-        document
-            .querySelectorAll(".sr-welcome-banner")
-            .forEach(element => {
-
-                element.dataset.skyShareHidden = "true";
-                element.style.display = "none";
-
-            });
-
-    }
-
-
-    /*
-     * Reassert Reader control exposure after all application
-     * isolation has happened.
-     *
-     * This is important because some normal application CSS
-     * uses workspace-level visibility rules.
-     */
-    if (isBookShare) {
-        exposeBookControls();
-    }
-}
-
-
-/*-------------------------------------------------------
-  Viewer mounting helpers
--------------------------------------------------------*/
-
-function detachExistingViewer(viewer) {
-
-    if (!viewer) {
-        return;
-    }
-
-
-    /*
-     * The actual rendering element remains in the document
-     * because the existing engine depends on it.
-     */
-
-    viewer.dataset.skyShareOriginalParent =
-        viewer.parentElement
-            ? viewer.parentElement.id || ""
-            : "";
-
-
-    viewer.dataset.skyShareOriginalDisplay =
-        viewer.style.display || "";
-
-
-    mediaHost.appendChild(viewer);
-
-    viewer.style.display = "";
-    viewer.classList.add(
-        "sky-share-mounted-viewer"
-    );
-}
-
-
-/*-------------------------------------------------------
-  Video
--------------------------------------------------------*/
-
-function prepareVideo(item) {
-
-    /*
-     * VideoLibrary is needed internally because
-     * VideoViewer.init() expects its library dependency.
-     */
-
-    if (
-        window.VideoLibrary &&
-        typeof VideoLibrary.init === "function"
-    ) {
-
-        VideoLibrary.init();
-
-        if (
-            typeof VideoLibrary.load === "function" &&
-            window.Manifest &&
-            typeof Manifest.videos === "function"
-        ) {
-
-            VideoLibrary.load(
-                Manifest.videos()
-            );
-
-        }
-    }
-
-
-    const viewer =
-        document.getElementById("videoViewer");
-
-
-    if (!viewer) {
-
-        throw new Error(
-            "Share Mode: #videoViewer not found."
-        );
-
-    }
-
-
-    if (
-        window.VideoViewer &&
-        typeof VideoViewer.init === "function"
-    ) {
-
-        VideoViewer.init();
-
-    }
-
-
-    detachExistingViewer(viewer);
-
-
-    if (
-        !window.VideoViewer ||
-        typeof VideoViewer.openVideo !== "function"
-    ) {
-
-        throw new Error(
-            "Share Mode: VideoViewer.openVideo() unavailable."
-        );
-
-    }
-
-
-    return VideoViewer.openVideo(item);
-}
-
-
-/*-------------------------------------------------------
-  Slideshow
--------------------------------------------------------*/
-
-async function prepareSlideshow(item) {
-
-    if (
-        typeof SlideshowLibrary === "undefined"
-    ) {
-
-        throw new Error(
-            "Share Mode: SlideshowLibrary is not available."
-        );
-
-    }
-
-
-    if (
-        typeof SlideshowViewer === "undefined"
-    ) {
-
-        throw new Error(
-            "Share Mode: SlideshowViewer is not available."
-        );
-
-    }
-
-
-    /*
-     * Initialize slideshow library first.
-     */
-
-    if (
-        typeof SlideshowLibrary.init === "function"
-    ) {
-
-        SlideshowLibrary.init();
-
-    }
-
-
-    /*
-     * Load slideshow manifest.
-     */
-
-    if (
-        typeof Manifest !== "undefined" &&
-        typeof Manifest.slideshows !== "undefined" &&
-        typeof Manifest.slideshows.load === "function"
-    ) {
-
-        await Manifest.slideshows.load();
-
-    }
-
-
-    /*
-     * Initialize actual slideshow viewer.
-     */
-
-    const initialized =
-        SlideshowViewer.init();
-
-
-    if (initialized === false) {
-
-        throw new Error(
-            "Share Mode: SlideshowViewer failed to initialize."
-        );
-
-    }
-
-
-    /*
-     * Share Mode bypasses normal application startup,
-     * so explicitly initialize SlideshowUI when available.
-     */
-
-    if (
-        typeof SlideshowUI !== "undefined" &&
-        typeof SlideshowUI.init === "function"
-    ) {
-
-        SlideshowUI.init();
-
-    }
-
-
-    const viewer =
-        document.getElementById("slideshowViewer");
-
-
-    if (!viewer) {
-
-        throw new Error(
-            "Share Mode: #slideshowViewer was not found."
-        );
-
-    }
-
-
-    detachExistingViewer(viewer);
-
-
-    /*
-     * Do not initialize the viewer again after moving it.
-     */
-
-    await SlideshowViewer.open(item);
-
-    return viewer;
-}
-
-
-/*-------------------------------------------------------
-  Book
--------------------------------------------------------*/
-
-async function prepareBook(item) {
-
-    /*
-     * Reader/Renderer initialize automatically from
-     * DOMContentLoaded. Reuse the existing Reader engine.
-     */
-
-    if (
-        !window.Reader ||
-        typeof Reader.open !== "function"
-    ) {
-
-        throw new Error(
-            "Share Mode: Reader.open() unavailable."
-        );
-
-    }
-
-
-    const viewerArea =
-        document.getElementById("viewerArea");
-
-
-    if (!viewerArea) {
-
-        throw new Error(
-            "Share Mode: #viewerArea not found."
-        );
-
-    }
-
-
-    /*
-     * Make sure the existing Reader toolbar exists before
-     * opening the book.
-     *
-     * We do NOT hide #workspace because the Reader controls
-     * live there.
-     */
-    exposeBookControls();
-
-
-    /*
-     * Move only the actual Reader viewing surface.
-     */
-    detachExistingViewer(viewerArea);
-
-
-    viewerArea.style.display = "";
-
-
-    /*
-     * Open the exact shared book.
-     */
-    await Reader.open(item);
-
-
-    /*
-     * Reader.open() can update DOM state. Reassert the
-     * Share Mode control layer after the book has opened.
-     */
-    exposeBookControls();
-
-
-    verifyBookControls();
-}
-
-
-/*-------------------------------------------------------
-  Media type dispatch
--------------------------------------------------------*/
-
-async function openItem(item, target) {
-
-    const section =
-        String(
-            target.section ||
-            item.type ||
-            ""
-        ).toLowerCase();
-
-
-    activeItem = item;
-    activeTarget = target;
-
-
-    titleElement.textContent =
-        escapeText(item.title) ||
-        "Meditation Mornings";
-
-
-    subtitleElement.textContent =
-        escapeText(item.subtitle);
-
-
-    document
-        .querySelector(".sky-share-section")
-        ?.setAttribute(
-            "data-section",
-            section
-        );
-
-
-    document
-        .querySelector(".sky-share-section")
-        ?.replaceChildren(
-            document.createTextNode(
-                getSectionLabel(section)
-            )
-        );
-
-
-    statusElement.textContent =
-        "Opening " +
-        getSectionLabel(section).toLowerCase() +
-        "…";
-
-
-    try {
-
-        if (section === "video") {
-
-            await prepareVideo(item);
-
-        }
-        else if (
-            section === "slideshow" ||
-            section === "slides"
-        ) {
-
-            await prepareSlideshow(item);
-
-        }
-        else if (
-            section === "reader" ||
-            section === "book"
-        ) {
-
-            await prepareBook(item);
-
-        }
-        else {
-
-            throw new Error(
-                "Unsupported Share Mode section: " +
-                section
-            );
-
-        }
-
-
-        statusElement.textContent = "";
-
-
-    } catch (error) {
-
-        console.error(
-            "[SkyMedia] Share Mode media open failed.",
-            error
-        );
-
-
-        statusElement.textContent =
-            "Unable to open this item.";
-
-
-        throw error;
-    }
-}
-
-
-/*-------------------------------------------------------
-  Close
--------------------------------------------------------*/
-
-function close() {
-
-    try {
-
-        if (
-            activeTarget &&
-            (
-                activeTarget.section === "video" ||
-                activeItem?.type === "video"
-            ) &&
-            window.VideoViewer &&
-            typeof VideoViewer.closeVideo === "function"
-        ) {
-
-            VideoViewer.closeVideo();
-
-        }
-
-
-        if (
-            activeTarget &&
-            (
-                activeTarget.section === "slideshow" ||
-                activeItem?.type === "slideshow"
-            ) &&
-            window.SlideshowViewer &&
-            typeof SlideshowViewer.close === "function"
-        ) {
-
-            SlideshowViewer.close();
-
-        }
-
-
-        if (
-            activeTarget &&
-            (
-                activeTarget.section === "reader" ||
-                activeTarget.section === "book" ||
-                activeItem?.type === "book"
-            ) &&
-            window.Reader &&
-            typeof Reader.close === "function" &&
-            Reader.isOpen()
-        ) {
-
-            Reader.close({
-                playSound: false
-            });
-
-        }
-
-
-    } catch (error) {
-
-        console.warn(
-            "[SkyMedia] Share Mode close cleanup failed.",
-            error
-        );
-
-    }
-
-
-    /*
-     * Restore temporary Share Mode control state before
-     * leaving the page.
-     */
-    restoreBookControls();
-
-
-    /*
-     * Return to the normal SkyMedia URL.
-     */
-    window.location.href =
-        "https://meditationmornings.glide.page/dl/media";
-}
-
-
-/*-------------------------------------------------------
-  Escape key
--------------------------------------------------------*/
-
-function bindEscape() {
-
-    document.addEventListener(
-        "keydown",
-        event => {
 
             if (
-                !document.body.classList.contains(
-                    "sky-share-mode"
-                )
+                el.id === "toolbar" ||
+                el.id === "statusBar" ||
+                el.classList.contains("sr-welcome-banner")
             ) {
 
+                el.style.zIndex = "1000002";
+
+            }
+
+        });
+
+
+        document.body.classList.add(
+            "sky-share-book-controls-active"
+        );
+
+
+        console.log(
+            "[ShareViewer] Reader controls exposed:",
+            bookControls.map(function (el) {
+                return el.id || el.className;
+            })
+        );
+    }
+
+
+    function restoreBookControls() {
+
+        bookControlState.forEach(function (state) {
+
+            const el = state.element;
+
+            if (!el) {
                 return;
             }
 
 
-            if (event.key === "Escape") {
+            el.style.display = state.display;
+            el.style.visibility = state.visibility;
+            el.style.pointerEvents = state.pointerEvents;
+            el.style.zIndex = state.zIndex;
 
-                event.preventDefault();
 
-                close();
+            delete el.dataset.skyShareReaderControl;
+
+        });
+
+
+        bookControlState = [];
+        bookControls = [];
+
+
+        document.body.classList.remove(
+            "sky-share-book-controls-active"
+        );
+    }
+
+
+    function verifyBookControls() {
+
+        const ids = [
+
+            "toolbar",
+
+            "previousButton",
+            "nextButton",
+            "rotateButton",
+
+            "muteButton",
+
+            "readerShareButton",
+
+            "viewerFullscreenButton",
+
+            "readerCloseButton",
+
+            "statusBar"
+
+        ];
+
+
+        const result = {};
+
+
+        ids.forEach(function (id) {
+
+            const el = document.getElementById(id);
+
+            if (!el) {
+
+                result[id] = null;
+                return;
 
             }
 
+
+            const rect =
+                el.getBoundingClientRect();
+
+            const style =
+                window.getComputedStyle(el);
+
+
+            result[id] = {
+
+                display: style.display,
+
+                visibility: style.visibility,
+
+                pointerEvents: style.pointerEvents,
+
+                zIndex: style.zIndex,
+
+                width: rect.width,
+
+                height: rect.height,
+
+                left: rect.left,
+
+                top: rect.top
+
+            };
+
+        });
+
+
+        console.log(
+            "[ShareViewer] Reader control state:",
+            result
+        );
+
+
+        return result;
+    }
+
+
+    /* --------------------------------------------------
+       Application isolation
+    -------------------------------------------------- */
+
+    function isolateApplication(section) {
+
+        document.body.classList.add(
+            "sky-share-mode"
+        );
+
+
+        const isBookShare =
+            section === "book" ||
+            section === "reader";
+
+
+        const selectors = [
+
+            "#frontPage",
+            "#frontSection",
+
+            "#videoSection",
+            "#slideshowSection",
+
+            "#librarySection",
+            "#landingSection",
+
+            "#appSwitcher",
+            "#mainNav",
+            "nav"
+
+        ];
+
+
+        /*
+         * For books we deliberately leave #workspace
+         * available because the Reader owns it.
+         */
+        if (!isBookShare) {
+
+            selectors.push("#workspace");
+
         }
-    );
-
-}
 
 
-/*-------------------------------------------------------
-  Start
--------------------------------------------------------*/
+        selectors.forEach(function (selector) {
 
-async function start(item, target) {
+            document
+                .querySelectorAll(selector)
+                .forEach(function (el) {
 
-    if (started) {
-        return;
-    }
+                    if (
+                        shell &&
+                        shell.contains(el)
+                    ) {
+                        return;
+                    }
 
+                    el.classList.add(
+                        "sky-share-hidden-app"
+                    );
 
-    console.log(
-        "[SkyMedia Share] start() entered."
-    );
+                });
 
-
-    if (!item) {
-
-        console.error(
-            "[SkyMedia Share] No item supplied."
-        );
-
-        throw new Error(
-            "Share Mode: no item supplied."
-        );
-
-    }
+        });
 
 
-    if (!target) {
-
-        console.error(
-            "[SkyMedia Share] No target supplied."
-        );
-
-        throw new Error(
-            "Share Mode: no target supplied."
-        );
-
-    }
-
-
-    console.log(
-        "[SkyMedia Share] Target:",
-        target.section,
-        target.id
-    );
-
-
-    console.log(
-        "[SkyMedia Share] Item:",
-        item
-    );
-
-
-    started = true;
-
-
-    try {
-
-        console.log(
-            "[SkyMedia Share] Creating shell."
-        );
-
-        createShell();
-
-
-        console.log(
-            "[SkyMedia Share] Binding Escape."
-        );
-
-        bindEscape();
-
-
-        console.log(
-            "[SkyMedia Share] Opening item."
-        );
-
-        await openItem(item, target);
-
-
-        console.log(
-            "[SkyMedia Share] Item opened successfully."
-        );
-
-
-        /*
-         * Only isolate the normal application after the
-         * requested viewer successfully opened.
-         */
-        isolateApplication(
-            String(
-                target.section ||
-                item.type ||
-                ""
-            ).toLowerCase()
-        );
-
-
-        /*
-         * One final verification after isolation.
-         */
-        if (
-            String(
-                target.section ||
-                item.type ||
-                ""
-            ).toLowerCase() === "reader" ||
-            String(
-                target.section ||
-                item.type ||
-                ""
-            ).toLowerCase() === "book"
-        ) {
+        if (isBookShare) {
 
             exposeBookControls();
-            verifyBookControls();
+
+        }
+    }
+
+
+    /* --------------------------------------------------
+       Viewer relocation
+    -------------------------------------------------- */
+
+    function detachExistingViewer(viewer) {
+
+        if (!viewer) {
+            return;
+        }
+
+
+        /*
+         * The Reader's actual viewer remains the same DOM
+         * object. We are only changing its host.
+         */
+        mediaHost.appendChild(viewer);
+
+
+        viewer.style.display = "";
+
+        viewer.classList.add(
+            "sky-share-mounted-viewer"
+        );
+    }
+
+
+    /* --------------------------------------------------
+       Reader / SRNavigation synchronization
+    -------------------------------------------------- */
+
+    function initializeShareReaderNavigation(item) {
+
+        if (
+            typeof window.SRNavigation === "undefined" ||
+            !window.SRNavigation
+        ) {
+
+            console.warn(
+                "[ShareViewer] SRNavigation is unavailable."
+            );
+
+            return false;
+        }
+
+
+        /*
+         * SRNavigation.initialize() is intentionally safe
+         * to call more than once; its own implementation
+         * exits when already initialized.
+         */
+        try {
+
+            if (
+                typeof SRNavigation.initialized === "function" &&
+                !SRNavigation.initialized()
+            ) {
+
+                SRNavigation.initialize();
+
+                console.log(
+                    "[ShareViewer] SRNavigation initialized."
+                );
+            }
+
+        } catch (error) {
+
+            console.error(
+                "[ShareViewer] SRNavigation.initialize() failed:",
+                error
+            );
+
+            return false;
+        }
+
+
+        /*
+         * Reader.open() has already established the actual
+         * current Reader book. Use that object whenever
+         * possible so navigation points at the same object
+         * Reader is using.
+         */
+        let book = null;
+
+
+        try {
+
+            if (
+                typeof Reader.currentBook === "function"
+            ) {
+
+                book = Reader.currentBook();
+
+            }
+
+        } catch (error) {
+
+            console.warn(
+                "[ShareViewer] Could not read Reader.currentBook():",
+                error
+            );
 
         }
 
 
+        if (!book) {
+            book = item;
+        }
+
+
+        try {
+
+            if (
+                typeof SRNavigation.setCurrentBook ===
+                "function"
+            ) {
+
+                SRNavigation.setCurrentBook(book);
+
+            }
+
+        } catch (error) {
+
+            console.error(
+                "[ShareViewer] SRNavigation.setCurrentBook() failed:",
+                error
+            );
+
+            return false;
+        }
+
+
         console.log(
-            "[SkyMedia Share] Application isolated."
+            "[ShareViewer] Navigation synchronized:",
+            SRNavigation.status()
         );
 
 
-    } catch (error) {
+        return true;
+    }
 
-        console.error(
-            "[SkyMedia Share] STARTUP FAILED:",
-            error
+
+    /* --------------------------------------------------
+       Book
+    -------------------------------------------------- */
+
+    async function prepareBook(item) {
+
+        if (
+            typeof window.Reader === "undefined" ||
+            !Reader ||
+            typeof Reader.open !== "function"
+        ) {
+
+            throw new Error(
+                "Reader is unavailable."
+            );
+
+        }
+
+
+        const viewerArea =
+            document.getElementById("viewerArea");
+
+
+        if (!viewerArea) {
+
+            throw new Error(
+                "#viewerArea was not found."
+            );
+
+        }
+
+
+        /*
+         * Move the existing Reader viewer into the Share
+         * Viewer before opening the book.
+         */
+        detachExistingViewer(viewerArea);
+
+        viewerArea.style.display = "";
+
+
+        /*
+         * Let the normal Reader open the book. Do not
+         * replace Reader's own rendering/navigation logic.
+         */
+        await Reader.open(item);
+
+
+        /*
+         * This is the critical Share Mode fix.
+         *
+         * Reader is now open, so synchronize the separate
+         * SRNavigation module with that Reader instance.
+         */
+        initializeShareReaderNavigation(item);
+
+
+        /*
+         * Reader.open() may create/show controls, so expose
+         * them again after opening.
+         */
+        exposeBookControls();
+
+
+        verifyBookControls();
+
+
+        /*
+         * Force the existing Reader viewer to recalculate
+         * its available dimensions after being moved into
+         * the Share Viewer host.
+         */
+        try {
+
+            if (
+                typeof Reader.refresh === "function"
+            ) {
+
+                requestAnimationFrame(function () {
+
+                    try {
+                        Reader.refresh();
+                    } catch (error) {
+                        console.warn(
+                            "[ShareViewer] Reader.refresh() failed:",
+                            error
+                        );
+                    }
+
+                });
+
+            }
+
+        } catch (error) {
+
+            console.warn(
+                "[ShareViewer] Reader refresh setup failed:",
+                error
+            );
+
+        }
+    }
+
+
+    /* --------------------------------------------------
+       Video
+    -------------------------------------------------- */
+
+    async function prepareVideo(item) {
+
+        if (
+            typeof window.VideoViewer !== "undefined" &&
+            VideoViewer &&
+            typeof VideoViewer.open === "function"
+        ) {
+
+            await VideoViewer.open(item);
+            return;
+        }
+
+
+        if (
+            typeof window.VideoViewer !== "undefined" &&
+            VideoViewer &&
+            typeof VideoViewer.openVideo === "function"
+        ) {
+
+            await VideoViewer.openVideo(item);
+            return;
+        }
+
+
+        throw new Error(
+            "Video viewer is unavailable."
         );
+    }
+
+
+    /* --------------------------------------------------
+       Slideshow
+    -------------------------------------------------- */
+
+    async function prepareSlideshow(item) {
+
+        if (
+            typeof window.SlideshowViewer !== "undefined" &&
+            SlideshowViewer &&
+            typeof SlideshowViewer.open === "function"
+        ) {
+
+            await SlideshowViewer.open(item);
+            return;
+        }
+
+
+        if (
+            typeof window.SlideshowViewer !== "undefined" &&
+            SlideshowViewer &&
+            typeof SlideshowViewer.openSlideshow === "function"
+        ) {
+
+            await SlideshowViewer.openSlideshow(item);
+            return;
+        }
+
+
+        throw new Error(
+            "Slideshow viewer is unavailable."
+        );
+    }
+
+
+    /* --------------------------------------------------
+       Open item
+    -------------------------------------------------- */
+
+    async function openItem(item, target) {
+
+        activeItem = item;
+        activeTarget = target;
+
+
+        const section =
+            String(
+                target &&
+                target.section ||
+                item.type ||
+                ""
+            ).toLowerCase();
+
+
+        titleElement.textContent =
+            escapeText(item.title || "Shared Media");
+
+
+        subtitleElement.textContent =
+            escapeText(
+                item.subtitle ||
+                getSectionLabel(section)
+            );
+
+
+        statusElement.textContent =
+            "Opening " +
+            getSectionLabel(section).toLowerCase() +
+            "…";
+
+
+        try {
+
+            switch (section) {
+
+                case "book":
+                case "reader":
+
+                    await prepareBook(item);
+                    break;
+
+
+                case "video":
+
+                    await prepareVideo(item);
+                    break;
+
+
+                case "slideshow":
+
+                    await prepareSlideshow(item);
+                    break;
+
+
+                default:
+
+                    throw new Error(
+                        "Unsupported shared media type: " +
+                        section
+                    );
+            }
+
+
+            statusElement.textContent = "";
+
+        } catch (error) {
+
+            console.error(
+                "[ShareViewer] Failed to open item:",
+                error
+            );
+
+
+            statusElement.textContent =
+                "Unable to open this item.";
+
+
+            throw error;
+        }
+    }
+
+
+    /* --------------------------------------------------
+       Close
+    -------------------------------------------------- */
+
+    function close() {
+
+        try {
+
+            if (
+                activeTarget &&
+                String(activeTarget.section).toLowerCase() ===
+                "video" &&
+                typeof window.VideoViewer !== "undefined" &&
+                VideoViewer
+            ) {
+
+                if (
+                    typeof VideoViewer.closeVideo ===
+                    "function"
+                ) {
+
+                    VideoViewer.closeVideo();
+
+                } else if (
+                    typeof VideoViewer.close ===
+                    "function"
+                ) {
+
+                    VideoViewer.close();
+
+                }
+
+            }
+
+
+            if (
+                activeTarget &&
+                String(activeTarget.section).toLowerCase() ===
+                "slideshow" &&
+                typeof window.SlideshowViewer !==
+                "undefined" &&
+                SlideshowViewer
+            ) {
+
+                if (
+                    typeof SlideshowViewer.close ===
+                    "function"
+                ) {
+
+                    SlideshowViewer.close();
+
+                }
+
+            }
+
+
+            if (
+                activeTarget &&
+                (
+                    String(activeTarget.section).toLowerCase() ===
+                    "book" ||
+                    String(activeTarget.section).toLowerCase() ===
+                    "reader"
+                ) &&
+                typeof window.Reader !== "undefined" &&
+                Reader &&
+                typeof Reader.close === "function"
+            ) {
+
+                Reader.close({
+                    playSound: false
+                });
+
+            }
+
+        } catch (error) {
+
+            console.warn(
+                "[ShareViewer] Viewer close error:",
+                error
+            );
+
+        }
 
 
         restoreBookControls();
 
+
+        document.body.classList.remove(
+            "sky-share-mode"
+        );
+
+
+        document
+            .querySelectorAll(".sky-share-hidden-app")
+            .forEach(function (el) {
+
+                el.classList.remove(
+                    "sky-share-hidden-app"
+                );
+
+            });
+
+
+        if (shell) {
+
+            shell.remove();
+            shell = null;
+
+        }
+
+
         started = false;
+        activeItem = null;
+        activeTarget = null;
 
-        throw error;
+
+        window.location.href =
+            GLIDE_MEDIA_URL;
     }
 
-}
+
+    /* --------------------------------------------------
+       Escape
+    -------------------------------------------------- */
+
+    function bindEscape() {
+
+        document.addEventListener(
+            "keydown",
+            function onShareEscape(event) {
+
+                if (
+                    !started ||
+                    event.key !== "Escape"
+                ) {
+                    return;
+                }
 
 
-/*-------------------------------------------------------
-  Public API
--------------------------------------------------------*/
+                /*
+                 * Do not close the Share Viewer if the normal
+                 * Reader is currently in its own focus/fullscreen
+                 * mode. Let the existing Reader control handle
+                 * that first.
+                 */
+                if (
+                    document
+                        .getElementById("app")
+                        ?.classList
+                        .contains("viewerFocus")
+                ) {
 
-return {
+                    return;
+                }
 
-    start,
-    close,
 
-    isStarted() {
-        return started;
-    },
+                close();
 
-    getItem() {
-        return activeItem;
-    },
-
-    getTarget() {
-        return activeTarget;
+            },
+            {
+                once: true
+            }
+        );
     }
 
-};
+
+    /* --------------------------------------------------
+       Public start
+    -------------------------------------------------- */
+
+    async function start(item, target) {
+
+        if (started) {
+            return;
+        }
+
+
+        if (!item) {
+
+            console.error(
+                "[ShareViewer] No item supplied."
+            );
+
+            return;
+        }
+
+
+        started = true;
+
+        activeItem = item;
+        activeTarget = target || {
+            section: item.type
+        };
+
+
+        createShell();
+
+        bindEscape();
+
+
+        const section =
+            String(
+                activeTarget.section ||
+                item.type ||
+                ""
+            ).toLowerCase();
+
+
+        isolateApplication(section);
+
+
+        try {
+
+            await openItem(
+                item,
+                activeTarget
+            );
+
+
+            /*
+             * Re-isolate after the viewer has opened because
+             * Reader/Video/Slideshow may have changed visibility.
+             */
+            isolateApplication(section);
+
+
+            if (
+                section === "book" ||
+                section === "reader"
+            ) {
+
+                exposeBookControls();
+
+                verifyBookControls();
+
+            }
+
+        } catch (error) {
+
+            console.error(
+                "[ShareViewer] Share startup failed:",
+                error
+            );
+
+            started = false;
+        }
+    }
+
+
+    /* --------------------------------------------------
+       Public API
+    -------------------------------------------------- */
+
+    return {
+
+        start,
+
+        close,
+
+        isStarted: function () {
+            return started;
+        },
+
+        getItem: function () {
+            return activeItem;
+        },
+
+        getTarget: function () {
+            return activeTarget;
+        }
+
+    };
 
 })();
