@@ -514,7 +514,8 @@ body.sky-share-mode .sky-share-media-host #toolbar #previousButton {
 
     visibility: visible !important;
     opacity: 1 !important;
-
+    backdrop-filter:blur(10px);
+    border-radius:50%;
     pointer-events: auto !important;
 
     z-index: 1000010 !important;
@@ -546,7 +547,8 @@ body.sky-share-mode .sky-share-media-host #toolbar #nextButton {
     transform: translateY(-50%) !important;
 
     display: flex !important;
-
+    backdrop-filter:blur(10px);
+    border-radius:50%;
     align-items: center !important;
     justify-content: center !important;
 
