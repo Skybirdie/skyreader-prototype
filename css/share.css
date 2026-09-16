@@ -3162,13 +3162,12 @@ body.sky-share-mode.sky-share-book #nextButton {
 
 /*
  * The 10-second timeout applies to every Share Mode type, not
- * just books: the shared header (brand/title, common to book,
- * video and slideshow shares) and the slideshow's own toolbar
- * rows fade the same way. Video's transport controls are the
+ * just books: the slideshow's own toolbar
+ * rows fade. Video's transport controls are the
  * browser's native <video controls> UI, which already has its
  * own built-in auto-hide behavior, so they are left alone here.
  */
-body.sky-share-mode.sky-share-controls-hidden .sky-share-header {
+body.sky-share-mode.sky-share-controls-hidden {
     opacity: 0 !important;
     pointer-events: none !important;
 }
@@ -3180,7 +3179,6 @@ body.sky-share-mode.sky-share-controls-hidden .slideshow-toolbar-secondary {
     pointer-events: none !important;
 }
 
-.sky-share-header,
 .sky-share-media-host .slideshow-toolbar,
 .sky-share-media-host .slideshow-toolbar-main,
 .sky-share-media-host .slideshow-toolbar-secondary {
