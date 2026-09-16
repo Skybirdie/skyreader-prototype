@@ -48,6 +48,17 @@ window.ShareViewer = (function () {
     let controlsIdleTimer = null;
     let controlsActivityBound = false;
 
+    let bookGestureBound = false;
+    let bookWheelTarget = null;
+    let bookTouchTarget = null;
+    let bookWheelLocked = false;
+    let bookTouchTracking = false;
+    let bookTouchStartX = 0;
+    let bookTouchStartY = 0;
+    let bookSuppressClickUntil = 0;
+
+    const BOOK_TOUCH_THRESHOLD = 48;
+
     const GLIDE_MEDIA_URL =
         "https://meditationmornings.glide.page/dl/media";
 
@@ -913,6 +924,346 @@ window.ShareViewer = (function () {
 
 
     /* =====================================================
+       BOOK WHEEL / SWIPE NAVIGATION
+
+       Share Mode owns page-turn wheel and touch-swipe input
+       directly, scoped to the reparented book surface.
+
+       Wheel: navigation.js's own listener is bound to the
+       original #viewerArea node, which survives being moved
+       into the Share media host -- but that is exactly the
+       kind of implicit, easy-to-break coupling this file's
+       original comments warned against relying on. Owning it
+       here makes wheel navigation resilient to any future
+       change in how/when the Reader surface is reparented.
+
+       Touch: navigation.js's swipe handler is bound to
+       #viewerBackground, which is the PARENT of #viewerArea
+       and is never moved into the Share host -- it stays
+       behind in #workspace, which isolateApplication() hides.
+       A hidden, detached-from-view element cannot receive
+       touch input, so mobile swipe was silently dead. Binding
+       fresh listeners to the actual visible Share surface
+       fixes this for every touch device.
+
+       navigation.js's own wheel/touch handling is disabled for
+       the duration (SRNavigation.enableWheel/enableTouch) so a
+       single gesture can never be double-counted.
+    ===================================================== */
+
+    function onBookWheel(event) {
+
+        if (!isBookShare()) {
+            return;
+        }
+
+        /* Ctrl+wheel belongs to the zoom controller. */
+        if (event.ctrlKey) {
+            return;
+        }
+
+        if (bookWheelLocked) {
+            return;
+        }
+
+        if (
+            window.SRNavigation &&
+            typeof SRNavigation.busy === "function" &&
+            SRNavigation.busy()
+        ) {
+            return;
+        }
+
+        if (
+            !window.SRNavigation ||
+            typeof SRNavigation.next !== "function" ||
+            typeof SRNavigation.previous !== "function"
+        ) {
+            return;
+        }
+
+        bookWheelLocked = true;
+
+        setTimeout(() => {
+            bookWheelLocked = false;
+        }, 250);
+
+        if (event.deltaY > 0) {
+            SRNavigation.next();
+        } else if (event.deltaY < 0) {
+            SRNavigation.previous();
+        }
+
+        setTimeout(updatePageButtons, 80);
+        setTimeout(updatePageButtons, 500);
+    }
+
+
+    function onBookTouchStart(event) {
+
+        if (!isBookShare()) {
+            bookTouchTracking = false;
+            return;
+        }
+
+        /* Pinch/2-finger gestures belong to zoom, never a page turn. */
+        if (event.touches.length !== 1) {
+            bookTouchTracking = false;
+            return;
+        }
+
+        const target = event.target;
+
+        if (
+            target &&
+            target.closest &&
+            target.closest(
+                "#toolbar, #previousButton, #nextButton, #pageJump, #pageIndicator"
+            )
+        ) {
+            bookTouchTracking = false;
+            return;
+        }
+
+        bookTouchTracking = true;
+        bookTouchStartX = event.touches[0].clientX;
+        bookTouchStartY = event.touches[0].clientY;
+    }
+
+
+    function onBookTouchMove(event) {
+
+        if (!bookTouchTracking || event.touches.length !== 1) {
+            return;
+        }
+
+        const dx = event.touches[0].clientX - bookTouchStartX;
+        const dy = event.touches[0].clientY - bookTouchStartY;
+
+        /*
+         * Ignore vertical movement. Once a horizontal swipe is
+         * established, stop the browser from treating it as a
+         * competing scroll/refresh gesture.
+         */
+        if (
+            Math.abs(dx) > BOOK_TOUCH_THRESHOLD &&
+            Math.abs(dx) > Math.abs(dy)
+        ) {
+            event.preventDefault();
+        }
+    }
+
+
+    function onBookTouchEnd(event) {
+
+        if (!bookTouchTracking) {
+            return;
+        }
+
+        bookTouchTracking = false;
+
+        if (!isBookShare()) {
+            return;
+        }
+
+        if (
+            window.SRNavigation &&
+            typeof SRNavigation.busy === "function" &&
+            SRNavigation.busy()
+        ) {
+            return;
+        }
+
+        const touch =
+            event.changedTouches &&
+            event.changedTouches[0];
+
+        if (!touch) {
+            return;
+        }
+
+        const dx = touch.clientX - bookTouchStartX;
+        const dy = touch.clientY - bookTouchStartY;
+
+        if (
+            Math.abs(dx) < BOOK_TOUCH_THRESHOLD ||
+            Math.abs(dx) <= Math.abs(dy)
+        ) {
+            return;
+        }
+
+        if (
+            !window.SRNavigation ||
+            typeof SRNavigation.next !== "function" ||
+            typeof SRNavigation.previous !== "function"
+        ) {
+            return;
+        }
+
+        /*
+         * Stop the click synthesized after a successful swipe from
+         * activating a page underneath the finger (e.g. the
+         * last-page-click-closes guard).
+         */
+        bookSuppressClickUntil = Date.now() + 500;
+        event.preventDefault();
+
+        if (dx < 0) {
+            SRNavigation.next();
+        } else {
+            SRNavigation.previous();
+        }
+
+        setTimeout(updatePageButtons, 80);
+        setTimeout(updatePageButtons, 500);
+    }
+
+
+    function onBookTouchClickCapture(event) {
+
+        if (Date.now() < bookSuppressClickUntil) {
+
+            event.preventDefault();
+            event.stopPropagation();
+
+            bookSuppressClickUntil = 0;
+        }
+    }
+
+
+    function bindBookGestures() {
+
+        if (bookGestureBound) {
+            return;
+        }
+
+        bookGestureBound = true;
+
+        bookWheelTarget =
+            document.getElementById("viewerArea") ||
+            mediaHost;
+
+        bookTouchTarget = mediaHost;
+
+        if (bookWheelTarget) {
+
+            bookWheelTarget.addEventListener(
+                "wheel",
+                onBookWheel,
+                { passive: true }
+            );
+        }
+
+        if (bookTouchTarget) {
+
+            bookTouchTarget.addEventListener(
+                "touchstart",
+                onBookTouchStart,
+                { passive: true }
+            );
+
+            bookTouchTarget.addEventListener(
+                "touchmove",
+                onBookTouchMove,
+                { passive: false }
+            );
+
+            bookTouchTarget.addEventListener(
+                "touchend",
+                onBookTouchEnd,
+                { passive: false }
+            );
+
+            bookTouchTarget.addEventListener(
+                "click",
+                onBookTouchClickCapture,
+                true
+            );
+        }
+
+        if (window.SRNavigation) {
+
+            if (
+                typeof SRNavigation.enableWheel ===
+                    "function"
+            ) {
+                SRNavigation.enableWheel(false);
+            }
+
+            if (
+                typeof SRNavigation.enableTouch ===
+                    "function"
+            ) {
+                SRNavigation.enableTouch(false);
+            }
+        }
+    }
+
+
+    function unbindBookGestures() {
+
+        if (!bookGestureBound) {
+            return;
+        }
+
+        bookGestureBound = false;
+
+        if (bookWheelTarget) {
+
+            bookWheelTarget.removeEventListener(
+                "wheel",
+                onBookWheel
+            );
+        }
+
+        if (bookTouchTarget) {
+
+            bookTouchTarget.removeEventListener(
+                "touchstart",
+                onBookTouchStart
+            );
+
+            bookTouchTarget.removeEventListener(
+                "touchmove",
+                onBookTouchMove
+            );
+
+            bookTouchTarget.removeEventListener(
+                "touchend",
+                onBookTouchEnd
+            );
+
+            bookTouchTarget.removeEventListener(
+                "click",
+                onBookTouchClickCapture,
+                true
+            );
+        }
+
+        bookWheelTarget = null;
+        bookTouchTarget = null;
+        bookTouchTracking = false;
+
+        if (window.SRNavigation) {
+
+            if (
+                typeof SRNavigation.enableWheel ===
+                    "function"
+            ) {
+                SRNavigation.enableWheel(true);
+            }
+
+            if (
+                typeof SRNavigation.enableTouch ===
+                    "function"
+            ) {
+                SRNavigation.enableTouch(true);
+            }
+        }
+    }
+
+
+    /* =====================================================
        LAST PAGE CLICK PROTECTION
     ===================================================== */
 
@@ -1040,6 +1391,7 @@ window.ShareViewer = (function () {
         stopPageWatcher();
         detachBookZoom();
         stopControlsIdleTimer();
+        unbindBookGestures();
 
         exitFullscreen();
 
@@ -1451,6 +1803,15 @@ window.ShareViewer = (function () {
         attachBookZoom();
         setTimeout(attachBookZoom, 150);
         setTimeout(attachBookZoom, 600);
+
+
+        /*
+         * Wheel scroll and touch swipe navigation for the share book
+         * viewer. See the "BOOK WHEEL / SWIPE NAVIGATION" section
+         * above for why this is owned here rather than left to
+         * navigation.js's app-level listeners.
+         */
+        bindBookGestures();
     }
 
 
