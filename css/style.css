@@ -316,7 +316,7 @@ html:fullscreen #topBar{
   right:0;
   top:50%;
   bottom:auto;
-
+  width: calc(100% - 32px);
   /* Strictly 60% of the viewer background height. */
   height:60%;
   min-height:0;
@@ -1779,7 +1779,7 @@ html[data-theme="dark"] #readerPanel #toolbar .iconButton{
     padding-bottom:max(8px,env(safe-area-inset-bottom));
   }
 
-  #viewerLibrary{padding:10px;}
+  #viewerLibrary{padding:10px;height:63%;width:100%}
   #viewerShelfView .bookCard{width:clamp(96px,16vw,145px);min-width:clamp(96px,16vw,145px);max-width:clamp(96px,16vw,145px);}
 
   #topSearchGroup{
