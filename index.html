@@ -95,6 +95,8 @@ window.dispatchEvent(new Event("skyreader-pdfjs-ready"));
 #reloadScreen img{width:auto;height:100px;object-fit:cover;}
 #reloadScreen .reloadFallback{font:600 16px/1.4 Inter,Arial,sans-serif;color:#66707a;text-align:center;padding:24px;}
 </style>
+
+
 </head>
 
 <body>
@@ -204,11 +206,15 @@ window.dispatchEvent(new Event("skyreader-pdfjs-ready"));
 </header>
 
 <main id="workspace">
+
 <img
     id="workspacePrimaryLogo"
     src="assets/primary-logo.png"
     alt=""
-    aria-hidden="true">
+    aria-hidden="true"
+    width="120"
+    style="width:clamp(70px, 7vw, 120px);height:auto;display:block;">
+
 <aside id="libraryPanel">
 
 
