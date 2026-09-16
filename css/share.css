@@ -3499,3 +3499,113 @@ body.sky-share-mode.sky-share-document-closed
 .sky-share-closed-open-button:active {
     transform: scale(.97) !important;
 }
+/* =========================================================
+   22. SHARE RESTORATION — PRIMARY LOGO + PERSISTENT OPEN BUTTON
+
+   These are deliberately separate from the Reader toolbar.
+   The primary logo is mounted directly in the Share shell because
+   #workspace is hidden in Share Mode.  The Open button is the
+   original small logo button and remains visible even after X is
+   pressed.  The later .sky-share-closed-open-button is a SECOND
+   button and is intentionally styled separately.
+   ========================================================= */
+
+body.sky-share-mode .sky-share-primary-logo {
+    position: fixed !important;
+    top: clamp(35px, 4vw, 40px) !important;
+    right: clamp(10px, 1.5vw, 20px) !important;
+    left: auto !important;
+    width: clamp(70px, 7vw, 120px) !important;
+    height: auto !important;
+    opacity: 0.5 !important;
+    filter: drop-shadow(0 5px 18px rgba(0,0,0,.16)) !important;
+    display: block !important;
+    visibility: visible !important;
+    z-index: 1000001 !important;
+    pointer-events: none !important;
+}
+
+/*
+ * Reassert the original persistent bottom-right button at the
+ * highest cascade level.  Do NOT hide this when the document is
+ * closed; only the Reader controls are closed by X.
+ */
+body.sky-share-mode .sky-share-actions {
+    position: fixed !important;
+    right: clamp(12px, 2vw, 24px) !important;
+    bottom: calc(
+        var(--sky-share-status-height, 28px) +
+        var(--sky-share-welcome-height, 22px) +
+        var(--sky-share-control-safe, 60px) +
+        8px
+    ) !important;
+    width: max-content !important;
+    display: flex !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    z-index: 1000040 !important;
+    pointer-events: auto !important;
+}
+
+body.sky-share-mode .sky-share-open-button {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    width: clamp(42px, 5vw, 64px) !important;
+    height: clamp(42px, 5vw, 64px) !important;
+    min-width: 42px !important;
+    min-height: 42px !important;
+    max-width: 64px !important;
+    max-height: 64px !important;
+    padding: 0 !important;
+    border: 1px solid rgba(255,255,255,.55) !important;
+    border-radius: clamp(8px, 1vw, 13px) !important;
+    background-image: url("../assets/logo.png") !important;
+    background-position: center !important;
+    background-repeat: no-repeat !important;
+    background-size: contain !important;
+    background-color: rgba(216,239,238,.80) !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+    font-size: 0 !important;
+    line-height: 0 !important;
+    text-indent: -9999px !important;
+    text-decoration: none !important;
+    cursor: pointer !important;
+    backdrop-filter: blur(7px);
+    animation: frontMenuGlow 4s ease-in-out infinite;
+    transition: transform .25s ease, box-shadow .25s ease;
+}
+
+body.sky-share-mode .sky-share-open-button::before,
+body.sky-share-mode .sky-share-open-button::after {
+    display: none !important;
+    content: none !important;
+}
+
+body.sky-share-mode .sky-share-open-button:hover {
+    transform: translateY(-2px) !important;
+    animation-play-state: paused !important;
+    box-shadow:
+        0 0 7px #ACE1AF,
+        0 0 14px #00FA9A,
+        inset 0 0 12px #ACE1AF !important;
+}
+
+body.sky-share-mode .sky-share-open-button:active {
+    transform: scale(.95) !important;
+}
+
+/* The central button is a separate layer and is intentionally
+   neutral for now; it can later receive an image background. */
+body.sky-share-mode.sky-share-document-closed
+.sky-share-closed-open-button {
+    position: relative !important;
+    z-index: 1000041 !important;
+}
+
+/* The title/header is not part of the closed document view, but the
+   persistent primary logo and bottom-right Open button remain. */
+body.sky-share-mode.sky-share-document-closed .sky-share-heading {
+    display: none !important;
+}
