@@ -2893,6 +2893,20 @@ body.sky-share-mode.sky-share-book .sky-share-header {
     pointer-events: none !important;
 }
 
+/*
+ * The header's own brand/section text is redundant for a book
+ * share -- the title/subtitle are already shown prominently via
+ * .sky-share-heading (see "READER TITLE — TRUE VIEWPORT CENTER"
+ * above), fixed and centered independently of this header. Left
+ * visible, .sky-share-section's text ("Book") would sit directly
+ * underneath the absolutely-positioned toolbar buttons above,
+ * since this header is pushed flex-end for the toolbar's sake.
+ */
+body.sky-share-mode.sky-share-book .sky-share-brand,
+body.sky-share-mode.sky-share-book .sky-share-section {
+    display: none !important;
+}
+
 body.sky-share-mode.sky-share-book #toolbar {
     position: absolute !important;
     top: 0 !important;
@@ -3131,6 +3145,33 @@ body.sky-share-mode.sky-share-book.sky-share-controls-hidden
 body.sky-share-mode.sky-share-book #toolbar,
 body.sky-share-mode.sky-share-book #previousButton,
 body.sky-share-mode.sky-share-book #nextButton {
+    transition: opacity .25s ease !important;
+}
+
+/*
+ * The 10-second timeout applies to every Share Mode type, not
+ * just books: the shared header (brand/title, common to book,
+ * video and slideshow shares) and the slideshow's own toolbar
+ * rows fade the same way. Video's transport controls are the
+ * browser's native <video controls> UI, which already has its
+ * own built-in auto-hide behavior, so they are left alone here.
+ */
+body.sky-share-mode.sky-share-controls-hidden .sky-share-header {
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+body.sky-share-mode.sky-share-controls-hidden .slideshow-toolbar,
+body.sky-share-mode.sky-share-controls-hidden .slideshow-toolbar-main,
+body.sky-share-mode.sky-share-controls-hidden .slideshow-toolbar-secondary {
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+.sky-share-header,
+.sky-share-media-host .slideshow-toolbar,
+.sky-share-media-host .slideshow-toolbar-main,
+.sky-share-media-host .slideshow-toolbar-secondary {
     transition: opacity .25s ease !important;
 }
 
