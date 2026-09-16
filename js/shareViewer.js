@@ -4,15 +4,22 @@
 =========================================================
  SkyMedia Share Viewer
  --------------------------------------------------------
- Share-mode shell for directly shared media.
+ Standalone Share-mode shell for directly shared media.
 
- IMPORTANT:
+ SHARE READER RULES
+ --------------------------------------------------------
  - Normal Reader engine is preserved.
  - Normal Reader rendering is preserved.
- - Share Mode explicitly wires the existing Reader
-   navigation controls after Reader.open().
- - No changes are made to Reader / Renderer /
-   SRNavigation / Sky180FlipEngine.
+ - Share Mode supplies missing control wiring.
+ - Previous / Next use SRNavigation.
+ - Rotate / Mute / Share are explicitly wired.
+ - Fullscreen uses REAL browser fullscreen.
+ - Reader controls remain visible while fullscreen.
+ - Mouse wheel turns pages.
+ - Last page does NOT return to the landing page.
+ - X closes the shared document without redirecting.
+ - The large decorated navigation button can later
+   navigate back to the Glide application.
 =========================================================
 */
 
@@ -34,14 +41,17 @@ window.ShareViewer = (function () {
     let bookControlState = [];
 
     /*
-     * Share-mode listeners that WE add.
-     *
-     * These are removed when Share Mode closes.
-     *
-     * We deliberately keep them separate from the
-     * Reader's own normal listeners.
+     * Event listeners installed specifically by ShareViewer.
+     * They are removed when Share Mode closes.
      */
     let shareReaderHandlers = [];
+
+
+    /*
+     * Prevents wheel events from causing multiple page turns
+     * while the current page turn is still settling.
+     */
+    let wheelBusy = false;
 
 
     const GLIDE_MEDIA_URL =
@@ -93,21 +103,6 @@ window.ShareViewer = (function () {
     }
 
 
-    function findFirst(selectors) {
-
-        for (const selector of selectors) {
-
-            const el = document.querySelector(selector);
-
-            if (el) {
-                return el;
-            }
-        }
-
-        return null;
-    }
-
-
     /* --------------------------------------------------
        Share shell
     -------------------------------------------------- */
@@ -117,6 +112,7 @@ window.ShareViewer = (function () {
         if (shell) {
             return;
         }
+
 
         shell = createElement(
             "section",
@@ -167,7 +163,8 @@ window.ShareViewer = (function () {
             "sky-share-media-host"
         );
 
-        mediaHost.id = "sky-share-media-host";
+        mediaHost.id =
+            "sky-share-media-host";
 
 
         statusElement = createElement(
@@ -175,7 +172,8 @@ window.ShareViewer = (function () {
             "sky-share-status"
         );
 
-        statusElement.id = "sky-share-status";
+        statusElement.id =
+            "sky-share-status";
 
 
         main.appendChild(mediaHost);
@@ -188,6 +186,14 @@ window.ShareViewer = (function () {
         );
 
 
+        /*
+         * This button is intentionally retained.
+         *
+         * It is the future large decorated navigation
+         * button requested by the user.
+         *
+         * For now it continues to navigate to Glide.
+         */
         openButton = createElement(
             "button",
             "sky-share-open-button",
@@ -208,6 +214,14 @@ window.ShareViewer = (function () {
         );
 
 
+        /*
+         * X / Close:
+         *
+         * IMPORTANT:
+         * This no longer navigates to Glide.
+         *
+         * It simply closes the shared document.
+         */
         closeButton = createElement(
             "button",
             "sky-share-close-button",
@@ -269,46 +283,37 @@ window.ShareViewer = (function () {
         const seen = new Set();
 
 
-        for (const selector of selectors) {
+        selectors.forEach(function (selector) {
 
-            const nodes =
-                document.querySelectorAll(selector);
+            document
+                .querySelectorAll(selector)
+                .forEach(function (node) {
 
+                    if (!seen.has(node)) {
 
-            for (const node of nodes) {
+                        seen.add(node);
+                        result.push(node);
 
-                if (!seen.has(node)) {
+                    }
 
-                    seen.add(node);
-                    result.push(node);
+                });
 
-                }
-
-            }
-
-        }
+        });
 
 
         return result;
     }
 
 
-    /*
-     * IMPORTANT:
-     *
-     * Capture the original state only once.
-     *
-     * The previous version recaptured state every time
-     * exposeBookControls() was called. Since Share Mode
-     * calls this several times, that could save Share Mode
-     * values as the supposed "original" values.
-     */
     function exposeBookControls() {
 
         const newlyCollected =
             collectBookControls();
 
 
+        /*
+         * Save the ORIGINAL state only once.
+         */
         if (!bookControlState.length) {
 
             bookControls =
@@ -340,11 +345,6 @@ window.ShareViewer = (function () {
 
         } else {
 
-            /*
-             * Keep the original saved state, but refresh
-             * the current list in case Reader created a
-             * control after the first collection.
-             */
             bookControls =
                 newlyCollected;
 
@@ -361,10 +361,6 @@ window.ShareViewer = (function () {
                 "auto";
 
 
-            /*
-             * Explicitly restore visibility for controls
-             * that Share CSS may have suppressed.
-             */
             if (
                 el.id === "toolbar" ||
                 el.id === "statusBar" ||
@@ -524,7 +520,7 @@ window.ShareViewer = (function () {
 
 
     /* --------------------------------------------------
-       Share Reader control wiring
+       Share-specific event management
     -------------------------------------------------- */
 
     function removeShareReaderHandlers() {
@@ -543,7 +539,7 @@ window.ShareViewer = (function () {
                 } catch (error) {
 
                     console.warn(
-                        "[ShareViewer] Could not remove Share Reader handler:",
+                        "[ShareViewer] Could not remove handler:",
                         error
                     );
 
@@ -569,9 +565,6 @@ window.ShareViewer = (function () {
         }
 
 
-        /*
-         * Do not accidentally install duplicates.
-         */
         element.addEventListener(
             type,
             handler,
@@ -581,22 +574,753 @@ window.ShareViewer = (function () {
 
         shareReaderHandlers.push({
 
-            element,
-            type,
-            handler,
-            options
+            element: element,
+            type: type,
+            handler: handler,
+            options: options
 
         });
 
     }
 
 
-    function wireShareReaderNavigation() {
+    /* --------------------------------------------------
+       Reader action helpers
+    -------------------------------------------------- */
+
+    function resetTurnBookmark() {
+
+        try {
+
+            if (
+                typeof window.resetBookmarkFlagForTurn ===
+                "function"
+            ) {
+
+                window.resetBookmarkFlagForTurn();
+
+            }
+
+        } catch (error) {
+
+            console.warn(
+                "[ShareViewer] Bookmark reset failed:",
+                error
+            );
+
+        }
+
+    }
+
+
+    function readerNext() {
+
+        if (
+            !window.Reader ||
+            typeof Reader.currentPage !== "function" ||
+            typeof Reader.pages !== "function"
+        ) {
+
+            return false;
+
+        }
+
+
+        const current =
+            Number(Reader.currentPage());
+
+
+        const total =
+            Number(Reader.pages());
+
 
         /*
-         * Remove only handlers installed by ShareViewer.
-         * We do NOT remove Reader's own handlers.
+         * CRITICAL STANDALONE-SHARE RULE:
+         *
+         * Never allow Share Mode to invoke the normal
+         * Reader "last page" action.
+         *
+         * The normal Reader uses the last-page event to
+         * return to the landing/library experience.
          */
+        if (
+            Number.isFinite(current) &&
+            Number.isFinite(total) &&
+            current >= total
+        ) {
+
+            console.log(
+                "[ShareViewer] Last page reached; Next disabled."
+            );
+
+
+            return false;
+
+        }
+
+
+        resetTurnBookmark();
+
+
+        if (
+            window.SRNavigation &&
+            typeof SRNavigation.next ===
+            "function"
+        ) {
+
+            return SRNavigation.next();
+
+        }
+
+
+        if (
+            typeof Reader.next ===
+            "function"
+        ) {
+
+            return Reader.next();
+
+        }
+
+
+        return false;
+    }
+
+
+    function readerPrevious() {
+
+        resetTurnBookmark();
+
+
+        if (
+            window.SRNavigation &&
+            typeof SRNavigation.previous ===
+            "function"
+        ) {
+
+            return SRNavigation.previous();
+
+        }
+
+
+        if (
+            window.Reader &&
+            typeof Reader.previous ===
+            "function"
+        ) {
+
+            return Reader.previous();
+
+        }
+
+
+        return false;
+    }
+
+
+    /* --------------------------------------------------
+       Fullscreen
+    -------------------------------------------------- */
+
+    async function enterShareFullscreen() {
+
+        /*
+         * Use the existing Reader viewer/background as the
+         * fullscreen element.
+         *
+         * The toolbar is inside the viewer, so the Reader
+         * controls remain available in browser fullscreen.
+         */
+        const target =
+            document.getElementById(
+                "viewerBackground"
+            ) ||
+            document.getElementById(
+                "viewerArea"
+            ) ||
+            mediaHost;
+
+
+        if (!target) {
+
+            console.warn(
+                "[ShareViewer] No fullscreen target found."
+            );
+
+
+            return;
+
+        }
+
+
+        try {
+
+            if (
+                document.fullscreenElement
+            ) {
+
+                if (
+                    typeof document.exitFullscreen ===
+                    "function"
+                ) {
+
+                    await document.exitFullscreen();
+
+                }
+
+
+                return;
+            }
+
+
+            if (
+                typeof target.requestFullscreen ===
+                "function"
+            ) {
+
+                await target.requestFullscreen();
+
+                return;
+
+            }
+
+
+            /*
+             * Safari / older WebKit fallback.
+             */
+            if (
+                typeof target.webkitRequestFullscreen ===
+                "function"
+            ) {
+
+                target.webkitRequestFullscreen();
+
+                return;
+
+            }
+
+
+            console.warn(
+                "[ShareViewer] Browser fullscreen API unavailable."
+            );
+
+        } catch (error) {
+
+            console.warn(
+                "[ShareViewer] Fullscreen request failed:",
+                error
+            );
+
+        }
+
+    }
+
+
+    /* --------------------------------------------------
+       Rotate
+    -------------------------------------------------- */
+
+    function performRotate() {
+
+        /*
+         * The normal Reader has historically owned the
+         * rotate behavior. Try the known application-level
+         * function first.
+         */
+        const candidates = [
+
+            "rotateViewer",
+
+            "rotateReader",
+
+            "rotatePage",
+
+            "toggleRotation",
+
+            "toggleReaderRotation"
+
+        ];
+
+
+        for (const name of candidates) {
+
+            if (
+                typeof window[name] ===
+                "function"
+            ) {
+
+                console.log(
+                    "[ShareViewer] Rotate →",
+                    name
+                );
+
+
+                try {
+
+                    return window[name]();
+
+                } catch (error) {
+
+                    console.warn(
+                        "[ShareViewer] Rotate function failed:",
+                        name,
+                        error
+                    );
+
+                }
+
+            }
+
+        }
+
+
+        /*
+         * If the Reader exposes rotation through Renderer,
+         * use that without modifying the engine.
+         */
+        if (
+            window.Renderer &&
+            typeof Renderer.rotate ===
+            "function"
+        ) {
+
+            console.log(
+                "[ShareViewer] Rotate → Renderer.rotate()"
+            );
+
+
+            return Renderer.rotate();
+
+        }
+
+
+        console.warn(
+            "[ShareViewer] No Reader rotate function was exposed."
+        );
+
+
+        return false;
+    }
+
+
+    /* --------------------------------------------------
+       Mute
+    -------------------------------------------------- */
+
+    function performMute() {
+
+        const candidates = [
+
+            "toggleMute",
+
+            "toggleReaderMute",
+
+            "toggleAudioMute",
+
+            "toggleSoundMute"
+
+        ];
+
+
+        for (const name of candidates) {
+
+            if (
+                typeof window[name] ===
+                "function"
+            ) {
+
+                console.log(
+                    "[ShareViewer] Mute →",
+                    name
+                );
+
+
+                try {
+
+                    return window[name]();
+
+                } catch (error) {
+
+                    console.warn(
+                        "[ShareViewer] Mute function failed:",
+                        name,
+                        error
+                    );
+
+                }
+
+            }
+
+        }
+
+
+        /*
+         * Try the application's AudioController if it
+         * exposes a mute/toggle method.
+         */
+        if (
+            window.AudioController
+        ) {
+
+            const audioCandidates = [
+
+                "toggleMute",
+                "muteToggle",
+                "setMuted"
+
+            ];
+
+
+            for (
+                const name of audioCandidates
+            ) {
+
+                if (
+                    typeof AudioController[name] ===
+                    "function"
+                ) {
+
+                    console.log(
+                        "[ShareViewer] Mute → AudioController." +
+                        name
+                    );
+
+
+                    try {
+
+                        return AudioController[name]();
+
+                    } catch (error) {
+
+                        console.warn(
+                            "[ShareViewer] AudioController mute failed:",
+                            error
+                        );
+
+                    }
+
+                }
+
+            }
+
+        }
+
+
+        console.warn(
+            "[ShareViewer] No Reader mute function was exposed."
+        );
+
+
+        return false;
+    }
+
+
+    /* --------------------------------------------------
+       Share link
+    -------------------------------------------------- */
+
+    async function performShare() {
+
+        /*
+         * First use the browser's native Web Share API
+         * when available.
+         *
+         * This gives a true standalone Share action and
+         * does not require changing the application's
+         * share-link generation.
+         */
+        const url =
+            window.location.href;
+
+
+        const title =
+            activeItem &&
+            activeItem.title
+                ? String(activeItem.title)
+                : document.title;
+
+
+        if (
+            navigator.share
+        ) {
+
+            try {
+
+                await navigator.share({
+
+                    title: title,
+
+                    text: title,
+
+                    url: url
+
+                });
+
+
+                return true;
+
+            } catch (error) {
+
+                /*
+                 * User cancellation is normal and should
+                 * not be treated as an application error.
+                 */
+                if (
+                    error &&
+                    error.name ===
+                    "AbortError"
+                ) {
+
+                    return false;
+
+                }
+
+
+                console.warn(
+                    "[ShareViewer] Native share failed:",
+                    error
+                );
+
+            }
+
+        }
+
+
+        /*
+         * Clipboard fallback.
+         */
+        try {
+
+            if (
+                navigator.clipboard &&
+                typeof navigator.clipboard.writeText ===
+                "function"
+            ) {
+
+                await navigator.clipboard.writeText(
+                    url
+                );
+
+
+                statusElement.textContent =
+                    "Share link copied.";
+
+
+                setTimeout(
+                    function () {
+
+                        if (
+                            statusElement &&
+                            started
+                        ) {
+
+                            statusElement.textContent =
+                                "";
+
+                        }
+
+                    },
+                    1800
+                );
+
+
+                return true;
+
+            }
+
+        } catch (error) {
+
+            console.warn(
+                "[ShareViewer] Clipboard share failed:",
+                error
+            );
+
+        }
+
+
+        /*
+         * Final fallback.
+         */
+        try {
+
+            window.prompt(
+                "Copy this share link:",
+                url
+            );
+
+
+            return true;
+
+        } catch (error) {
+
+            console.warn(
+                "[ShareViewer] Share fallback failed:",
+                error
+            );
+
+        }
+
+
+        return false;
+    }
+
+
+    /* --------------------------------------------------
+       Mouse wheel navigation
+    -------------------------------------------------- */
+
+    function handleShareWheel(event) {
+
+        if (!started) {
+            return;
+        }
+
+
+        /*
+         * Only act when a book is actually open.
+         */
+        if (
+            !window.Reader ||
+            typeof Reader.isOpen !==
+            "function" ||
+            !Reader.isOpen()
+        ) {
+
+            return;
+        }
+
+
+        /*
+         * Ignore horizontal wheel gestures.
+         */
+        if (
+            Math.abs(event.deltaX) >
+            Math.abs(event.deltaY)
+        ) {
+
+            return;
+
+        }
+
+
+        /*
+         * Ignore tiny trackpad noise.
+         */
+        if (
+            Math.abs(event.deltaY) <
+            12
+        ) {
+
+            return;
+
+        }
+
+
+        /*
+         * Do not allow the normal page/container wheel
+         * behavior to bubble into another application.
+         */
+        event.preventDefault();
+
+
+        if (wheelBusy) {
+            return;
+        }
+
+
+        wheelBusy = true;
+
+
+        const direction =
+            event.deltaY > 0
+                ? "next"
+                : "previous";
+
+
+        const result =
+            direction === "next"
+                ? readerNext()
+                : readerPrevious();
+
+
+        /*
+         * PageFlip animations need a short settling
+         * interval before accepting another wheel turn.
+         */
+        Promise.resolve(result)
+            .catch(function (error) {
+
+                console.warn(
+                    "[ShareViewer] Wheel navigation failed:",
+                    error
+                );
+
+            })
+            .finally(function () {
+
+                setTimeout(
+                    function () {
+
+                        wheelBusy = false;
+
+                    },
+                    450
+                );
+
+            });
+
+    }
+
+
+    function attachShareWheelNavigation() {
+
+        const viewer =
+            document.getElementById(
+                "viewerArea"
+            );
+
+
+        if (!viewer) {
+
+            console.warn(
+                "[ShareViewer] #viewerArea unavailable for wheel navigation."
+            );
+
+
+            return;
+
+        }
+
+
+        /*
+         * Capture phase ensures Share Mode receives the
+         * wheel event before another application handler
+         * can consume it.
+         */
+        addShareReaderHandler(
+            viewer,
+            "wheel",
+            handleShareWheel,
+            {
+                passive: false,
+                capture: true
+            }
+        );
+
+
+        console.log(
+            "[ShareViewer] Share wheel navigation attached."
+        );
+
+    }
+
+
+    /* --------------------------------------------------
+       Wire Share Reader controls
+    -------------------------------------------------- */
+
+    function wireShareReaderControls() {
+
         removeShareReaderHandlers();
 
 
@@ -612,6 +1336,24 @@ window.ShareViewer = (function () {
             );
 
 
+        const rotateButton =
+            document.getElementById(
+                "rotateButton"
+            );
+
+
+        const muteButton =
+            document.getElementById(
+                "muteButton"
+            );
+
+
+        const shareButton =
+            document.getElementById(
+                "readerShareButton"
+            );
+
+
         const fullscreenButton =
             document.getElementById(
                 "viewerFullscreenButton"
@@ -624,91 +1366,23 @@ window.ShareViewer = (function () {
             );
 
 
-        /*
-         * ------------------------------------------------
-         * PREVIOUS
-         * ------------------------------------------------
-         */
+        /* -----------------------------------------------
+           Previous
+        ----------------------------------------------- */
 
         if (previousButton) {
 
             addShareReaderHandler(
                 previousButton,
                 "click",
-                function (event) {
+                function () {
 
-                    event.preventDefault();
-                    event.stopPropagation();
-
-
-                    try {
-
-                        if (
-                            typeof window.pinching !==
-                            "undefined" &&
-                            window.pinching
-                        ) {
-
-                            return;
-
-                        }
-
-                    } catch (error) {
-                        /* Ignore */
-                    }
+                    console.log(
+                        "[ShareViewer] Previous button."
+                    );
 
 
-                    /*
-                     * Preserve the normal Reader bookmark
-                     * turn behavior if that helper exists.
-                     */
-                    try {
-
-                        if (
-                            typeof window.resetBookmarkFlagForTurn ===
-                            "function"
-                        ) {
-
-                            window.resetBookmarkFlagForTurn();
-
-                        }
-
-                    } catch (error) {
-                        /* Ignore */
-                    }
-
-
-                    if (
-                        window.SRNavigation &&
-                        typeof SRNavigation.previous ===
-                        "function"
-                    ) {
-
-                        console.log(
-                            "[ShareViewer] Previous → SRNavigation.previous()"
-                        );
-
-
-                        SRNavigation.previous();
-
-                    } else if (
-                        window.Reader &&
-                        typeof Reader.previous ===
-                        "function"
-                    ) {
-
-                        /*
-                         * Fallback only. Normally SRNavigation
-                         * should be available.
-                         */
-                        console.log(
-                            "[ShareViewer] Previous → Reader.previous() fallback"
-                        );
-
-
-                        Reader.previous();
-
-                    }
+                    readerPrevious();
 
                 },
                 false
@@ -717,86 +1391,23 @@ window.ShareViewer = (function () {
         }
 
 
-        /*
-         * ------------------------------------------------
-         * NEXT
-         * ------------------------------------------------
-         */
+        /* -----------------------------------------------
+           Next
+        ----------------------------------------------- */
 
         if (nextButton) {
 
             addShareReaderHandler(
                 nextButton,
                 "click",
-                function (event) {
+                function () {
 
-                    event.preventDefault();
-                    event.stopPropagation();
-
-
-                    try {
-
-                        if (
-                            typeof window.pinching !==
-                            "undefined" &&
-                            window.pinching
-                        ) {
-
-                            return;
-
-                        }
-
-                    } catch (error) {
-                        /* Ignore */
-                    }
+                    console.log(
+                        "[ShareViewer] Next button."
+                    );
 
 
-                    try {
-
-                        if (
-                            typeof window.resetBookmarkFlagForTurn ===
-                            "function"
-                        ) {
-
-                            window.resetBookmarkFlagForTurn();
-
-                        }
-
-                    } catch (error) {
-                        /* Ignore */
-                    }
-
-
-                    if (
-                        window.SRNavigation &&
-                        typeof SRNavigation.next ===
-                        "function"
-                    ) {
-
-                        console.log(
-                            "[ShareViewer] Next → SRNavigation.next()"
-                        );
-
-
-                        SRNavigation.next();
-
-                    } else if (
-                        window.Reader &&
-                        typeof Reader.next ===
-                        "function"
-                    ) {
-
-                        /*
-                         * Fallback only.
-                         */
-                        console.log(
-                            "[ShareViewer] Next → Reader.next() fallback"
-                        );
-
-
-                        Reader.next();
-
-                    }
+                    readerNext();
 
                 },
                 false
@@ -805,50 +1416,98 @@ window.ShareViewer = (function () {
         }
 
 
-        /*
-         * ------------------------------------------------
-         * FULLSCREEN / FOCUS
-         * ------------------------------------------------
-         *
-         * The current Reader uses toggleViewerFocus().
-         */
+        /* -----------------------------------------------
+           Rotate
+        ----------------------------------------------- */
+
+        if (rotateButton) {
+
+            addShareReaderHandler(
+                rotateButton,
+                "click",
+                function () {
+
+                    console.log(
+                        "[ShareViewer] Rotate button."
+                    );
+
+
+                    performRotate();
+
+                },
+                false
+            );
+
+        }
+
+
+        /* -----------------------------------------------
+           Mute
+        ----------------------------------------------- */
+
+        if (muteButton) {
+
+            addShareReaderHandler(
+                muteButton,
+                "click",
+                function () {
+
+                    console.log(
+                        "[ShareViewer] Mute button."
+                    );
+
+
+                    performMute();
+
+                },
+                false
+            );
+
+        }
+
+
+        /* -----------------------------------------------
+           Share
+        ----------------------------------------------- */
+
+        if (shareButton) {
+
+            addShareReaderHandler(
+                shareButton,
+                "click",
+                function () {
+
+                    console.log(
+                        "[ShareViewer] Share button."
+                    );
+
+
+                    performShare();
+
+                },
+                false
+            );
+
+        }
+
+
+        /* -----------------------------------------------
+           Fullscreen
+        ----------------------------------------------- */
+
         if (fullscreenButton) {
 
             addShareReaderHandler(
                 fullscreenButton,
                 "click",
-                function (event) {
+                function () {
 
-                    event.preventDefault();
-                    event.stopPropagation();
-
-
-                    if (
-                        typeof window.toggleViewerFocus ===
-                        "function"
-                    ) {
-
-                        window.toggleViewerFocus();
-
-                    } else {
-
-                        /*
-                         * Safe fallback matching the Reader's
-                         * current focus-mode mechanism.
-                         */
-                        const app =
-                            document.getElementById("app");
+                    console.log(
+                        "[ShareViewer] Fullscreen button."
+                    );
 
 
-                        if (app) {
-
-                            app.classList.toggle(
-                                "viewerFocus"
-                            );
-
-                        }
-
-                    }
+                    enterShareFullscreen();
 
                 },
                 false
@@ -857,23 +1516,20 @@ window.ShareViewer = (function () {
         }
 
 
-        /*
-         * ------------------------------------------------
-         * READER CLOSE
-         * ------------------------------------------------
-         *
-         * In Share Mode this closes the Reader content
-         * and returns through ShareViewer.close().
-         */
+        /* -----------------------------------------------
+           X / Reader Close
+        ----------------------------------------------- */
+
         if (readerCloseButton) {
 
             addShareReaderHandler(
                 readerCloseButton,
                 "click",
-                function (event) {
+                function () {
 
-                    event.preventDefault();
-                    event.stopPropagation();
+                    console.log(
+                        "[ShareViewer] Reader close button."
+                    );
 
 
                     close();
@@ -885,11 +1541,22 @@ window.ShareViewer = (function () {
         }
 
 
+        /*
+         * Mouse wheel handler must be attached AFTER
+         * collecting the controls because it is part of
+         * the ShareViewer-specific handler collection.
+         */
+        attachShareWheelNavigation();
+
+
         console.log(
             "[ShareViewer] Share Reader controls wired:",
             {
                 previous: !!previousButton,
                 next: !!nextButton,
+                rotate: !!rotateButton,
+                mute: !!muteButton,
+                share: !!shareButton,
                 fullscreen: !!fullscreenButton,
                 readerClose: !!readerCloseButton
             }
@@ -932,13 +1599,11 @@ window.ShareViewer = (function () {
         ];
 
 
-        /*
-         * For books we deliberately leave #workspace
-         * available because the Reader owns it.
-         */
         if (!isBookShare) {
 
-            selectors.push("#workspace");
+            selectors.push(
+                "#workspace"
+            );
 
         }
 
@@ -988,10 +1653,6 @@ window.ShareViewer = (function () {
         }
 
 
-        /*
-         * The Reader's actual viewer remains the same DOM
-         * object. We are only changing its host.
-         */
         mediaHost.appendChild(viewer);
 
 
@@ -1122,7 +1783,6 @@ window.ShareViewer = (function () {
 
 
         return true;
-
     }
 
 
@@ -1162,10 +1822,6 @@ window.ShareViewer = (function () {
         }
 
 
-        /*
-         * Move the existing Reader viewer into the Share
-         * Viewer before opening the book.
-         */
         detachExistingViewer(
             viewerArea
         );
@@ -1175,13 +1831,14 @@ window.ShareViewer = (function () {
 
 
         /*
-         * Let the normal Reader open the book.
+         * Normal Reader opening remains untouched.
          */
         await Reader.open(item);
 
 
         /*
-         * Reader is now fully open.
+         * Synchronize Share Mode navigation with the
+         * Reader instance that just opened.
          */
         initializeShareReaderNavigation(
             item
@@ -1189,32 +1846,22 @@ window.ShareViewer = (function () {
 
 
         /*
-         * Reader.open() may have changed control
-         * visibility, so expose them again.
+         * Reader.open() can create/show its controls.
          */
         exposeBookControls();
 
 
         /*
-         * CRITICAL FIX:
-         *
-         * Explicitly attach Share Mode handlers to the
-         * existing Reader buttons.
-         *
-         * The physical button click was reaching
-         * #nextButton, but the application's normal
-         * listener was not invoking SRNavigation.next().
+         * Explicit Share Mode control wiring.
          */
-        wireShareReaderNavigation();
+        wireShareReaderControls();
 
 
         verifyBookControls();
 
 
         /*
-         * Force the existing Reader viewer to recalculate
-         * its available dimensions after being moved into
-         * the Share Viewer host.
+         * Refresh dimensions after relocation.
          */
         try {
 
@@ -1442,10 +2089,34 @@ window.ShareViewer = (function () {
     function close() {
 
         /*
-         * Remove only ShareViewer-installed Reader
-         * listeners before restoring the normal state.
+         * Leave browser fullscreen first if Share Mode
+         * is currently fullscreen.
+         */
+        try {
+
+            if (
+                document.fullscreenElement &&
+                typeof document.exitFullscreen ===
+                "function"
+            ) {
+
+                document.exitFullscreen()
+                    .catch(function () {});
+
+            }
+
+        } catch (error) {
+            /* Ignore fullscreen cleanup errors */
+        }
+
+
+        /*
+         * Remove ShareViewer-specific listeners.
          */
         removeShareReaderHandlers();
+
+
+        wheelBusy = false;
 
 
         try {
@@ -1560,10 +2231,6 @@ window.ShareViewer = (function () {
             });
 
 
-        /*
-         * Remove the Share-mounted class from the
-         * existing Reader viewer.
-         */
         const viewerArea =
             document.getElementById(
                 "viewerArea"
@@ -1592,8 +2259,14 @@ window.ShareViewer = (function () {
         activeTarget = null;
 
 
-        window.location.href =
-            GLIDE_MEDIA_URL;
+        /*
+         * IMPORTANT:
+         *
+         * There is deliberately NO redirect here.
+         *
+         * The large decorated "Open in Meditation
+         * Mornings" button retains the Glide navigation.
+         */
 
     }
 
@@ -1619,15 +2292,12 @@ window.ShareViewer = (function () {
 
 
                 /*
-                 * Do not close the Share Viewer if the normal
-                 * Reader is currently in its own focus/fullscreen
-                 * mode.
+                 * If browser fullscreen is active, let the
+                 * browser's fullscreen behavior handle the
+                 * first Escape.
                  */
                 if (
-                    document
-                        .getElementById("app")
-                        ?.classList
-                        .contains("viewerFocus")
+                    document.fullscreenElement
                 ) {
 
                     return;
@@ -1709,8 +2379,7 @@ window.ShareViewer = (function () {
 
 
             /*
-             * Re-isolate after the viewer has opened because
-             * Reader/Video/Slideshow may have changed visibility.
+             * Re-isolate after Reader has opened.
              */
             isolateApplication(
                 section
@@ -1726,11 +2395,11 @@ window.ShareViewer = (function () {
 
 
                 /*
-                 * Ensure Share Mode navigation remains
-                 * wired even if a later Reader initialization
-                 * changed the controls.
+                 * Re-wire once more because Reader.open()
+                 * and the subsequent layout pass can modify
+                 * the control DOM.
                  */
-                wireShareReaderNavigation();
+                wireShareReaderControls();
 
 
                 verifyBookControls();
@@ -1777,3 +2446,4 @@ window.ShareViewer = (function () {
     };
 
 })();
+
