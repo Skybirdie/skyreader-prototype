@@ -42,6 +42,12 @@ window.ShareViewer = (function () {
     let bookControlsBound = false;
     let pageStateTimer = null;
 
+    let bookZoomController = null;
+    let bookZoomTarget = null;
+
+    let controlsIdleTimer = null;
+    let controlsActivityBound = false;
+
     const GLIDE_MEDIA_URL =
         "https://meditationmornings.glide.page/dl/media";
 
@@ -1032,6 +1038,8 @@ window.ShareViewer = (function () {
     function close() {
 
         stopPageWatcher();
+        detachBookZoom();
+        stopControlsIdleTimer();
 
         exitFullscreen();
 
@@ -1118,6 +1126,99 @@ window.ShareViewer = (function () {
          * Share shell remains the visible application.
          */
         showClosedPanel();
+    }
+
+
+    /* =====================================================
+       CONTROLS IDLE TIMEOUT (10s)
+    ===================================================== */
+
+    /*
+     * All Share Mode controls (book toolbar/previous/next,
+     * and, via the same "sky-share-controls-hidden" class,
+     * the video/slideshow chrome) fade out after 10 seconds
+     * of no pointer/touch/keyboard activity, and reappear
+     * immediately on the next interaction.
+     */
+
+    const CONTROLS_IDLE_MS = 10000;
+
+    function showControls() {
+
+        document.body.classList.remove(
+            "sky-share-controls-hidden"
+        );
+    }
+
+    function scheduleControlsHide() {
+
+        if (controlsIdleTimer) {
+            clearTimeout(controlsIdleTimer);
+        }
+
+        controlsIdleTimer = setTimeout(() => {
+
+            controlsIdleTimer = null;
+
+            document.body.classList.add(
+                "sky-share-controls-hidden"
+            );
+
+        }, CONTROLS_IDLE_MS);
+    }
+
+    function registerControlsActivity() {
+
+        if (
+            !document.body.classList.contains(
+                "sky-share-mode"
+            )
+        ) {
+            return;
+        }
+
+        showControls();
+        scheduleControlsHide();
+    }
+
+    function bindControlsIdleTimer() {
+
+        if (controlsActivityBound) {
+
+            registerControlsActivity();
+            return;
+        }
+
+        controlsActivityBound = true;
+
+        [
+            "pointerdown",
+            "pointermove",
+            "mousemove",
+            "touchstart",
+            "keydown",
+            "wheel"
+        ].forEach(type => {
+
+            document.addEventListener(
+                type,
+                registerControlsActivity,
+                { passive: true }
+            );
+        });
+
+        registerControlsActivity();
+    }
+
+    function stopControlsIdleTimer() {
+
+        if (controlsIdleTimer) {
+
+            clearTimeout(controlsIdleTimer);
+            controlsIdleTimer = null;
+        }
+
+        showControls();
     }
 
 
@@ -1327,6 +1428,88 @@ window.ShareViewer = (function () {
 
             updatePageButtons();
         });
+
+        /*
+         * Pinch-zoom and Ctrl+wheel zoom are provided by the
+         * existing SkyMediaZoom controller (see zoomController.js),
+         * the same one slideshowViewer.js already attaches to its
+         * own stage. The Reader itself never attaches it, and Share
+         * Mode's book view is a fresh mount each time, so ShareViewer
+         * must attach it explicitly here.
+         *
+         * This does not add a second wheel handler: SkyMediaZoom
+         * only reacts to wheel events carrying ctrlKey, which
+         * navigation.js's own page-turn handler already ignores
+         * (see onWheel() in navigation.js), so the two never compete
+         * for the same gesture.
+         *
+         * PageFlip (.stf__parent) may not exist the instant
+         * Reader.open() resolves, so this is attempted a few times
+         * as the page settles -- matching the retry timing
+         * updatePageButtons() already uses elsewhere in this file.
+         */
+        attachBookZoom();
+        setTimeout(attachBookZoom, 150);
+        setTimeout(attachBookZoom, 600);
+    }
+
+
+    /* =====================================================
+       BOOK ZOOM (pinch / Ctrl+wheel)
+    ===================================================== */
+
+    function attachBookZoom() {
+
+        if (!window.SkyMediaZoom) {
+            return;
+        }
+
+        const viewer =
+            document.getElementById(
+                "viewerArea"
+            );
+
+        if (!viewer) {
+            return;
+        }
+
+        const target =
+            viewer.querySelector(".stf__parent") ||
+            document.getElementById("pageContainer") ||
+            viewer;
+
+        if (
+            bookZoomController &&
+            bookZoomTarget === target
+        ) {
+            /*
+             * Already attached to the current target -- nothing
+             * to do on this retry pass.
+             */
+            return;
+        }
+
+        if (bookZoomController) {
+            bookZoomController.destroy();
+            bookZoomController = null;
+        }
+
+        bookZoomController =
+            SkyMediaZoom.create(viewer);
+
+        bookZoomController.setTarget(target);
+        bookZoomTarget = target;
+    }
+
+
+    function detachBookZoom() {
+
+        if (bookZoomController) {
+
+            bookZoomController.destroy();
+            bookZoomController = null;
+            bookZoomTarget = null;
+        }
     }
 
 
@@ -1507,6 +1690,20 @@ window.ShareViewer = (function () {
         activeItem = item;
         activeTarget = target;
 
+        /*
+         * A large portion of share.css (status bar, welcome
+         * banner, previous/next positioning and [hidden]
+         * page-state logic, centering, breathing room, etc.)
+         * is written against "body.sky-share-mode.sky-share-book".
+         * That class must be set here or all of those rules are
+         * permanently dead -- nothing else in this file ever
+         * adds it.
+         */
+        document.body.classList.toggle(
+            "sky-share-book",
+            section === "reader" || section === "book"
+        );
+
 
         titleElement.textContent =
             String(
@@ -1625,6 +1822,9 @@ window.ShareViewer = (function () {
              * item has successfully opened.
              */
             isolateApplication();
+
+
+            bindControlsIdleTimer();
 
 
             shell.style.zIndex =
