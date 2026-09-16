@@ -3513,8 +3513,8 @@ body.sky-share-mode.sky-share-document-closed
 body.sky-share-mode .sky-share-primary-logo {
     position: fixed !important;
     top: clamp(35px, 4vw, 40px) !important;
-    right: clamp(10px, 1.5vw, 20px) !important;
-    left: auto !important;
+    left: clamp(10px, 1.5vw, 20px) !important;
+    right: auto !important;
     width: clamp(70px, 7vw, 120px) !important;
     height: auto !important;
     opacity: 0.5 !important;
