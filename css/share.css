@@ -2911,7 +2911,7 @@ body.sky-share-mode.sky-share-book .sky-share-section {
 
 body.sky-share-mode.sky-share-book #toolbar {
     position: absolute !important;
-    top: 69px !important;
+    top: 45px !important;
     right: clamp(12px, 2vw, 28px) !important;
     height: var(--sky-share-book-toolbar-height) !important;
     display: flex !important;
