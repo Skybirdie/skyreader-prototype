@@ -4351,3 +4351,98 @@ body.sky-share-mode.sky-share-book
 #viewerArea * {
     transition: none !important;
 }
+
+/* =========================================================
+   SHARE BOOK STATUS — TITLE + PAGE INDICATOR SAME LINE
+   ========================================================= */
+
+body.sky-share-mode.sky-share-book #statusBar {
+    display: flex !important;
+
+    flex-direction: row !important;
+    align-items: center !important;
+
+    flex-wrap: nowrap !important;
+
+    width: 100% !important;
+    max-width: 100% !important;
+
+    min-width: 0 !important;
+
+    box-sizing: border-box !important;
+
+    overflow: hidden !important;
+}
+
+
+/* ---------------------------------------------------------
+   Book title
+   --------------------------------------------------------- */
+
+body.sky-share-mode.sky-share-book #readerTitle {
+    flex: 1 1 auto !important;
+
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+
+    margin: 0 !important;
+
+    white-space: nowrap !important;
+
+    overflow: hidden !important;
+
+    text-overflow: ellipsis !important;
+
+    line-height: 1.2 !important;
+
+    text-align: left !important;
+
+    box-sizing: border-box !important;
+
+    flex-shrink: 1 !important;
+}
+
+
+/* ---------------------------------------------------------
+   Page indicator
+   --------------------------------------------------------- */
+
+body.sky-share-mode.sky-share-book #pageIndicator {
+    flex: 0 0 auto !important;
+
+    width: auto !important;
+    min-width: max-content !important;
+    max-width: none !important;
+
+    margin-left: auto !important;
+
+    white-space: nowrap !important;
+
+    display: inline-flex !important;
+
+    align-items: center !important;
+
+    justify-content: center !important;
+
+    line-height: 1.2 !important;
+
+    box-sizing: border-box !important;
+
+    flex-shrink: 0 !important;
+}
+
+
+/* ---------------------------------------------------------
+   Page jump, when present
+   --------------------------------------------------------- */
+
+body.sky-share-mode.sky-share-book #pageJump {
+    flex: 0 0 auto !important;
+
+    white-space: nowrap !important;
+
+    flex-shrink: 0 !important;
+
+    box-sizing: border-box !important;
+}
