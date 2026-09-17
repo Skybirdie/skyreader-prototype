@@ -73,6 +73,11 @@ window.ShareViewer = (function () {
     let controlsIdleTimer = null;
     let controlsActivityBound = false;
 
+let bookResizeObserver = null;
+let bookResizeTimer = null;
+let bookResizeRaf = 0;
+let bookResponsiveRefreshBound = false;
+
     let shareClosing = false;
 
     let mediaCloseClickBound = false;
@@ -3108,6 +3113,8 @@ window.ShareViewer = (function () {
 
             stopPageWatcher();
 
+            unbindBookResponsiveRefresh();
+
             detachBookZoom();
 
             stopControlsIdleTimer();
@@ -3617,6 +3624,40 @@ window.ShareViewer = (function () {
         }
 
 
+        if (mediaHost) {
+
+    mediaHost.style.setProperty(
+        "width",
+        "100%",
+        "important"
+    );
+
+    mediaHost.style.setProperty(
+        "height",
+        "100%",
+        "important"
+    );
+
+    mediaHost.style.setProperty(
+        "min-width",
+        "0",
+        "important"
+    );
+
+    mediaHost.style.setProperty(
+        "min-height",
+        "0",
+        "important"
+    );
+
+    mediaHost.style.setProperty(
+        "box-sizing",
+        "border-box",
+        "important"
+    );
+}
+
+
         const viewer =
             document.getElementById(
                 "viewerArea"
@@ -3878,6 +3919,8 @@ window.ShareViewer = (function () {
 
 
         bindBookGestures();
+
+        bindBookResponsiveRefresh();
     }
 
 
@@ -4215,6 +4258,337 @@ window.ShareViewer = (function () {
             true
         );
     }
+
+
+
+    /* =====================================================
+       RESPONSIVE BOOK REFRESH
+
+       Share Mode can change the effective viewport after the
+       Reader/PageFlip engine has already calculated its size.
+
+       This handles:
+         • Browser resize
+         • DevTools opening/closing
+         • Window maximization
+         • Mobile visual viewport changes
+         • Share container size changes
+         • Delayed layout changes after Share Mode starts
+    ===================================================== */
+
+    function scheduleBookResponsiveRefresh(
+        delay = 0
+    ) {
+
+        if (!isBookShare()) {
+            return;
+        }
+
+
+        if (
+            shell &&
+            shell.classList.contains(
+                "sky-share-document-closed"
+            )
+        ) {
+            return;
+        }
+
+
+        if (
+            !window.Reader ||
+            typeof Reader.refresh !==
+                "function"
+        ) {
+            return;
+        }
+
+
+        if (bookResizeTimer) {
+
+            clearTimeout(
+                bookResizeTimer
+            );
+
+            bookResizeTimer =
+                null;
+        }
+
+
+        bookResizeTimer =
+            setTimeout(
+                function () {
+
+                    bookResizeTimer =
+                        null;
+
+
+                    if (
+                        bookResizeRaf
+                    ) {
+
+                        cancelAnimationFrame(
+                            bookResizeRaf
+                        );
+                    }
+
+
+                    /*
+                     * Wait until the browser has completed
+                     * the current layout pass.
+                     */
+                    bookResizeRaf =
+                        requestAnimationFrame(
+                            function () {
+
+                                bookResizeRaf =
+                                    0;
+
+
+                                if (
+                                    !isBookShare() ||
+                                    (
+                                        shell &&
+                                        shell.classList.contains(
+                                            "sky-share-document-closed"
+                                        )
+                                    )
+                                ) {
+                                    return;
+                                }
+
+
+                                try {
+
+                                    Reader.refresh();
+
+                                }
+                                catch (error) {
+
+                                    console.warn(
+                                        "[SkyMedia Share] Responsive Reader refresh:",
+                                        error
+                                    );
+                                }
+
+
+                                updatePageButtons();
+
+                                updateShareBookIndicator();
+
+                            }
+                        );
+
+                },
+                delay
+            );
+    }
+
+
+    function bindBookResponsiveRefresh() {
+
+        if (bookResponsiveRefreshBound) {
+
+            /*
+             * Still trigger an immediate reflow for the
+             * current viewport.
+             */
+            scheduleBookResponsiveRefresh();
+
+            return;
+        }
+
+
+        bookResponsiveRefreshBound =
+            true;
+
+
+        /*
+         * -------------------------------------------------
+         * Browser/window resize
+         *
+         * This catches DevTools opening/closing, maximizing,
+         * restoring, resizing the browser, etc.
+         * -------------------------------------------------
+         */
+        window.addEventListener(
+            "resize",
+            function () {
+
+                scheduleBookResponsiveRefresh(
+                    30
+                );
+
+            },
+            {
+                passive: true
+            }
+        );
+
+
+        /*
+         * -------------------------------------------------
+         * Visual viewport resize
+         *
+         * Especially useful on mobile browsers and situations
+         * where the layout viewport itself is not the first
+         * thing to change.
+         * -------------------------------------------------
+         */
+        if (
+            window.visualViewport
+        ) {
+
+            window.visualViewport.addEventListener(
+                "resize",
+                function () {
+
+                    scheduleBookResponsiveRefresh(
+                        30
+                    );
+
+                },
+                {
+                    passive: true
+                }
+            );
+        }
+
+
+        /*
+         * -------------------------------------------------
+         * ResizeObserver
+         *
+         * This is the important part for Share Mode because
+         * the actual Reader container can change size without
+         * a traditional window resize being sufficient.
+         * -------------------------------------------------
+         */
+        if (
+            typeof ResizeObserver ===
+                "function"
+        ) {
+
+            bookResizeObserver =
+                new ResizeObserver(
+                    function () {
+
+                        scheduleBookResponsiveRefresh(
+                            20
+                        );
+
+                    }
+                );
+
+
+            const viewer =
+                document.getElementById(
+                    "viewerArea"
+                );
+
+
+            if (viewer) {
+
+                bookResizeObserver.observe(
+                    viewer
+                );
+            }
+
+
+            if (mediaHost) {
+
+                bookResizeObserver.observe(
+                    mediaHost
+                );
+            }
+
+
+            if (shell) {
+
+                const main =
+                    shell.querySelector(
+                        ".sky-share-main"
+                    );
+
+
+                if (main) {
+
+                    bookResizeObserver.observe(
+                        main
+                    );
+                }
+            }
+        }
+
+
+        /*
+         * Initial layout passes.
+         *
+         * These are intentionally staggered because PageFlip,
+         * Share Mode, and the browser layout engine do not all
+         * settle on the same animation frame.
+         */
+        scheduleBookResponsiveRefresh(
+            0
+        );
+
+
+        scheduleBookResponsiveRefresh(
+            100
+        );
+
+
+        scheduleBookResponsiveRefresh(
+            300
+        );
+
+
+        scheduleBookResponsiveRefresh(
+            700
+        );
+    }
+
+
+    function unbindBookResponsiveRefresh() {
+
+        if (
+            bookResizeTimer
+        ) {
+
+            clearTimeout(
+                bookResizeTimer
+            );
+
+            bookResizeTimer =
+                null;
+        }
+
+
+        if (
+            bookResizeRaf
+        ) {
+
+            cancelAnimationFrame(
+                bookResizeRaf
+            );
+
+            bookResizeRaf =
+                0;
+        }
+
+
+        if (
+            bookResizeObserver
+        ) {
+
+            bookResizeObserver.disconnect();
+
+            bookResizeObserver =
+                null;
+        }
+    }
+
+
 
     /* =====================================================
        VIDEO
@@ -4700,6 +5074,14 @@ window.ShareViewer = (function () {
                 updatePageButtons();
 
                 updateShareBookIndicator();
+    /*
+     * The complete Share layout now exists.
+     *
+     * Start responsive monitoring AFTER isolation so the
+     * Reader/PageFlip engine measures the real Share viewport.
+     */
+                bindBookResponsiveRefresh();
+
             }
 
 
