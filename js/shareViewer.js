@@ -2920,10 +2920,12 @@ let bookResponsiveRefreshBound = false;
             "sky-share-document-closed"
         );
 
-
+        
         /*
          * Hide all active item content first.
          */
+
+        hideClosedStateHeader();
         hideSharedItemControls();
         hideSharedItemSurfaces();
 
@@ -3075,6 +3077,89 @@ let bookResponsiveRefreshBound = false;
 
         updateClosedGoButtonLayout();
     }
+
+
+    /* =====================================================
+       CLOSED-STATE SHARE HEADER
+       
+       Universal rule:
+       When the shared item is closed and the status/welcome
+       surfaces are hidden, the Share header is hidden too.
+    ===================================================== */
+
+    function hideClosedStateHeader() {
+
+        if (!shell) {
+            return;
+        }
+
+        const header =
+            shell.querySelector(
+                ".sky-share-header"
+            );
+
+        if (!header) {
+            return;
+        }
+
+        header.style.setProperty(
+            "display",
+            "none",
+            "important"
+        );
+
+        header.style.setProperty(
+            "visibility",
+            "hidden",
+            "important"
+        );
+
+        header.style.setProperty(
+            "opacity",
+            "0",
+            "important"
+        );
+
+        header.style.setProperty(
+            "pointer-events",
+            "none",
+            "important"
+        );
+    }
+
+
+    function restoreShareHeader() {
+
+        if (!shell) {
+            return;
+        }
+
+        const header =
+            shell.querySelector(
+                ".sky-share-header"
+            );
+
+        if (!header) {
+            return;
+        }
+
+        header.style.removeProperty(
+            "display"
+        );
+
+        header.style.removeProperty(
+            "visibility"
+        );
+
+        header.style.removeProperty(
+            "opacity"
+        );
+
+        header.style.removeProperty(
+            "pointer-events"
+        );
+    }
+
 
 
         /* =====================================================
@@ -4884,6 +4969,7 @@ let bookResponsiveRefreshBound = false;
             "sky-share-document-closed"
         );
 
+        restoreShareHeader();
 
         titleElement.textContent =
             String(
