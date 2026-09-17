@@ -118,6 +118,55 @@ window.ShareViewer = (function () {
         }
     }
 
+function updateShareBookIndicator() {
+    if (!activeItem || !document.body.classList.contains("sky-share-book")) {
+        return;
+    }
+
+    const indicator = document.getElementById("pageIndicator");
+    if (!indicator) return;
+
+    const book =
+        (window.Reader && typeof Reader.book === "function" && Reader.book()) ||
+        activeItem;
+
+    const page =
+        (window.Reader && typeof Reader.currentPage === "function"
+            ? Number(Reader.currentPage())
+            : 0) || 1;
+
+    const pages =
+        (window.Reader && typeof Reader.pages === "function"
+            ? Number(Reader.pages())
+            : 0) ||
+        Number(book?.pageCount) ||
+        0;
+
+    const title =
+        String(book?.title || activeItem?.title || "").trim();
+
+    let text = "";
+
+    if (title && pages > 0) {
+        text = `${title} — Page ${page} of ${pages}`;
+    } else if (title) {
+        text = title;
+    } else if (pages > 0) {
+        text = `Page ${page} of ${pages}`;
+    } else {
+        text = `Page ${page}`;
+    }
+
+    indicator.textContent = text;
+
+    indicator.hidden = false;
+    indicator.removeAttribute("aria-hidden");
+
+    indicator.style.removeProperty("display");
+    indicator.style.removeProperty("visibility");
+    indicator.style.removeProperty("opacity");
+}
+
 
     /* =====================================================
        SHARE SHELL
@@ -582,6 +631,9 @@ window.ShareViewer = (function () {
                     : "false"
             );
         }
+
+    updateShareBookIndicator();
+
     }
 
 
@@ -595,7 +647,12 @@ window.ShareViewer = (function () {
 
         pageStateTimer =
             setInterval(
-                updatePageButtons,
+                function () {
+
+                    updatePageButtons();
+                    updateShareBookIndicator();
+
+                },
                 150
             );
     }
@@ -612,7 +669,6 @@ window.ShareViewer = (function () {
             pageStateTimer = null;
         }
     }
-
 
     /* =====================================================
        FULLSCREEN
@@ -1858,11 +1914,12 @@ window.ShareViewer = (function () {
  *
  * ui.js owns the actual page count and page-jump behavior.
  */
-if (
-    typeof updatePageIndicator === "function"
-) {
-    updatePageIndicator();
+
+if (typeof window.updatePageIndicator === "function") {
+    window.updatePageIndicator();
 }
+
+updateShareBookIndicator();
 
 
         requestAnimationFrame(() => {
@@ -1876,6 +1933,7 @@ if (
             }
 
             updatePageButtons();
+            updateShareBookIndicator();
         });
 
         /*
