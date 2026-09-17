@@ -830,7 +830,7 @@ function stopShareLoading() {
     /* =====================================================
        OVERLAY GIF
        -----------------------------------------------------
-       60px wide; height remains automatic to preserve the
+       120px wide; height remains automatic to preserve the
        GIF's native aspect ratio. pointer-events:none keeps
        the underlying Go button fully clickable.
     ===================================================== */
@@ -869,26 +869,21 @@ function stopShareLoading() {
     );
 
     gif.style.setProperty(
-        "left",
-        "50%",
+        "right",
+        "26%",
         "important"
     );
 
     gif.style.setProperty(
-        "top",
-        "50%",
+        "bottom",
+        "13%",
         "important"
     );
 
-    gif.style.setProperty(
-        "transform",
-        "translate(-50%, -50%)",
-        "important"
-    );
 
     gif.style.setProperty(
         "width",
-        "60px",
+        "min(120px,60px)",
         "important"
     );
 
@@ -900,7 +895,7 @@ function stopShareLoading() {
 
     gif.style.setProperty(
         "max-width",
-        "none",
+        "20%",
         "important"
     );
 
