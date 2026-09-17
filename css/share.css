@@ -258,7 +258,11 @@ body.sky-share-mode .sky-share-subtitle {
     transform: none !important;
 }
 
+body.sky-share-mode .sky-share-title {
+    text-shadow:none !important;
+    filter:none !important;
 
+}
 
 body.sky-share-mode .sky-share-title {
     position: relative !important;
