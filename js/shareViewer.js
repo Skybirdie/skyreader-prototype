@@ -2225,7 +2225,13 @@ if (
         }
 
 
-        statusElement.textContent = "";
+        /*
+ * Book Share uses the REAL Reader #statusBar.
+ * Video and slideshow have their own status systems.
+ */
+if (!isBookShare() && statusElement) {
+    statusElement.textContent = "";
+}
     }
 
 
@@ -2282,7 +2288,42 @@ if (
             isolateApplication();
 
 
-            bindControlsIdleTimer();
+/*
+ * Share Mode has now finished isolating the normal application.
+ * Reassert the Reader's real status bar and page indicator because
+ * the Reader owns this information and Share Mode must not replace it.
+ */
+if (isBookShare()) {
+
+    const status =
+        document.getElementById("statusBar");
+
+    if (status) {
+
+        status.hidden = false;
+
+        status.removeAttribute("aria-hidden");
+
+        status.style.removeProperty("display");
+        status.style.removeProperty("visibility");
+        status.style.removeProperty("opacity");
+    }
+
+    if (
+        typeof updatePageIndicator === "function"
+    ) {
+        updatePageIndicator();
+    }
+
+    if (
+        typeof updatePageButtons === "function"
+    ) {
+        updatePageButtons();
+    }
+}
+
+
+bindControlsIdleTimer();
 
 
             shell.style.zIndex =
