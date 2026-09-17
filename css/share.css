@@ -4522,10 +4522,6 @@ body.sky-share-mode.sky-share-book #pageJump {
 .sky-share-go-button .sky-share-go-gif {
     position: absolute !important;
 
-    right: 26% !important;
-    bottom: 13% !important;
-
-    width: clamp(60px, 8vw, 120px) !important;
     height: auto !important;
 
     object-fit: contain !important;
