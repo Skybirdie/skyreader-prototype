@@ -72,6 +72,15 @@ body.sky-share-mode {
     color: var(--text-color, var(--text, #fff));
 }
 
+ /* =========================================================
+    PREVENT SHARE TITLE FLASH DURING INITIAL LOAD
+    ========================================================= */
+
+.sky-share-title,
+.sky-share-subtitle {
+    visibility: hidden;
+    opacity: 0;
+}
 
 /* =========================================================
    SHARE TOP STRIP
@@ -205,6 +214,20 @@ body.sky-share-mode .sky-share-heading {
 }
 
 /* =========================================================
+   SHARE TITLE — VISIBLE ONLY AFTER SHARE MODE IS ACTIVE
+   ========================================================= */
+
+body.sky-share-mode .sky-share-title {
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+body.sky-share-mode .sky-share-subtitle {
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+/* =========================================================
    SHARE TITLE — IMAGE CLIPPED TEXT
    ========================================================= */
 
@@ -226,7 +249,7 @@ body.sky-share-mode .sky-share-subtitle {
     -webkit-text-fill-color: transparent !important;
 
     text-align: center !important;
-    text-shadow: none !important;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, .65);
     filter: none !important;
     transform: none !important;
 }
@@ -260,6 +283,8 @@ body.sky-share-mode .sky-share-title {
     font-size: 12px;
     line-height: 1.2;
 }
+
+
 
 
 /* =========================================================
