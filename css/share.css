@@ -172,87 +172,84 @@ body.sky-share-mode #workspacePrimaryLogo {
     pointer-events: none !important;
 }
 
-
 /* =========================================================
-   SHARE TITLE
+   SHARE HEADING — LOCKED TO HEADER
    ========================================================= */
 
-.sky-share-heading {
-    /*
-     * Reserved upper area for the share title.
-     * The title remains independent of the media stage.
-     */
-    position: absolute;
+body.sky-share-mode .sky-share-heading {
+    position: fixed !important;
 
-    left: 0;
-    right: 0;
-    top: 0;
+    top: clamp(44px, 5.5vh, 68px) !important;
+    left: 0 !important;
+    right: 0 !important;
 
-    height: clamp(42px, 7vh, 64px);
+    width: 100vw !important;
+    height: clamp(42px, 7vh, 64px) !important;
 
-    padding: 7px 14px 5px;
+    margin: 0 !important;
+    padding: 7px 14px 5px !important;
 
-    text-align: center;
+    box-sizing: border-box !important;
 
-    box-sizing: border-box;
-
-    z-index: 80;
-
-    pointer-events: none;
-
-    /*
-     * Do not apply transforms, filters, opacity, or scaling
-     * to the heading. They can soften text rendering.
-     */
-    transform: none !important;
-    filter: none !important;
-    opacity: 1 !important;
-}
-
-.sky-share-title,
-.sky-share-subtitle {
-    width: 100% !important;
-
-    margin-left: auto !important;
-    margin-right: auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
 
     text-align: center !important;
 
-    /*
-     * Crisp gradient text.
-     */
-    background: linear-gradient(
-        180deg,
-        #00A693 0%,
-        #ACE1AF 100%
-    ) !important;
+    z-index: 100000 !important;
+    pointer-events: none !important;
+
+    overflow: hidden !important;
+}
+
+/* =========================================================
+   SHARE TITLE — IMAGE CLIPPED TEXT
+   ========================================================= */
+
+body.sky-share-mode .sky-share-title,
+body.sky-share-mode .sky-share-subtitle {
+    width: 100% !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+
+    background-image: url("../assets/background.jpg") !important;
+    background-repeat: no-repeat !important;
+    background-position: center center !important;
+    background-size: cover !important;
 
     -webkit-background-clip: text !important;
     background-clip: text !important;
 
+    color: transparent !important;
     -webkit-text-fill-color: transparent !important;
 
-    /*
-     * Prevent softening from transforms/filters/shadows.
-     */
-    transform: none !important;
+    text-align: center !important;
+    text-shadow: none !important;
     filter: none !important;
-    text-shadow: 0 1px 1px rgba(0, 0, 0, .65);;
-
-    opacity: 1 !important;
+    transform: none !important;
 }
 
-.sky-share-title {
-    margin-top: 0;
+body.sky-share-mode .sky-share-title {
+    position: relative !important;
 
-    font-size: clamp(17px, 2vw, 25px);
-    line-height: 1.2;
-
+    display: block !important;
+    width: 100% !important;
     max-width: 72vw !important;
+
+    margin: 0 auto !important;
+
+    font-size: clamp(17px, 2vw, 25px) !important;
+    line-height: 1.2 !important;
 
     white-space: nowrap !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
+
+    text-align: center !important;
+
+    text-shadow: none !important;
 }
 
 .sky-share-subtitle {
@@ -3710,4 +3707,222 @@ body.sky-share-mode.sky-share-book.sky-share-controls-hidden
     visibility: visible !important;
     opacity: 1 !important;
     pointer-events: auto !important;
+}
+
+
+/* =========================================================
+   SHARE MODE — COMMON STATUS + WELCOME BARS
+   Applies to ALL Share Viewers:
+   Book / Video / Slideshow
+   ========================================================= */
+
+/*
+ * The normal application hides #statusBar in Share Mode.
+ * Restore it for every Share Viewer.
+ */
+body.sky-share-mode #statusBar {
+    position: fixed !important;
+
+    left: 0 !important;
+    right: 0 !important;
+    bottom: var(--sky-share-welcome-height, 22px) !important;
+
+    width: 100vw !important;
+
+    height: var(--sky-share-status-height, 30px) !important;
+    min-height: var(--sky-share-status-height, 30px) !important;
+    max-height: var(--sky-share-status-height, 30px) !important;
+
+    margin: 0 !important;
+    padding: 0 12px !important;
+
+    box-sizing: border-box !important;
+
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+
+    visibility: visible !important;
+    opacity: 1 !important;
+
+    overflow: visible !important;
+
+    z-index: 1000020 !important;
+
+    pointer-events: auto !important;
+}
+
+
+/*
+ * Existing Reader page indicator.
+ * Books use this for Page X / Y.
+ *
+ * For viewers where the indicator has no applicable content,
+ * the element can remain empty/hidden through the normal JS.
+ */
+body.sky-share-mode #pageIndicator {
+    position: relative !important;
+
+    display: inline-flex !important;
+
+    align-items: center !important;
+    justify-content: center !important;
+
+    visibility: visible !important;
+    opacity: 1 !important;
+
+    z-index: 1000021 !important;
+
+    pointer-events: auto !important;
+}
+
+
+/*
+ * Existing page-jump popup.
+ * Only relevant to book/Reader shares.
+ */
+body.sky-share-mode #pageJump {
+    position: fixed !important;
+
+    left: 50% !important;
+    right: auto !important;
+
+    bottom: calc(
+        var(--sky-share-status-height, 30px) +
+        var(--sky-share-welcome-height, 22px) +
+        14px
+    ) !important;
+
+    transform: translateX(-50%) !important;
+
+    z-index: 1000022 !important;
+
+    pointer-events: auto !important;
+}
+
+
+/*
+ * Common Share Mode welcome bar.
+ */
+body.sky-share-mode .sr-welcome-banner {
+    position: fixed !important;
+
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+
+    width: 100vw !important;
+
+    height: var(--sky-share-welcome-height, 22px) !important;
+    min-height: var(--sky-share-welcome-height, 22px) !important;
+    max-height: var(--sky-share-welcome-height, 22px) !important;
+
+    margin: 0 !important;
+    padding: 0 !important;
+
+    box-sizing: border-box !important;
+
+    display: flex !important;
+
+    align-items: center !important;
+    justify-content: center !important;
+
+    visibility: visible !important;
+    opacity: 1 !important;
+
+    overflow: visible !important;
+
+    z-index: 1000020 !important;
+
+    pointer-events: none !important;
+}
+
+
+/*
+ * Keep the actual welcome text centered.
+ */
+body.sky-share-mode .sr-welcome-banner center {
+    margin: 0 !important;
+    padding: 0 !important;
+
+    line-height: 1.2 !important;
+
+    text-align: center !important;
+}
+
+
+/*
+ * The timeout must NEVER hide the status or welcome bars.
+ */
+body.sky-share-mode.sky-share-controls-hidden #statusBar,
+body.sky-share-mode.sky-share-controls-hidden .sr-welcome-banner {
+    display: flex !important;
+
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+
+/* =========================================================
+   SHARE MODE — COMMON MOBILE STATUS / WELCOME
+   ========================================================= */
+
+@media (max-width: 700px) {
+
+    body.sky-share-mode {
+        --sky-share-status-height: 28px;
+        --sky-share-welcome-height: 21px;
+    }
+
+    body.sky-share-mode #statusBar {
+        position: fixed !important;
+
+        left: 0 !important;
+        right: 0 !important;
+        bottom: var(--sky-share-welcome-height) !important;
+
+        width: 100vw !important;
+
+        height: var(--sky-share-status-height) !important;
+        min-height: var(--sky-share-status-height) !important;
+
+        display: flex !important;
+
+        visibility: visible !important;
+        opacity: 1 !important;
+
+        z-index: 1000020 !important;
+    }
+
+    body.sky-share-mode .sr-welcome-banner {
+        position: fixed !important;
+
+        left: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+
+        width: 100vw !important;
+
+        height: var(--sky-share-welcome-height) !important;
+        min-height: var(--sky-share-welcome-height) !important;
+
+        display: flex !important;
+
+        visibility: visible !important;
+        opacity: 1 !important;
+
+        z-index: 1000020 !important;
+    }
+
+    body.sky-share-mode #pageIndicator {
+        display: inline-flex !important;
+
+        visibility: visible !important;
+        opacity: 1 !important;
+
+        min-height: 28px !important;
+
+        align-items: center !important;
+        justify-content: center !important;
+    }
 }
