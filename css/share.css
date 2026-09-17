@@ -604,8 +604,8 @@ body.sky-share-mode .sky-share-subtitle {
 
     background:linear-gradient(
         180deg,
-        #29AB87 0%,
-        #00FA9A 100%
+        #00FA9A 0%,
+        #ACE1AF 100%
     ) !important;
 
     -webkit-background-clip:text !important;
