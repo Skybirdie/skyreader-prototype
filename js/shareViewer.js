@@ -424,7 +424,6 @@ window.ShareViewer = (function () {
 
     button = document.createElement("a");
     button.className = "sky-share-closed-go-button";
-
     button.href = GLIDE_MEDIA_URL;
     button.target = "_blank";
     button.rel = "noopener noreferrer";
@@ -435,50 +434,15 @@ window.ShareViewer = (function () {
     );
 
     /*
-     * The button is positioned inside the closed panel.
-     *
-     * Change these two values to move it:
-     *
-     *   --sky-go-x: 50%;
-     *   --sky-go-y: 50%;
-     *
-     * Examples:
-     *
-     *   50% 50% = center
-     *   50% 60% = lower
-     *   50% 40% = higher
-     *   60% 50% = right
-     *   40% 50% = left
+     * Keep the button safely inside the closed panel.
      */
-    button.style.setProperty("--sky-go-x", "50%");
-    button.style.setProperty("--sky-go-y", "50%");
-
-    button.style.setProperty(
-        "position",
-        "absolute",
-        "important"
-    );
-
-    button.style.setProperty(
-        "left",
-        "var(--sky-go-x)",
-        "important"
-    );
-
-    button.style.setProperty(
-        "top",
-        "var(--sky-go-y)",
-        "important"
-    );
-
-    button.style.setProperty(
-        "transform",
-        "translate(-50%, -50%)",
-        "important"
-    );
+    button.style.setProperty("position", "absolute", "important");
+    button.style.setProperty("left", "50%", "important");
+    button.style.setProperty("top", "50%", "important");
+    button.style.setProperty("transform", "translate(-50%, -50%)", "important");
 
     /*
-     * Significantly larger than the previous 520px maximum.
+     * Larger desktop presentation.
      */
     button.style.setProperty(
         "width",
@@ -488,7 +452,7 @@ window.ShareViewer = (function () {
 
     button.style.setProperty(
         "max-width",
-        "75vw",
+        "85vw",
         "important"
     );
 
@@ -498,71 +462,32 @@ window.ShareViewer = (function () {
         "important"
     );
 
-    button.style.setProperty(
-        "height",
-        "auto",
-        "important"
-    );
+    button.style.setProperty("height", "auto", "important");
+    button.style.setProperty("padding", "0", "important");
+    button.style.setProperty("margin", "0", "important");
+    button.style.setProperty("border", "0", "important");
+    button.style.setProperty("outline", "none", "important");
+    button.style.setProperty("text-decoration", "none", "important");
+    button.style.setProperty("cursor", "pointer", "important");
+    button.style.setProperty("box-sizing", "border-box", "important");
+    button.style.setProperty("z-index", "10000", "important");
+    button.style.setProperty("pointer-events", "auto", "important");
+    button.style.setProperty("display", "block", "important");
 
-    button.style.setProperty(
-        "margin",
-        "0",
-        "important"
-    );
+    /*
+     * Use <picture> so the mobile asset is selected automatically.
+     */
+    const picture = document.createElement("picture");
 
-    button.style.setProperty(
-        "padding",
-        "0",
-        "important"
-    );
+    const mobileSource = document.createElement("source");
 
-    button.style.setProperty(
-        "border",
-        "0",
-        "important"
-    );
+    mobileSource.media = "(max-width: 700px)";
+    mobileSource.srcset = new URL(
+        "/assets/go-button-mobile.png",
+        window.location.origin
+    ).href;
 
-    button.style.setProperty(
-        "outline",
-        "none",
-        "important"
-    );
-
-    button.style.setProperty(
-        "text-decoration",
-        "none",
-        "important"
-    );
-
-    button.style.setProperty(
-        "cursor",
-        "pointer",
-        "important"
-    );
-
-    button.style.setProperty(
-        "box-sizing",
-        "border-box",
-        "important"
-    );
-
-    button.style.setProperty(
-        "overflow",
-        "hidden",
-        "important"
-    );
-
-    button.style.setProperty(
-        "z-index",
-        "10000",
-        "important"
-    );
-
-    button.style.setProperty(
-        "pointer-events",
-        "auto",
-        "important"
-    );
+    picture.appendChild(mobileSource);
 
     const image = document.createElement("img");
 
@@ -574,65 +499,18 @@ window.ShareViewer = (function () {
     image.alt = "Open Meditation Mornings";
     image.draggable = false;
 
-    image.style.setProperty(
-        "display",
-        "block",
-        "important"
-    );
+    image.style.setProperty("display", "block", "important");
+    image.style.setProperty("width", "100%", "important");
+    image.style.setProperty("height", "auto", "important");
+    image.style.setProperty("max-width", "100%", "important");
+    image.style.setProperty("max-height", "75vh", "important");
+    image.style.setProperty("object-fit", "contain", "important");
+    image.style.setProperty("pointer-events", "none", "important");
+    image.style.setProperty("user-select", "none", "important");
+    image.style.setProperty("-webkit-user-drag", "none", "important");
 
-    image.style.setProperty(
-        "width",
-        "100%",
-        "important"
-    );
-
-    image.style.setProperty(
-        "height",
-        "auto",
-        "important"
-    );
-
-    image.style.setProperty(
-        "max-width",
-        "100%",
-        "important"
-    );
-
-    image.style.setProperty(
-        "max-height",
-        "75vh",
-        "important"
-    );
-
-    image.style.setProperty(
-        "object-fit",
-        "contain",
-        "important"
-    );
-
-    /*
-     * The anchor handles the click.
-     * The image deliberately does not intercept it.
-     */
-    image.style.setProperty(
-        "pointer-events",
-        "none",
-        "important"
-    );
-
-    image.style.setProperty(
-        "user-select",
-        "none",
-        "important"
-    );
-
-    image.style.setProperty(
-        "-webkit-user-drag",
-        "none",
-        "important"
-    );
-
-    button.appendChild(image);
+    picture.appendChild(image);
+    button.appendChild(picture);
     closedPanel.appendChild(button);
 
     return button;
@@ -1733,6 +1611,100 @@ window.ShareViewer = (function () {
         startPageWatcher();
     }
 
+    /* =====================================================
+       HIDE CONTROLS WHEN ITEM IS CLOSED
+    ===================================================== */
+
+function hideSharedItemControls() {
+    /*
+     * Reader controls
+     */
+    const readerToolbar = document.getElementById("toolbar");
+    const readerStatus = document.getElementById("statusBar");
+
+    if (readerToolbar) {
+        readerToolbar.style.setProperty(
+            "display",
+            "none",
+            "important"
+        );
+    }
+
+    if (readerStatus) {
+        readerStatus.style.setProperty(
+            "display",
+            "none",
+            "important"
+        );
+    }
+
+    /*
+     * Video controls/toolbars.
+     */
+    const videoToolbar = document.getElementById("videoTopBar");
+    const videoControls = document.getElementById("videoControls");
+
+    if (videoToolbar) {
+        videoToolbar.style.setProperty(
+            "display",
+            "none",
+            "important"
+        );
+    }
+
+    if (videoControls) {
+        videoControls.style.setProperty(
+            "display",
+            "none",
+            "important"
+        );
+    }
+
+    /*
+     * Slideshow controls.
+     *
+     * Hide the actual slideshow control containers rather than
+     * removing them from the DOM.
+     */
+    const slideshowToolbar = document.querySelector(
+        ".slideshow-top-bar"
+    );
+
+    const slideshowControls = document.querySelector(
+        ".slideshow-controls"
+    );
+
+    if (slideshowToolbar) {
+        slideshowToolbar.style.setProperty(
+            "display",
+            "none",
+            "important"
+        );
+    }
+
+    if (slideshowControls) {
+        slideshowControls.style.setProperty(
+            "display",
+            "none",
+            "important"
+        );
+    }
+
+    /*
+     * Prevent any orphaned Reader navigation buttons from remaining
+     * visible after a shared book closes.
+     */
+    document.querySelectorAll(
+        "#prevPage, #nextPage, #previousPage, #nextButton"
+    ).forEach(function(element) {
+        element.style.setProperty(
+            "display",
+            "none",
+            "important"
+        );
+    });
+}
+
 
     /* =====================================================
        BOOK WHEEL / SWIPE NAVIGATION
@@ -2221,48 +2193,109 @@ window.ShareViewer = (function () {
     ===================================================== */
 
     function bindLastPageProtection() {
+    if (!mediaHost) return;
 
-        if (
-            document.body.dataset
-                .skyShareLastPageGuard ===
-            "true"
-        ) {
-            return;
-        }
+    /*
+     * Prevent forward wheel scrolling from doing anything when the
+     * shared book is already on its final page.
+     */
+    if (!mediaHost._skyLastPageWheelHandler) {
+        mediaHost._skyLastPageWheelHandler = function(event) {
+            if (!isBookShare()) return;
 
+            if (
+                !window.Reader ||
+                typeof Reader.currentPage !== "function" ||
+                typeof Reader.pages !== "function"
+            ) {
+                return;
+            }
 
-        document.body.dataset
-            .skyShareLastPageGuard =
-            "true";
+            const current = Number(Reader.currentPage()) || 1;
+            const total = Number(Reader.pages()) || 0;
 
+            if (!total || current < total) {
+                return;
+            }
 
-        document.addEventListener(
-            "skyreader:last-page-click",
-            event => {
+            /*
+             * Positive wheel delta means the user is attempting to
+             * move forward/downward.
+             */
+            const forward =
+                event.deltaY > 0 ||
+                event.deltaX > 0;
 
-                if (
-                    !document.body.classList.contains(
-                        "sky-share-mode"
-                    )
-                ) {
-                    return;
-                }
+            if (!forward) {
+                return;
+            }
 
+            /*
+             * Stop the event before the normal Reader navigation
+             * handler can interpret it as another page turn.
+             */
+            event.preventDefault();
+            event.stopPropagation();
 
-                if (!isBookShare()) {
-                    return;
-                }
-
-
-                event.preventDefault();
+            if (typeof event.stopImmediatePropagation === "function") {
                 event.stopImmediatePropagation();
+            }
+        };
 
-
-                updatePageButtons();
-            },
-            true
+        mediaHost.addEventListener(
+            "wheel",
+            mediaHost._skyLastPageWheelHandler,
+            {
+                passive: false,
+                capture: true
+            }
         );
     }
+
+    /*
+     * Also protect the viewer itself in case the browser/event path
+     * sends the wheel event through a child element.
+     */
+    if (!mediaHost._skyLastPageScrollHandler) {
+        mediaHost._skyLastPageScrollHandler = function(event) {
+            if (!isBookShare()) return;
+
+            if (
+                !window.Reader ||
+                typeof Reader.currentPage !== "function" ||
+                typeof Reader.pages !== "function"
+            ) {
+                return;
+            }
+
+            const current = Number(Reader.currentPage()) || 1;
+            const total = Number(Reader.pages()) || 0;
+
+            if (!total || current < total) {
+                return;
+            }
+
+            const forward =
+                event.deltaY > 0 ||
+                event.deltaX > 0;
+
+            if (!forward) {
+                return;
+            }
+
+            event.preventDefault();
+        };
+
+        document.addEventListener(
+            "wheel",
+            mediaHost._skyLastPageScrollHandler,
+            {
+                passive: false,
+                capture: true
+            }
+        );
+    }
+}
 
 
     /* =====================================================
@@ -2275,7 +2308,7 @@ window.ShareViewer = (function () {
     shell.classList.add("sky-share-document-closed");
 
     /*
-     * Create the panel before creating the Go button.
+     * Create the closed panel once.
      */
     if (!closedPanel) {
         closedPanel = createElement(
@@ -2323,18 +2356,6 @@ window.ShareViewer = (function () {
     );
 
     closedPanel.style.setProperty(
-        "max-width",
-        "100%",
-        "important"
-    );
-
-    closedPanel.style.setProperty(
-        "max-height",
-        "100%",
-        "important"
-    );
-
-    closedPanel.style.setProperty(
         "overflow",
         "hidden",
         "important"
@@ -2353,7 +2374,7 @@ window.ShareViewer = (function () {
     );
 
     /*
-     * Create the actual image button.
+     * The same Go button is used for every shared item type.
      */
     createClosedGoButton();
 }
@@ -2375,6 +2396,7 @@ window.ShareViewer = (function () {
 
         exitFullscreen();
 
+        hideSharedItemControls();
 
         try {
 
@@ -2461,6 +2483,7 @@ window.ShareViewer = (function () {
                     );
                 }
             );
+
 
 
         /*
