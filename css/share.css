@@ -251,6 +251,7 @@ body.sky-share-mode .sky-share-subtitle {
 
     color: transparent !important;
     -webkit-text-fill-color: transparent !important;
+    -webkit-text-stroke: 1px #50C878; 
 
     text-align: center !important;
 
@@ -4128,4 +4129,10 @@ body.sky-share-mode.sky-share-book #statusBar #pageIndicator {
     margin: 0 !important;
     padding: 0 !important;
     transform: none !important;
+}
+
+body.sky-share-mode.sky-share-book #statusBar #pageIndicator {
+    display: inline-block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
 }
