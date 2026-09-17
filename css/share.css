@@ -4202,9 +4202,6 @@ body.sky-share-mode.sky-share-book #statusBar #pageIndicator {
 
     z-index:1000100 !important;
 
-    filter: drop-shadow(0 0 6px #ACE1AFcc);
-
-    animation: goGlow 10s ease-in-out infinite;
 
     -webkit-tap-highlight-color:transparent;
 }
@@ -4231,36 +4228,7 @@ body.sky-share-mode.sky-share-book #statusBar #pageIndicator {
 }
 
 
-/* =========================================================
-   LOGO GLOW
-   ========================================================= */
 
-@keyframes goGlow {
-
-    0%, 100% {
-        filter: 
-            drop-shadow(0 0 4px #ACE1AF)
-            drop-shadow(0 0 7px #ACE1AF);
-    }
-
-    45% {
-        filter: 
-            drop-shadow(0 0 0 #ACE1AF)
-            drop-shadow(0 0 0 #ACE1AF);
-    }
-
-    52% {
-        filter: 
-            drop-shadow(0 0 0 #ACE1AF)
-            drop-shadow(0 0 0 #ACE1AF);
-    }
-
-    60% {
-        filter: 
-            drop-shadow(0 0 8px #ACE1AF)
-            drop-shadow(0 0 20px #ACE1AF);
-    }
-}
 
 
 
@@ -4336,4 +4304,26 @@ body.sky-share-mode.sky-share-book #statusBar #pageIndicator {
 
         position: relative !important;
     }
+}
+
+/* =========================================================
+   SHARE BOOK — NO STARTUP MOVEMENT
+   ========================================================= */
+
+body.sky-share-mode.sky-share-book
+#viewerArea,
+body.sky-share-mode.sky-share-book
+#viewerArea * {
+    transition: none !important;
+}
+
+
+/*
+ * The viewer is temporarily hidden by ShareViewer while
+ * PageFlip establishes its initial dimensions.
+ */
+body.sky-share-mode.sky-share-book
+#viewerArea.sky-share-book-layout-pending {
+    visibility: hidden !important;
+    opacity: 0 !important;
 }
