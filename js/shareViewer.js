@@ -146,6 +146,7 @@ window.ShareViewer = (function () {
         return;
     }
 
+
     if (
         !window.Reader ||
         typeof Reader.currentPage !== "function" ||
@@ -154,11 +155,41 @@ window.ShareViewer = (function () {
         return;
     }
 
+
     const indicator =
         document.getElementById("pageIndicator");
 
     if (!indicator) {
         return;
+    }
+
+
+    /*
+    -------------------------------------------------------
+     Let the normal Reader UI establish its page/spread
+     information first.
+    -------------------------------------------------------
+    */
+
+    if (
+        typeof window.updatePageIndicator ===
+            "function"
+    ) {
+
+        try {
+
+            window.updatePageIndicator();
+
+        }
+        catch (error) {
+
+            console.warn(
+                "[SkyMedia Share] Reader page indicator refresh:",
+                error
+            );
+
+        }
+
     }
 
 
@@ -175,38 +206,11 @@ window.ShareViewer = (function () {
 
 
     /*
-     * Let the normal Reader UI calculate its established
-     * spread information first.
-     */
-    if (
-        typeof window.updatePageIndicator ===
-            "function"
-    ) {
+    -------------------------------------------------------
+     Preserve the Reader's established spread label.
+     -------------------------------------------------------
+    */
 
-        try {
-
-            window.updatePageIndicator();
-
-        } catch (error) {
-
-            console.warn(
-                "[SkyMedia Share] Reader page indicator refresh:",
-                error
-            );
-        }
-    }
-
-
-    /*
-     * Preserve the Reader's existing spread label.
-     *
-     * Examples:
-     *
-     *     1
-     *     2–3
-     *     4–5
-     *     6
-     */
     let label = "";
 
 
@@ -219,6 +223,7 @@ window.ShareViewer = (function () {
             const spread =
                 Reader.spread();
 
+
             if (
                 spread &&
                 spread.label !== undefined &&
@@ -229,105 +234,197 @@ window.ShareViewer = (function () {
                     String(
                         spread.label
                     ).trim();
+
             }
 
-        } catch (error) {
+        }
+        catch (error) {
 
             console.warn(
                 "[SkyMedia Share] Reader spread lookup:",
                 error
             );
+
         }
+
     }
 
 
     if (!label) {
-        label = String(page);
+
+        label =
+            String(page);
+
     }
 
 
     /*
-     * Include the actual book title so Share Book has the same
-     * title + page information presentation as the other viewers.
-     */
-    const book =
-        window.Reader &&
-        typeof Reader.book === "function"
-            ? Reader.book()
-            : null;
+    -------------------------------------------------------
+     IMPORTANT:
+     #pageIndicator contains ONLY the page information.
 
+     The book title is NOT placed inside this element.
 
-    const title =
-        String(
-            book?.title ||
-            activeItem?.title ||
-            ""
-        ).trim();
+     This keeps Share Book consistent with Video Viewer,
+     where the title and indicator are separate elements.
+    -------------------------------------------------------
+    */
 
-
-    const pageText =
+    indicator.textContent =
         label +
         " / " +
         (pages || "");
 
 
     /*
- * Title remains outside the page-number indicator.
- * The indicator itself contains only the page numbers.
- */
-if (title) {
-    indicator.innerHTML =
-        '<span class="sky-share-page-title">' +
-        title.replace(/[&<>"']/g, function (char) {
-            return {
-                "&": "&amp;",
-                "<": "&lt;",
-                ">": "&gt;",
-                '"': "&quot;",
-                "'": "&#039;"
-            }[char];
-        }) +
-        '</span>' +
-        '<span class="sky-share-page-count">' +
-        pageText +
-        '</span>';
-} else {
-    indicator.innerHTML =
-        '<span class="sky-share-page-count">' +
-        pageText +
-        '</span>';
-}
+    -------------------------------------------------------
+     Restore the actual Reader indicator after the
+     Reader status bar has been moved into Share Mode.
+    -------------------------------------------------------
+    */
 
+    indicator.hidden =
+        false;
 
-    /*
-     * Explicitly restore the actual Reader indicator after
-     * Share Mode reparents #statusBar.
-     */
-    indicator.hidden = false;
 
     indicator.removeAttribute(
         "aria-hidden"
     );
 
-    indicator.tabIndex = 0;
+
+    indicator.tabIndex =
+        0;
+
 
     indicator.style.removeProperty(
         "display"
     );
 
+
     indicator.style.removeProperty(
         "visibility"
     );
+
 
     indicator.style.removeProperty(
         "opacity"
     );
 
+
     indicator.classList.add(
         "pageIndicatorActive"
     );
+
 }
 
+function createClosedGoButton() {
+
+    /*
+    -------------------------------------------------------
+     Do not create duplicates.
+    -------------------------------------------------------
+    */
+
+    if (closedPanel) {
+
+        const existing =
+            closedPanel.querySelector(
+                ".sky-share-closed-go-button"
+            );
+
+        if (existing) {
+            return existing;
+        }
+
+    }
+
+
+    /*
+    -------------------------------------------------------
+     Create the large button.
+    -------------------------------------------------------
+    */
+
+    const button =
+        document.createElement("a");
+
+
+    button.className =
+        "sky-share-closed-go-button";
+
+
+    button.href =
+        GLIDE_MEDIA_URL;
+
+
+    button.target =
+        "_self";
+
+
+    button.rel =
+        "noopener";
+
+
+    button.setAttribute(
+        "aria-label",
+        "Open Meditation Mornings"
+    );
+
+
+    /*
+    -------------------------------------------------------
+     Image
+    -------------------------------------------------------
+    */
+
+const image =
+    document.createElement("img");
+
+image.src =
+    new URL(
+        "assets/go-button.png",
+        window.location.href
+    ).href;
+
+image.alt =
+    "Open Meditation Mornings";
+
+image.draggable =
+    false;
+
+button.appendChild(
+    image
+);
+
+
+    /*
+    -------------------------------------------------------
+     Add to the existing closed panel.
+
+     This does NOT modify the existing smaller
+     Open Meditation Mornings button.
+    -------------------------------------------------------
+    */
+
+    if (closedPanel) {
+
+        closedPanel.appendChild(
+            button
+        );
+
+    }
+    else {
+
+        document.body.appendChild(
+            button
+        );
+
+    }
+
+
+    return button;
+
+}
 
     /* =====================================================
        SHARE SHELL
@@ -1836,6 +1933,17 @@ if (title) {
             "sky-share-document-closed"
         );
 
+if (closedPanel) {
+
+    closedPanel.style.display =
+        "flex";
+
+    closedPanel.hidden =
+        false;
+
+}
+
+createClosedGoButton();
 
         if (!closedPanel) {
 
