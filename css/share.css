@@ -232,12 +232,13 @@ body.sky-share-mode .sky-share-subtitle {
 }
 
 /* =========================================================
-   SHARE TITLE — IMAGE CLIPPED TEXT
+   SHARE TITLE — SIMPLE background.jpg IMAGE FILL
    ========================================================= */
 
 body.sky-share-mode .sky-share-title,
 body.sky-share-mode .sky-share-subtitle {
     width: 100% !important;
+
     margin-left: auto !important;
     margin-right: auto !important;
 
@@ -253,39 +254,69 @@ body.sky-share-mode .sky-share-subtitle {
     -webkit-text-fill-color: transparent !important;
 
     text-align: center !important;
-    font-weight:1000;
+
+    text-shadow: none !important;
+    box-shadow: none !important;
+    outline: none !important;
     filter: none !important;
+
+    -webkit-text-stroke: 0 transparent !important;
+
     transform: none !important;
 }
 
-body.sky-share-mode .sky-share-title {
-    text-shadow:none !important;
-    filter:none !important;
 
-}
+/* =========================================================
+   SHARE TITLE
+   ========================================================= */
 
 body.sky-share-mode .sky-share-title {
     position: relative !important;
 
     display: block !important;
+
     width: 100% !important;
     max-width: 72vw !important;
 
     margin: 0 auto !important;
 
-    font-size: clamp(17px, 2vw, 25px) !important;
+    font-size: clamp(25px, 3.5vw, 35px) !important;
     line-height: 1.2 !important;
 
     white-space: nowrap !important;
+
     overflow: hidden !important;
+
     text-overflow: ellipsis !important;
 
     text-align: center !important;
 
     text-shadow: none !important;
+    box-shadow: none !important;
+    outline: none !important;
+    filter: none !important;
+
+    -webkit-text-stroke: 0 transparent !important;
+
+    transform: none !important;
 }
 
-.sky-share-subtitle {
+
+/* =========================================================
+   SHARE SUBTITLE
+   ========================================================= */
+
+body.sky-share-mode .sky-share-subtitle {
+    text-shadow: none !important;
+    box-shadow: none !important;
+    outline: none !important;
+    filter: none !important;
+
+    -webkit-text-stroke: 0 transparent !important;
+
+    transform: none !important;
+
+}.sky-share-subtitle {
     display: none;
 
     margin-top: 2px;
