@@ -251,7 +251,7 @@ body.sky-share-mode .sky-share-subtitle {
 
     color: transparent !important;
     -webkit-text-fill-color: transparent !important;
-    -webkit-text-stroke: 1px #50C878; 
+
 
     text-align: center !important;
 
@@ -261,7 +261,8 @@ body.sky-share-mode .sky-share-subtitle {
 
 body.sky-share-mode .sky-share-title {
     text-shadow: none !important;
-    filter: drop-shadow(0 1px 0 rgba(0,0,0,1)) !important;
+
+    -webkit-text-stroke: .5px #50C878;
 }
 
 body.sky-share-mode .sky-share-title {
@@ -4131,8 +4132,3 @@ body.sky-share-mode.sky-share-book #statusBar #pageIndicator {
     transform: none !important;
 }
 
-body.sky-share-mode.sky-share-book #statusBar #pageIndicator {
-    display: inline-block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-}
