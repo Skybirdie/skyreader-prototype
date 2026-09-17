@@ -424,6 +424,7 @@ window.ShareViewer = (function () {
 
     button = document.createElement("a");
     button.className = "sky-share-closed-go-button";
+
     button.href = GLIDE_MEDIA_URL;
     button.target = "_blank";
     button.rel = "noopener noreferrer";
@@ -434,28 +435,134 @@ window.ShareViewer = (function () {
     );
 
     /*
-     * Make the clickable element a controlled viewport-sized box.
-     * The image itself is contained inside it, so it cannot exceed
-     * the available screen.
+     * The button is positioned inside the closed panel.
+     *
+     * Change these two values to move it:
+     *
+     *   --sky-go-x: 50%;
+     *   --sky-go-y: 50%;
+     *
+     * Examples:
+     *
+     *   50% 50% = center
+     *   50% 60% = lower
+     *   50% 40% = higher
+     *   60% 50% = right
+     *   40% 50% = left
      */
-    button.style.setProperty("display", "flex", "important");
-    button.style.setProperty("align-items", "center", "important");
-    button.style.setProperty("justify-content", "center", "important");
-    button.style.setProperty("width", "min(80vw, 520px)", "important");
-    button.style.setProperty("max-width", "80vw", "important");
-    button.style.setProperty("max-height", "70vh", "important");
-    button.style.setProperty("height", "auto", "important");
-    button.style.setProperty("margin", "0 auto", "important");
-    button.style.setProperty("padding", "0", "important");
-    button.style.setProperty("border", "0", "important");
-    button.style.setProperty("outline", "none", "important");
-    button.style.setProperty("text-decoration", "none", "important");
-    button.style.setProperty("cursor", "pointer", "important");
-    button.style.setProperty("box-sizing", "border-box", "important");
-    button.style.setProperty("overflow", "hidden", "important");
-    button.style.setProperty("position", "relative", "important");
-    button.style.setProperty("z-index", "10000", "important");
-    button.style.setProperty("pointer-events", "auto", "important");
+    button.style.setProperty("--sky-go-x", "50%");
+    button.style.setProperty("--sky-go-y", "50%");
+
+    button.style.setProperty(
+        "position",
+        "absolute",
+        "important"
+    );
+
+    button.style.setProperty(
+        "left",
+        "var(--sky-go-x)",
+        "important"
+    );
+
+    button.style.setProperty(
+        "top",
+        "var(--sky-go-y)",
+        "important"
+    );
+
+    button.style.setProperty(
+        "transform",
+        "translate(-50%, -50%)",
+        "important"
+    );
+
+    /*
+     * Significantly larger than the previous 520px maximum.
+     */
+    button.style.setProperty(
+        "width",
+        "min(75vw, 1000px)",
+        "important"
+    );
+
+    button.style.setProperty(
+        "max-width",
+        "75vw",
+        "important"
+    );
+
+    button.style.setProperty(
+        "max-height",
+        "75vh",
+        "important"
+    );
+
+    button.style.setProperty(
+        "height",
+        "auto",
+        "important"
+    );
+
+    button.style.setProperty(
+        "margin",
+        "0",
+        "important"
+    );
+
+    button.style.setProperty(
+        "padding",
+        "0",
+        "important"
+    );
+
+    button.style.setProperty(
+        "border",
+        "0",
+        "important"
+    );
+
+    button.style.setProperty(
+        "outline",
+        "none",
+        "important"
+    );
+
+    button.style.setProperty(
+        "text-decoration",
+        "none",
+        "important"
+    );
+
+    button.style.setProperty(
+        "cursor",
+        "pointer",
+        "important"
+    );
+
+    button.style.setProperty(
+        "box-sizing",
+        "border-box",
+        "important"
+    );
+
+    button.style.setProperty(
+        "overflow",
+        "hidden",
+        "important"
+    );
+
+    button.style.setProperty(
+        "z-index",
+        "10000",
+        "important"
+    );
+
+    button.style.setProperty(
+        "pointer-events",
+        "auto",
+        "important"
+    );
 
     const image = document.createElement("img");
 
@@ -467,25 +574,70 @@ window.ShareViewer = (function () {
     image.alt = "Open Meditation Mornings";
     image.draggable = false;
 
+    image.style.setProperty(
+        "display",
+        "block",
+        "important"
+    );
+
+    image.style.setProperty(
+        "width",
+        "100%",
+        "important"
+    );
+
+    image.style.setProperty(
+        "height",
+        "auto",
+        "important"
+    );
+
+    image.style.setProperty(
+        "max-width",
+        "100%",
+        "important"
+    );
+
+    image.style.setProperty(
+        "max-height",
+        "75vh",
+        "important"
+    );
+
+    image.style.setProperty(
+        "object-fit",
+        "contain",
+        "important"
+    );
+
     /*
-     * The image must fit INSIDE the clickable anchor rather than
-     * determining the size of the anchor.
+     * The anchor handles the click.
+     * The image deliberately does not intercept it.
      */
-    image.style.setProperty("display", "block", "important");
-    image.style.setProperty("width", "100%", "important");
-    image.style.setProperty("height", "auto", "important");
-    image.style.setProperty("max-width", "100%", "important");
-    image.style.setProperty("max-height", "70vh", "important");
-    image.style.setProperty("object-fit", "contain", "important");
-    image.style.setProperty("pointer-events", "none", "important");
-    image.style.setProperty("user-select", "none", "important");
-    image.style.setProperty("-webkit-user-drag", "none", "important");
+    image.style.setProperty(
+        "pointer-events",
+        "none",
+        "important"
+    );
+
+    image.style.setProperty(
+        "user-select",
+        "none",
+        "important"
+    );
+
+    image.style.setProperty(
+        "-webkit-user-drag",
+        "none",
+        "important"
+    );
 
     button.appendChild(image);
     closedPanel.appendChild(button);
 
     return button;
 }
+
 
 
     /* =====================================================
@@ -2123,9 +2275,7 @@ window.ShareViewer = (function () {
     shell.classList.add("sky-share-document-closed");
 
     /*
-     * Create the closed panel FIRST.
-     * This is important because createClosedGoButton() needs a
-     * real panel to append the image button into.
+     * Create the panel before creating the Go button.
      */
     if (!closedPanel) {
         closedPanel = createElement(
@@ -2140,27 +2290,23 @@ window.ShareViewer = (function () {
         }
     }
 
-    /*
-     * Make the panel occupy the available screen without allowing
-     * its contents to create an oversized page.
-     */
     closedPanel.hidden = false;
 
     closedPanel.style.setProperty(
         "display",
-        "flex",
+        "block",
         "important"
     );
 
     closedPanel.style.setProperty(
-        "align-items",
-        "center",
+        "position",
+        "absolute",
         "important"
     );
 
     closedPanel.style.setProperty(
-        "justify-content",
-        "center",
+        "inset",
+        "0",
         "important"
     );
 
@@ -2207,7 +2353,7 @@ window.ShareViewer = (function () {
     );
 
     /*
-     * Now create the actual image button inside the panel.
+     * Create the actual image button.
      */
     createClosedGoButton();
 }
