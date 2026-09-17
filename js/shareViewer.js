@@ -271,10 +271,32 @@ window.ShareViewer = (function () {
         (pages || "");
 
 
-    indicator.textContent =
-        title
-            ? title + " — " + pageText
-            : pageText;
+    /*
+ * Title remains outside the page-number indicator.
+ * The indicator itself contains only the page numbers.
+ */
+if (title) {
+    indicator.innerHTML =
+        '<span class="sky-share-page-title">' +
+        title.replace(/[&<>"']/g, function (char) {
+            return {
+                "&": "&amp;",
+                "<": "&lt;",
+                ">": "&gt;",
+                '"': "&quot;",
+                "'": "&#039;"
+            }[char];
+        }) +
+        '</span>' +
+        '<span class="sky-share-page-count">' +
+        pageText +
+        '</span>';
+} else {
+    indicator.innerHTML =
+        '<span class="sky-share-page-count">' +
+        pageText +
+        '</span>';
+}
 
 
     /*
