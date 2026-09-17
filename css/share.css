@@ -4133,12 +4133,6 @@ body.sky-share-mode.sky-share-book #statusBar #pageIndicator {
     transform: none !important;
 }
 
-body.sky-share-mode.sky-share-book #statusBar #pageIndicator {
-    display: inline-block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-}
-
 body.sky-share-mode.sky-share-book #pageIndicator {
     display:inline-flex !important;
     align-items:center;
@@ -4146,3 +4140,94 @@ body.sky-share-mode.sky-share-book #pageIndicator {
     gap:10px;
 }
 
+
+body.sky-share-mode.sky-share-book #statusBar #pageIndicator {
+    display: inline-block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+
+/* =========================================================
+   SHARE CLOSED-STATE LARGE GO BUTTON
+   ========================================================= */
+
+.sky-share-closed-go-button {
+    position:fixed !important;
+    left:50% !important;
+    top:50% !important;
+
+    transform:translate(-50%, -50%) !important;
+
+    width:50vw !important;
+    height:auto !important;
+
+    max-width:50vw !important;
+    max-height:70vh !important;
+
+    margin:0 !important;
+    padding:0 !important;
+
+    border:0 !important;
+    outline:0 !important;
+
+    background:transparent !important;
+
+    display:block !important;
+
+    cursor:pointer;
+
+    z-index:1000100 !important;
+
+    animation:
+        skyShareGoFloat
+        4.5s
+        ease-in-out
+        infinite;
+
+    -webkit-tap-highlight-color:transparent;
+}
+
+
+.sky-share-closed-go-button img {
+    display:block !important;
+
+    width:100% !important;
+    height:auto !important;
+
+    max-width:none !important;
+    max-height:none !important;
+
+    margin:0 !important;
+    padding:0 !important;
+
+    border:0 !important;
+    outline:0 !important;
+
+    object-fit:contain !important;
+
+    pointer-events:none;
+}
+
+
+@keyframes skyShareGoFloat {
+
+    0%,
+    100% {
+        margin-top:0;
+    }
+
+    50% {
+        margin-top:-8px;
+    }
+}
+
+
+@media (max-width:600px) {
+
+    .sky-share-closed-go-button {
+        width:100vw !important;
+        max-width:100vw !important;
+    }
+
+}
