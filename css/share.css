@@ -179,10 +179,8 @@ body.sky-share-mode #workspacePrimaryLogo {
 
 .sky-share-heading {
     /*
-     * The title occupies a small reserved upper area.
-     *
-     * It is outside the slideshow stage, so the actual slide
-     * can never render underneath it.
+     * Reserved upper area for the share title.
+     * The title remains independent of the media stage.
      */
     position: absolute;
 
@@ -195,31 +193,75 @@ body.sky-share-mode #workspacePrimaryLogo {
     padding: 7px 14px 5px;
 
     text-align: center;
-    color:#fff;
+
     box-sizing: border-box;
 
     z-index: 80;
 
     pointer-events: none;
+
+    /*
+     * Do not apply transforms, filters, opacity, or scaling
+     * to the heading. They can soften text rendering.
+     */
+    transform: none !important;
+    filter: none !important;
+    opacity: 1 !important;
+}
+
+.sky-share-title,
+.sky-share-subtitle {
+    width: 100% !important;
+
+    margin-left: auto !important;
+    margin-right: auto !important;
+
+    text-align: center !important;
+
+    /*
+     * Crisp gradient text.
+     */
+    background: linear-gradient(
+        180deg,
+        #00FA9A 0%,
+        #ACE1AF 100%
+    ) !important;
+
+    -webkit-background-clip: text !important;
+    background-clip: text !important;
+
+    -webkit-text-fill-color: transparent !important;
+
+    /*
+     * Prevent softening from transforms/filters/shadows.
+     */
+    transform: none !important;
+    filter: none !important;
+    text-shadow: none !important;
+
+    opacity: 1 !important;
 }
 
 .sky-share-title {
-    margin: 0;
+    margin-top: 0;
 
     font-size: clamp(17px, 2vw, 25px);
     line-height: 1.2;
 
-    text-shadow: 0 1px 4px rgba(0,0,0,.75);
+    max-width: 72vw !important;
+
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
 }
 
 .sky-share-subtitle {
     display: none;
+
     margin-top: 2px;
 
     font-size: 12px;
-    opacity: .9;
-
-    text-shadow: 0 1px 4px rgba(0,0,0,.75);
+    line-height: 1.2;
 }
 
 
@@ -582,45 +624,6 @@ color-mix(in srgb, var(--control-text) 22%, transparent);
 }
 
 
-/* =========================================================
-   READER TITLE — TRUE VIEWPORT CENTER
-   ========================================================= */
-
-/*
- * Do not let the Share title participate in the header's
- * flex layout.
- *
- * This guarantees that the title is centered against the
- * actual device viewport rather than against the remaining
- * space between the left and right header elements.
- */
-
-body.sky-share-mode .sky-share-title,
-body.sky-share-mode .sky-share-subtitle {
-    width:100% !important;
-
-    margin-left:auto !important;
-    margin-right:auto !important;
-
-    background:linear-gradient(
-        180deg,
-        #00FA9A 0%,
-        #ACE1AF 100%
-    ) !important;
-
-    -webkit-background-clip:text !important;
-    background-clip:text !important;
-
-    -webkit-text-fill-color:transparent !important;
-
-    text-align:center !important;
-
-    /*
-     * Keep the text rendered at its natural size.
-     */
-    transform:none !important;
-    filter:none !important;
-}
 
 /* =========================================================
    READER — KEEP PAGE BELOW HEADER/CONTROLS
@@ -2051,29 +2054,9 @@ z-index: 1000003 !important;
 
 }
 
-body.sky-share-mode .sky-share-title,
-body.sky-share-mode .sky-share-subtitle {
-width: 100% !important;
 
- 
-margin-left: auto !important;
-margin-right: auto !important;
 
-text-align: center !important;
- 
 
-}
-
-body.sky-share-mode .sky-share-title {
-max-width: 72vw !important;
-
- 
-white-space: nowrap !important;
-overflow: hidden !important;
-text-overflow: ellipsis !important;
- 
-
-}
 
 /* =========================================================
 4. BOOK — READER TOOLBAR
