@@ -2938,199 +2938,309 @@ let bookResponsiveRefreshBound = false;
     }
 
 
-    function bindLastPageProtection() {
+    /* =====================================================
+   FINAL-PAGE CLOSE PROTECTION
 
-        if (!mediaHost) {
-            return;
-        }
+   PageFlip can interpret a mouse click on the final page
+   as a close/back action. The protection therefore begins
+   at pointer/mouse-down, before the later click event.
 
+   Share controls remain usable.
+===================================================== */
 
-        /*
-         * -------------------------------------------------
-         * FINAL-PAGE MOUSE / POINTER CLICK PROTECTION
-         * -------------------------------------------------
-         */
-        if (
-            !lastPageClickProtectionBound
-        ) {
-
-            document.addEventListener(
-                "click",
-                onLastPageClickCapture,
-                true
-            );
+let lastPageProtectionBound = false;
 
 
-            lastPageClickProtectionBound =
-                true;
-        }
+function isAllowedLastPageControl(target) {
 
-
-        /*
-         * -------------------------------------------------
-         * FORWARD WHEEL PROTECTION
-         * -------------------------------------------------
-         */
-        if (
-            !mediaHost._skyLastPageWheelHandler
-        ) {
-
-            mediaHost._skyLastPageWheelHandler =
-                function (event) {
-
-                    if (!isBookShare()) {
-                        return;
-                    }
-
-
-                    if (
-                        !window.Reader ||
-                        typeof Reader.currentPage !==
-                            "function" ||
-                        typeof Reader.pages !==
-                            "function"
-                    ) {
-                        return;
-                    }
-
-
-                    const current =
-                        Number(
-                            Reader.currentPage()
-                        ) || 1;
-
-
-                    const total =
-                        Number(
-                            Reader.pages()
-                        ) || 0;
-
-
-                    if (
-                        !total ||
-                        current < total
-                    ) {
-                        return;
-                    }
-
-
-                    const forward =
-                        event.deltaY > 0 ||
-                        event.deltaX > 0;
-
-
-                    if (!forward) {
-                        return;
-                    }
-
-
-                    event.preventDefault();
-                    event.stopPropagation();
-
-
-                    if (
-                        typeof event.stopImmediatePropagation ===
-                            "function"
-                    ) {
-
-                        event.stopImmediatePropagation();
-                    }
-                };
-
-
-            mediaHost.addEventListener(
-                "wheel",
-                mediaHost._skyLastPageWheelHandler,
-                {
-                    passive: false,
-                    capture: true
-                }
-            );
-        }
-
-
-        /*
-         * -------------------------------------------------
-         * DOCUMENT-LEVEL WHEEL FALLBACK
-         * -------------------------------------------------
-         */
-        if (
-            !mediaHost._skyLastPageDocumentHandler
-        ) {
-
-            mediaHost._skyLastPageDocumentHandler =
-                function (event) {
-
-                    if (!isBookShare()) {
-                        return;
-                    }
-
-
-                    if (
-                        !window.Reader ||
-                        typeof Reader.currentPage !==
-                            "function" ||
-                        typeof Reader.pages !==
-                            "function"
-                    ) {
-                        return;
-                    }
-
-
-                    const current =
-                        Number(
-                            Reader.currentPage()
-                        ) || 1;
-
-
-                    const total =
-                        Number(
-                            Reader.pages()
-                        ) || 0;
-
-
-                    if (
-                        !total ||
-                        current < total
-                    ) {
-                        return;
-                    }
-
-
-                    const forward =
-                        event.deltaY > 0 ||
-                        event.deltaX > 0;
-
-
-                    if (!forward) {
-                        return;
-                    }
-
-
-                    event.preventDefault();
-                    event.stopPropagation();
-
-
-                    if (
-                        typeof event.stopImmediatePropagation ===
-                            "function"
-                    ) {
-
-                        event.stopImmediatePropagation();
-                    }
-                };
-
-
-            document.addEventListener(
-                "wheel",
-                mediaHost._skyLastPageDocumentHandler,
-                {
-                    passive: false,
-                    capture: true
-                }
-            );
-        }
+    if (
+        !target ||
+        !target.closest
+    ) {
+        return false;
     }
+
+
+    return !!target.closest(
+        [
+            "#toolbar",
+            "#previousButton",
+            "#nextButton",
+            "#muteButton",
+            "#readerShareButton",
+            "#viewerFullscreenButton",
+            "#readerCloseButton",
+            "#pageIndicator",
+            "#pageJump",
+            "#pageJumpInput",
+            ".sky-share-actions",
+            ".sky-share-close-button"
+        ].join(",")
+    );
+}
+
+
+function isFinalPageBookSurface(target) {
+
+    if (!isBookShare()) {
+        return false;
+    }
+
+
+    if (
+        !window.Reader ||
+        typeof Reader.currentPage !==
+            "function" ||
+        typeof Reader.pages !==
+            "function"
+    ) {
+        return false;
+    }
+
+
+    const current =
+        Number(
+            Reader.currentPage()
+        ) || 1;
+
+
+    const total =
+        Number(
+            Reader.pages()
+        ) || 0;
+
+
+    if (
+        !total ||
+        current < total
+    ) {
+        return false;
+    }
+
+
+    if (
+        isAllowedLastPageControl(
+            target
+        )
+    ) {
+        return false;
+    }
+
+
+    const viewer =
+        document.getElementById(
+            "viewerArea"
+        );
+
+
+    if (!viewer) {
+        return false;
+    }
+
+
+    return viewer.contains(
+        target
+    );
+}
+
+
+function blockFinalPageMouseEvent(event) {
+
+    /*
+     * Only protect the actual book surface.
+     */
+    if (
+        !isFinalPageBookSurface(
+            event.target
+        )
+    ) {
+        return;
+    }
+
+
+    /*
+     * Only mouse/pointer interaction is blocked here.
+     *
+     * The existing touch/swipe navigation remains
+     * responsible for touch gestures.
+     */
+    if (
+        event.type === "pointerdown" &&
+        event.pointerType &&
+        event.pointerType !== "mouse"
+    ) {
+        return;
+    }
+
+
+    event.preventDefault();
+    event.stopPropagation();
+
+
+    if (
+        typeof event.stopImmediatePropagation ===
+            "function"
+    ) {
+
+        event.stopImmediatePropagation();
+    }
+}
+
+
+function bindLastPageProtection() {
+
+    if (lastPageProtectionBound) {
+        return;
+    }
+
+
+    lastPageProtectionBound =
+        true;
+
+
+    /*
+     * These occur before the final click event.
+     */
+    document.addEventListener(
+        "pointerdown",
+        blockFinalPageMouseEvent,
+        true
+    );
+
+
+    document.addEventListener(
+        "mousedown",
+        blockFinalPageMouseEvent,
+        true
+    );
+
+
+    document.addEventListener(
+        "mouseup",
+        blockFinalPageMouseEvent,
+        true
+    );
+
+
+    /*
+     * Keep the click guard as a final fallback.
+     */
+    document.addEventListener(
+        "click",
+        blockFinalPageMouseEvent,
+        true
+    );
+
+
+    /*
+     * Forward wheel protection.
+     */
+    if (
+        mediaHost &&
+        !mediaHost._skyLastPageWheelHandler
+    ) {
+
+        mediaHost._skyLastPageWheelHandler =
+            function (event) {
+
+                if (
+                    !isFinalPageBookSurface(
+                        event.target
+                    )
+                ) {
+                    return;
+                }
+
+
+                if (
+                    event.deltaY <= 0 &&
+                    event.deltaX <= 0
+                ) {
+                    return;
+                }
+
+
+                event.preventDefault();
+                event.stopPropagation();
+
+
+                if (
+                    typeof event.stopImmediatePropagation ===
+                        "function"
+                ) {
+
+                    event.stopImmediatePropagation();
+                }
+            };
+
+
+        mediaHost.addEventListener(
+            "wheel",
+            mediaHost._skyLastPageWheelHandler,
+            {
+                passive: false,
+                capture: true
+            }
+        );
+    }
+}
+
+
+function unbindLastPageProtection() {
+
+    if (!lastPageProtectionBound) {
+        return;
+    }
+
+
+    document.removeEventListener(
+        "pointerdown",
+        blockFinalPageMouseEvent,
+        true
+    );
+
+
+    document.removeEventListener(
+        "mousedown",
+        blockFinalPageMouseEvent,
+        true
+    );
+
+
+    document.removeEventListener(
+        "mouseup",
+        blockFinalPageMouseEvent,
+        true
+    );
+
+
+    document.removeEventListener(
+        "click",
+        blockFinalPageMouseEvent,
+        true
+    );
+
+
+    if (
+        mediaHost &&
+        mediaHost._skyLastPageWheelHandler
+    ) {
+
+        mediaHost.removeEventListener(
+            "wheel",
+            mediaHost._skyLastPageWheelHandler,
+            true
+        );
+
+
+        mediaHost._skyLastPageWheelHandler =
+            null;
+    }
+
+
+    lastPageProtectionBound =
+        false;
+}
 
 
     /* =====================================================
@@ -3998,6 +4108,10 @@ let bookResponsiveRefreshBound = false;
 
 
         viewer.classList.add(
+    "sky-share-responsive-book"
+);
+
+        viewer.classList.add(
             "sky-share-mounted-viewer"
         );
 
@@ -4676,6 +4790,27 @@ let bookResponsiveRefreshBound = false;
                                 try {
 
                                     Reader.refresh();
+
+requestAnimationFrame(
+    function () {
+
+        try {
+
+            Reader.refresh();
+
+        }
+        catch (error) {
+
+            console.warn(
+                "[SkyMedia Share] Second responsive Reader refresh:",
+                error
+            );
+        }
+
+        updatePageButtons();
+        updateShareBookIndicator();
+    }
+);
 
                                 }
                                 catch (error) {
