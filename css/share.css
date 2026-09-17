@@ -1817,6 +1817,10 @@ body.sky-share-mode .app-switch-button {
  */
 
 .sky-share-open-button {
+    position: absolute;
+    bottom: clamp(35px, 4vw, 40px);
+    right: clamp(15px, 1.2vw, 25px);
+
     display: block !important;
 
     width: clamp(42px, 5vw, 64px) !important;
@@ -3587,9 +3591,9 @@ body.sky-share-mode .sky-share-actions {
 
 body.sky-share-mode .sky-share-open-button {
 
-    position: fixed !important;
-    bottom: clamp(50px, 5vw, 60px) !important;
-    right: clamp(10px, 1.5vw, 20px) !important;
+    position: absolute !important;
+    bottom: clamp(35px, 4vw, 40px);
+    right: clamp(15px, 1.2vw, 25px);
     left: auto !important;
     top: auto !important;
 
