@@ -595,57 +595,29 @@ color-mix(in srgb, var(--control-text) 22%, transparent);
  * space between the left and right header elements.
  */
 
-body.sky-share-mode .sky-share-heading {
-    position: fixed !important;
-
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-
-    width: 100vw !important;
-
-    height:
-        clamp(44px, 5.5vh, 68px) !important;
-
-    margin: 0 !important;
-
-    padding:
-        4px 90px !important;
-
-    display: flex !important;
-
-    flex-direction: column !important;
-
-    align-items: center !important;
-    justify-content: center !important;
-
-    box-sizing: border-box !important;
-
-    text-align: center !important;
-
-    pointer-events: none !important;
-
-    z-index: 1000003 !important;
-}
-
 body.sky-share-mode .sky-share-title,
 body.sky-share-mode .sky-share-subtitle {
-    width: 100% !important;
+    width:100% !important;
 
-    margin-left: auto !important;
-    margin-right: auto !important;
-    color: linear-gradient(180deg, #00FA9A 0%, #20B2AA 50%, #2c5364 100%);
-    text-align: center !important;
-}
+    margin-left:auto !important;
+    margin-right:auto !important;
 
-body.sky-share-mode .sky-share-title {
-    max-width: 72vw !important;
+    background-image:
+        linear-gradient(
+            180deg,
+            #00FA9A 0%,
+            #20B2AA 50%,
+            #2c5364 100%
+        ) !important;
 
-    white-space: nowrap !important;
+    -webkit-background-clip:text !important;
+    background-clip:text !important;
 
-    overflow: hidden !important;
+    -webkit-text-fill-color:transparent !important;
 
-    text-overflow: ellipsis !important;
+    color:transparent !important;
+
+    text-align:center !important;
 }
 
 
