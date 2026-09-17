@@ -271,7 +271,7 @@ body.sky-share-mode .sky-share-media-host #viewerLibrary {
     max-height: none !important;
 
     margin: 0 !important;
-
+    border-radius: 10px;
     overflow: hidden !important;
 }
 
@@ -602,11 +602,12 @@ body.sky-share-mode .sky-share-subtitle {
     margin-left:auto !important;
     margin-right:auto !important;
 
+
     background-image:
         linear-gradient(
             180deg,
-            #00FA9A 0%,
-            #20B2AA 50%,
+            #43cea2 0%,
+            #185a9d 50%,
             #2c5364 100%
         ) !important;
 
