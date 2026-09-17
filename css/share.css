@@ -252,7 +252,6 @@ body.sky-share-mode .sky-share-subtitle {
     color: transparent !important;
     -webkit-text-fill-color: transparent !important;
 
-
     text-align: center !important;
 
     filter: none !important;
@@ -260,9 +259,11 @@ body.sky-share-mode .sky-share-subtitle {
 }
 
 body.sky-share-mode .sky-share-title {
-    text-shadow: none !important;
+    text-shadow:none !important;
+    filter:none !important;
 
-    -webkit-text-stroke: .5px #50C878;
+    -webkit-text-stroke:0.2px rgba(0,0,0,.65);
+    paint-order:stroke fill;
 }
 
 body.sky-share-mode .sky-share-title {
@@ -4132,3 +4133,32 @@ body.sky-share-mode.sky-share-book #statusBar #pageIndicator {
     transform: none !important;
 }
 
+body.sky-share-mode.sky-share-book #statusBar #pageIndicator {
+    display: inline-block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+body.sky-share-mode.sky-share-book #pageIndicator {
+    display:inline-flex !important;
+    align-items:center;
+    justify-content:center;
+    gap:10px;
+}
+
+body.sky-share-mode.sky-share-book .sky-share-page-title {
+    background:none !important;
+    border:0 !important;
+    padding:0 !important;
+}
+
+body.sky-share-mode.sky-share-book .sky-share-page-count {
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    padding:2px 8px;
+    border:1px solid currentColor;
+    border-radius:4px;
+    line-height:1.2;
+    white-space:nowrap;
+}
