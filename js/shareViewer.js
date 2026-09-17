@@ -77,6 +77,7 @@ let bookResizeObserver = null;
 let bookResizeTimer = null;
 let bookResizeRaf = 0;
 let bookResponsiveRefreshBound = false;
+let bookInitialLayoutReady = false;
 
     let shareClosing = false;
 
@@ -4102,6 +4103,13 @@ function unbindLastPageProtection() {
         );
 
 
+       bookInitialLayoutReady =
+    false;
+
+setBookInitialVisibility(
+    false
+);
+
         moveIntoShareHost(
             viewer
         );
@@ -4689,6 +4697,53 @@ function unbindLastPageProtection() {
     }
 
 
+function setBookInitialVisibility(visible) {
+
+    const viewer =
+        document.getElementById(
+            "viewerArea"
+        );
+
+    if (!viewer) {
+        return;
+    }
+
+
+    if (visible) {
+
+        viewer.classList.remove(
+            "sky-share-book-layout-pending"
+        );
+
+        viewer.style.removeProperty(
+            "visibility"
+        );
+
+        viewer.style.removeProperty(
+            "opacity"
+        );
+
+    }
+    else {
+
+        viewer.classList.add(
+            "sky-share-book-layout-pending"
+        );
+
+        viewer.style.setProperty(
+            "visibility",
+            "hidden",
+            "important"
+        );
+
+        viewer.style.setProperty(
+            "opacity",
+            "0",
+            "important"
+        );
+    }
+}
+
 
     /* =====================================================
        RESPONSIVE BOOK REFRESH
@@ -4809,6 +4864,23 @@ requestAnimationFrame(
 
         updatePageButtons();
         updateShareBookIndicator();
+
+        if (!bookInitialLayoutReady) {
+
+    bookInitialLayoutReady = true;
+
+    requestAnimationFrame(
+        function () {
+
+            setBookInitialVisibility(
+                true
+            );
+
+        }
+    );
+}
+
+
     }
 );
 
@@ -4978,24 +5050,17 @@ requestAnimationFrame(
          * Share Mode, and the browser layout engine do not all
          * settle on the same animation frame.
          */
-        scheduleBookResponsiveRefresh(
-            0
-        );
 
+scheduleBookResponsiveRefresh(60);
 
-        scheduleBookResponsiveRefresh(
-            100
-        );
+setTimeout(
+    function () {
 
+        scheduleBookResponsiveRefresh(180);
 
-        scheduleBookResponsiveRefresh(
-            300
-        );
-
-
-        scheduleBookResponsiveRefresh(
-            700
-        );
+    },
+    180
+);
     }
 
 
@@ -5261,6 +5326,10 @@ requestAnimationFrame(
         );
 
 
+        bookInitialLayoutReady =
+    false;
+
+
         /*
          * Opening a new item means the closed state must disappear.
          */
@@ -5408,6 +5477,12 @@ requestAnimationFrame(
             );
         }
 
+if (!isBookShare()) {
+
+    setBookInitialVisibility(
+        true
+    );
+}
 
         if (
             !isBookShare() &&
@@ -5525,6 +5600,7 @@ requestAnimationFrame(
                 updatePageButtons();
 
                 updateShareBookIndicator();
+
     /*
      * The complete Share layout now exists.
      *
