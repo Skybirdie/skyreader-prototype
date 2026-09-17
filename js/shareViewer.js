@@ -82,6 +82,7 @@ let bookResponsiveRefreshBound = false;
 
     let mediaCloseClickBound = false;
 
+
     let bookGestureBound = false;
     let bookWheelTarget = null;
     let bookTouchTarget = null;
@@ -90,6 +91,7 @@ let bookResponsiveRefreshBound = false;
     let bookTouchStartX = 0;
     let bookTouchStartY = 0;
     let bookSuppressClickUntil = 0;
+    let lastPageClickProtectionBound = false;
 
     const BOOK_TOUCH_THRESHOLD = 48;
 
@@ -2645,6 +2647,61 @@ let bookResponsiveRefreshBound = false;
     }
 
 
+    function unbindLastPageProtection() {
+
+        if (
+            !lastPageClickProtectionBound
+        ) {
+            return;
+        }
+
+
+        document.removeEventListener(
+            "click",
+            onLastPageClickCapture,
+            true
+        );
+
+
+        lastPageClickProtectionBound =
+            false;
+
+
+        if (
+            mediaHost &&
+            mediaHost._skyLastPageWheelHandler
+        ) {
+
+            mediaHost.removeEventListener(
+                "wheel",
+                mediaHost._skyLastPageWheelHandler,
+                true
+            );
+
+
+            mediaHost._skyLastPageWheelHandler =
+                null;
+        }
+
+
+        if (
+            mediaHost &&
+            mediaHost._skyLastPageDocumentHandler
+        ) {
+
+            document.removeEventListener(
+                "wheel",
+                mediaHost._skyLastPageDocumentHandler,
+                true
+            );
+
+
+            mediaHost._skyLastPageDocumentHandler =
+                null;
+        }
+    }
+
+
     function unbindBookGestures() {
 
         if (!bookGestureBound) {
@@ -2735,6 +2792,152 @@ let bookResponsiveRefreshBound = false;
        LAST PAGE PROTECTION
     ===================================================== */
 
+        /* =====================================================
+       LAST PAGE PROTECTION
+
+       Prevents a direct mouse click on the final PageFlip
+       surface from closing the shared book.
+
+       Forward wheel scrolling is also blocked.
+
+       Share controls remain clickable.
+    ===================================================== */
+
+    function onLastPageClickCapture(event) {
+
+        if (!isBookShare()) {
+            return;
+        }
+
+
+        if (
+            shell &&
+            shell.classList.contains(
+                "sky-share-document-closed"
+            )
+        ) {
+            return;
+        }
+
+
+        if (
+            !window.Reader ||
+            typeof Reader.currentPage !==
+                "function" ||
+            typeof Reader.pages !==
+                "function"
+        ) {
+            return;
+        }
+
+
+        const current =
+            Number(
+                Reader.currentPage()
+            ) || 1;
+
+
+        const total =
+            Number(
+                Reader.pages()
+            ) || 0;
+
+
+        /*
+         * Only protect the final page.
+         */
+        if (
+            !total ||
+            current < total
+        ) {
+            return;
+        }
+
+
+        const target =
+            event.target;
+
+
+        if (!target) {
+            return;
+        }
+
+
+        /*
+         * Do NOT block Share controls.
+         *
+         * The toolbar is mounted inside mediaHost, so we
+         * explicitly allow these controls even though they
+         * share the same parent as the book.
+         */
+        if (
+            target.closest &&
+            target.closest(
+                [
+                    "#toolbar",
+                    "#previousButton",
+                    "#nextButton",
+                    "#muteButton",
+                    "#readerShareButton",
+                    "#viewerFullscreenButton",
+                    "#readerCloseButton",
+                    "#pageIndicator",
+                    "#pageJump",
+                    "#pageJumpInput",
+                    ".sky-share-actions",
+                    ".sky-share-close-button"
+                ].join(", ")
+            )
+        ) {
+            return;
+        }
+
+
+        /*
+         * Only protect clicks occurring on the actual Reader
+         * book surface.
+         */
+        const viewer =
+            document.getElementById(
+                "viewerArea"
+            );
+
+
+        if (!viewer) {
+            return;
+        }
+
+
+        if (
+            !viewer.contains(
+                target
+            )
+        ) {
+            return;
+        }
+
+
+        /*
+         * This is a direct click on the shared book while
+         * already on the final page.
+         *
+         * Stop it before the normal Reader/PageFlip click
+         * handlers can interpret it as a close/back action.
+         */
+        event.preventDefault();
+        event.stopPropagation();
+
+
+        if (
+            typeof event.stopImmediatePropagation ===
+                "function"
+        ) {
+
+            event.stopImmediatePropagation();
+        }
+    }
+
+
     function bindLastPageProtection() {
 
         if (!mediaHost) {
@@ -2743,7 +2946,30 @@ let bookResponsiveRefreshBound = false;
 
 
         /*
-         * Primary protection at the Share media host.
+         * -------------------------------------------------
+         * FINAL-PAGE MOUSE / POINTER CLICK PROTECTION
+         * -------------------------------------------------
+         */
+        if (
+            !lastPageClickProtectionBound
+        ) {
+
+            document.addEventListener(
+                "click",
+                onLastPageClickCapture,
+                true
+            );
+
+
+            lastPageClickProtectionBound =
+                true;
+        }
+
+
+        /*
+         * -------------------------------------------------
+         * FORWARD WHEEL PROTECTION
+         * -------------------------------------------------
          */
         if (
             !mediaHost._skyLastPageWheelHandler
@@ -2824,7 +3050,9 @@ let bookResponsiveRefreshBound = false;
 
 
         /*
-         * Secondary protection at document capture phase.
+         * -------------------------------------------------
+         * DOCUMENT-LEVEL WHEEL FALLBACK
+         * -------------------------------------------------
          */
         if (
             !mediaHost._skyLastPageDocumentHandler
@@ -3197,6 +3425,8 @@ let bookResponsiveRefreshBound = false;
         try {
 
             stopPageWatcher();
+
+            unbindLastPageProtection();
 
             unbindBookResponsiveRefresh();
 
