@@ -223,7 +223,7 @@ body.sky-share-mode #workspacePrimaryLogo {
      */
     background: linear-gradient(
         180deg,
-        #00FA9A 0%,
+        #00A693 0%,
         #ACE1AF 100%
     ) !important;
 
@@ -237,7 +237,7 @@ body.sky-share-mode #workspacePrimaryLogo {
      */
     transform: none !important;
     filter: none !important;
-    text-shadow: none !important;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, .65);;
 
     opacity: 1 !important;
 }
@@ -1816,7 +1816,7 @@ body.sky-share-mode .app-switch-button {
     box-shadow:
         0 0 7px #ACE1AF,
         0 0 14px #00FA9A,
-        inset 0 0 12px #ACE1AF !important;
+        inset 0 0 10px #ACE1AF !important;
 }
 
 .sky-share-open-button:active {
@@ -1840,7 +1840,7 @@ body.sky-share-mode .app-switch-button {
         box-shadow:
             0 0 6px #ACE1AF,
             0 0 7px #ACE1AF,
-            inset 0 0 20px #00FA9A;
+            inset 0 0 10px #00FA9A;
     }
 
     52% {
@@ -3212,6 +3212,37 @@ body.sky-share-mode.sky-share-document-closed .sky-share-header {
     #nextButton {
         right: 8px !important;
     }
+    body.sky-share-mode.sky-share-book #statusBar {
+        position: fixed !important;
+
+        left: 0 !important;
+        right: 0 !important;
+        bottom: var(--sky-share-book-welcome-height) !important;
+
+        width: 100vw !important;
+
+        height: var(--sky-share-book-status-height) !important;
+        min-height: var(--sky-share-book-status-height) !important;
+
+        display: flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+
+        z-index: 1000020 !important;
+    }
+
+    body.sky-share-mode.sky-share-book #pageIndicator {
+        display: inline-flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+
+        min-width: 78px !important;
+        min-height: 28px !important;
+
+        align-items: center !important;
+        justify-content: center !important;
+    }
+
 }
 
 
@@ -3572,18 +3603,22 @@ body.sky-share-mode.sky-share-document-closed .sky-share-heading {
 
 
 /* =========================================================
-   FINAL — RESTORE THE ACTUAL READER STATUS / PAGE JUMP
+   FINAL — RESTORE READER STATUS / PAGE INDICATOR
    ========================================================= */
 
 body.sky-share-mode.sky-share-book #statusBar {
-    position: absolute !important;
+    position: fixed !important;
+
     left: 0 !important;
     right: 0 !important;
+
     bottom: var(--sky-share-book-welcome-height) !important;
 
-    width: 100% !important;
+    width: 100vw !important;
+
     height: var(--sky-share-book-status-height) !important;
     min-height: var(--sky-share-book-status-height) !important;
+    max-height: var(--sky-share-book-status-height) !important;
 
     margin: 0 !important;
     padding: 0 12px !important;
@@ -3591,6 +3626,7 @@ body.sky-share-mode.sky-share-book #statusBar {
     box-sizing: border-box !important;
 
     display: flex !important;
+
     align-items: center !important;
     justify-content: center !important;
 
@@ -3600,8 +3636,9 @@ body.sky-share-mode.sky-share-book #statusBar {
     z-index: 1000020 !important;
 
     pointer-events: auto !important;
-}
 
+    overflow: visible !important;
+}
 
 /*
  * The existing Reader page indicator.
