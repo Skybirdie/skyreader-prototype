@@ -4204,7 +4204,7 @@ body.sky-share-mode.sky-share-book #statusBar #pageIndicator {
 
     filter: drop-shadow(0 0 6px #ACE1AFcc);
 
-    animation: goGlow 4s ease-in-out infinite;
+    animation: goGlow 10s ease-in-out infinite;
 
     -webkit-tap-highlight-color:transparent;
 }
@@ -4245,14 +4245,14 @@ body.sky-share-mode.sky-share-book #statusBar #pageIndicator {
 
     45% {
         filter: 
-            drop-shadow(0 0 6px #ACE1AF)
-            drop-shadow(0 0 7px #ACE1AF);
+            drop-shadow(0 0 0 #ACE1AF)
+            drop-shadow(0 0 0 #ACE1AF);
     }
 
     52% {
         filter: 
-            drop-shadow(0 0 3px #ACE1AF)
-            drop-shadow(0 0 5px #ACE1AF);
+            drop-shadow(0 0 0 #ACE1AF)
+            drop-shadow(0 0 0 #ACE1AF);
     }
 
     60% {
