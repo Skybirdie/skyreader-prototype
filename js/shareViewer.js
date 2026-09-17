@@ -870,20 +870,20 @@ function stopShareLoading() {
 
     gif.style.setProperty(
         "right",
-        "26%",
+        "35%",
         "important"
     );
 
     gif.style.setProperty(
         "bottom",
-        "13%",
+        "25%",
         "important"
     );
 
 
     gif.style.setProperty(
         "width",
-        "min(120px,60px)",
+        "120px",
         "important"
     );
 
@@ -895,7 +895,7 @@ function stopShareLoading() {
 
     gif.style.setProperty(
         "max-width",
-        "20%",
+        "40%",
         "important"
     );
 
