@@ -1199,7 +1199,7 @@ body.sky-share-mode .app-switch-button {
     justify-content: center;
 
     opacity: 1;
-
+    border-radius: 10px;
     z-index: 1;
 }
 

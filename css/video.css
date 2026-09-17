@@ -828,7 +828,15 @@ AppSwitcher marks the active section.
     --video-statusbar-height:
         clamp(22px,3vh,32px);
 
+    /* Clearance above and below the video */
+    --video-clearance-top:
+        clamp(14px,2vh,24px);
+
+    --video-clearance-bottom:
+        clamp(14px,2vh,24px);
+
     position: relative;
+
     top: 50%;
     transform: translateY(-50%);
 
@@ -837,11 +845,23 @@ AppSwitcher marks the active section.
     width:0;
 
     min-width:0;
-    min-height:0; 
+    min-height:0;
+
     height:93%;
 
-    padding-bottom:20px +
-        var(--video-statusbar-height);
+    /*
+     * Reserve space inside the viewer so the video does not
+     * touch the top bar or the status bar.
+     */
+    padding-top:var(--video-clearance-top);
+
+    padding-bottom:
+        calc(
+            var(--video-clearance-bottom) +
+            var(--video-statusbar-height)
+        );
+
+    box-sizing:border-box;
 
     display:flex;
 
@@ -851,10 +871,8 @@ AppSwitcher marks the active section.
     overflow:hidden;
 
     background:transparent;
-    border-radius: 10px;
-
+    border-radius:10px;
 }
-
 
 
 /* Close control shown whenever a video is active. */
