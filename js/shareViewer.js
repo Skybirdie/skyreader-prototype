@@ -414,131 +414,78 @@ window.ShareViewer = (function () {
     ===================================================== */
 
     function createClosedGoButton() {
+    if (!closedPanel) return null;
 
-        /*
-        -------------------------------------------------------
-         closedPanel MUST already exist before this function
-         is called.
-        -------------------------------------------------------
-        */
+    let button = closedPanel.querySelector(".sky-share-closed-go-button");
 
-        if (!closedPanel) {
-            return null;
-        }
-
-
-        /*
-        -------------------------------------------------------
-         Do not create duplicates.
-        -------------------------------------------------------
-        */
-
-        const existing =
-            closedPanel.querySelector(
-                ".sky-share-closed-go-button"
-            );
-
-
-        if (existing) {
-            return existing;
-        }
-
-
-        /*
-        -------------------------------------------------------
-         Create the large image button.
-         -------------------------------------------------------
-        */
-
-        const button =
-            document.createElement(
-                "a"
-            );
-
-
-        button.className =
-            "sky-share-closed-go-button";
-
-
-        button.href =
-            GLIDE_MEDIA_URL;
-
-
-        /*
-         Use the same page rather than opening another
-         browser tab.
-        */
-
-        button.target =
-            "_self";
-
-
-        button.rel =
-            "noopener noreferrer";
-
-
-        button.setAttribute(
-            "aria-label",
-            "Open Meditation Mornings"
-        );
-
-
-        /*
-        -------------------------------------------------------
-         Image
-         -------------------------------------------------------
-        */
-
-        const image =
-            document.createElement(
-                "img"
-            );
-
-
-        /*
-         Absolute application-relative path.
-
-         This is important because the previous relative
-         URL could resolve incorrectly depending on the
-         current Share URL.
-        */
-
-        image.src =
-            "/assets/go-button.png";
-
-
-        image.alt =
-            "Open Meditation Mornings";
-
-
-        image.draggable =
-            false;
-
-
-        image.decoding =
-            "async";
-
-
-        button.appendChild(
-            image
-        );
-
-
-        /*
-        -------------------------------------------------------
-         Add ONLY the image button to the closed panel.
-
-         The existing bottom-right text button is NOT touched.
-        -------------------------------------------------------
-        */
-
-        closedPanel.appendChild(
-            button
-        );
-
-
+    if (button) {
         return button;
     }
+
+    button = document.createElement("a");
+    button.className = "sky-share-closed-go-button";
+    button.href = GLIDE_MEDIA_URL;
+    button.target = "_blank";
+    button.rel = "noopener noreferrer";
+
+    button.setAttribute(
+        "aria-label",
+        "Open Meditation Mornings"
+    );
+
+    /*
+     * Make the clickable element a controlled viewport-sized box.
+     * The image itself is contained inside it, so it cannot exceed
+     * the available screen.
+     */
+    button.style.setProperty("display", "flex", "important");
+    button.style.setProperty("align-items", "center", "important");
+    button.style.setProperty("justify-content", "center", "important");
+    button.style.setProperty("width", "min(80vw, 520px)", "important");
+    button.style.setProperty("max-width", "80vw", "important");
+    button.style.setProperty("max-height", "70vh", "important");
+    button.style.setProperty("height", "auto", "important");
+    button.style.setProperty("margin", "0 auto", "important");
+    button.style.setProperty("padding", "0", "important");
+    button.style.setProperty("border", "0", "important");
+    button.style.setProperty("outline", "none", "important");
+    button.style.setProperty("text-decoration", "none", "important");
+    button.style.setProperty("cursor", "pointer", "important");
+    button.style.setProperty("box-sizing", "border-box", "important");
+    button.style.setProperty("overflow", "hidden", "important");
+    button.style.setProperty("position", "relative", "important");
+    button.style.setProperty("z-index", "10000", "important");
+    button.style.setProperty("pointer-events", "auto", "important");
+
+    const image = document.createElement("img");
+
+    image.src = new URL(
+        "/assets/go-button.png",
+        window.location.origin
+    ).href;
+
+    image.alt = "Open Meditation Mornings";
+    image.draggable = false;
+
+    /*
+     * The image must fit INSIDE the clickable anchor rather than
+     * determining the size of the anchor.
+     */
+    image.style.setProperty("display", "block", "important");
+    image.style.setProperty("width", "100%", "important");
+    image.style.setProperty("height", "auto", "important");
+    image.style.setProperty("max-width", "100%", "important");
+    image.style.setProperty("max-height", "70vh", "important");
+    image.style.setProperty("object-fit", "contain", "important");
+    image.style.setProperty("pointer-events", "none", "important");
+    image.style.setProperty("user-select", "none", "important");
+    image.style.setProperty("-webkit-user-drag", "none", "important");
+
+    button.appendChild(image);
+    closedPanel.appendChild(button);
+
+    return button;
+}
 
 
     /* =====================================================
@@ -2171,73 +2118,99 @@ window.ShareViewer = (function () {
     ===================================================== */
 
     function showClosedPanel() {
+    if (!shell) return;
 
-        if (!shell) {
-            return;
-        }
+    shell.classList.add("sky-share-document-closed");
 
-
-        shell.classList.add(
-            "sky-share-document-closed"
+    /*
+     * Create the closed panel FIRST.
+     * This is important because createClosedGoButton() needs a
+     * real panel to append the image button into.
+     */
+    if (!closedPanel) {
+        closedPanel = createElement(
+            "div",
+            "sky-share-closed-panel"
         );
 
+        const main = shell.querySelector(".sky-share-main");
 
-        /*
-        -------------------------------------------------------
-         CREATE THE PANEL FIRST.
-
-         This is the critical correction from the previous
-         version. The large image button must be placed INSIDE
-         this panel.
-        -------------------------------------------------------
-        */
-
-        if (!closedPanel) {
-
-            closedPanel =
-                createElement(
-                    "div",
-                    "sky-share-closed-panel"
-                );
-
-
-            /*
-             * Do NOT create another text
-             * "Open Meditation Mornings" button here.
-
-             * The existing small bottom-right button is already
-             * in .sky-share-actions.
-
-             * The closed panel gets only the large image button.
-             */
-
-            shell
-                .querySelector(
-                    ".sky-share-main"
-                )
-                ?.appendChild(
-                    closedPanel
-                );
+        if (main) {
+            main.appendChild(closedPanel);
         }
-
-
-        /*
-        -------------------------------------------------------
-         Ensure the large image button exists AFTER the panel
-         has been created.
-        -------------------------------------------------------
-        */
-
-        createClosedGoButton();
-
-
-        closedPanel.hidden =
-            false;
-
-
-        closedPanel.style.display =
-            "flex";
     }
+
+    /*
+     * Make the panel occupy the available screen without allowing
+     * its contents to create an oversized page.
+     */
+    closedPanel.hidden = false;
+
+    closedPanel.style.setProperty(
+        "display",
+        "flex",
+        "important"
+    );
+
+    closedPanel.style.setProperty(
+        "align-items",
+        "center",
+        "important"
+    );
+
+    closedPanel.style.setProperty(
+        "justify-content",
+        "center",
+        "important"
+    );
+
+    closedPanel.style.setProperty(
+        "width",
+        "100%",
+        "important"
+    );
+
+    closedPanel.style.setProperty(
+        "height",
+        "100%",
+        "important"
+    );
+
+    closedPanel.style.setProperty(
+        "max-width",
+        "100%",
+        "important"
+    );
+
+    closedPanel.style.setProperty(
+        "max-height",
+        "100%",
+        "important"
+    );
+
+    closedPanel.style.setProperty(
+        "overflow",
+        "hidden",
+        "important"
+    );
+
+    closedPanel.style.setProperty(
+        "box-sizing",
+        "border-box",
+        "important"
+    );
+
+    closedPanel.style.setProperty(
+        "pointer-events",
+        "auto",
+        "important"
+    );
+
+    /*
+     * Now create the actual image button inside the panel.
+     */
+    createClosedGoButton();
+}
 
 
     /* =====================================================
