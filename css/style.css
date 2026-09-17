@@ -2723,6 +2723,19 @@ max-width:35vw;
 
 
 /* =========================================================
+   SHARE TOAST — SUCCESS
+   ========================================================= */
+
+.skymedia-share-toast.success {
+    background: #2e8b57 !important;
+    color: #ffffff !important;
+
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+/* =========================================================
    Primary logo — visible over Video and Slideshow
 ========================================================= */
 
