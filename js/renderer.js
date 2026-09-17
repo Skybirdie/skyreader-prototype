@@ -64,7 +64,41 @@ function emit(name,...args){
 }
 
 function progress(percent,text){
-    emit("progress",percent,text);
+
+    /*
+     * The shared loading sequence supplies the visible
+     * loading message while the existing loading GIF
+     * remains active.
+     */
+    if (
+        window.SkyMediaLoading &&
+        SkyMediaLoading.isActive()
+    ) {
+
+        SkyMediaLoading.update(
+            percent
+        );
+
+
+        emit(
+            "progress",
+            percent,
+            SkyMediaLoading.message()
+        );
+
+
+        return;
+    }
+
+
+    /*
+     * Normal fallback when the shared sequence is not active.
+     */
+    emit(
+        "progress",
+        percent,
+        text
+    );
 }
 
 async function resolvePdfUrl(value){
@@ -335,7 +369,20 @@ renderer.open=async function(book,options={}){
     const token=++openToken;
     const presentation=++presentationToken;
 
-    progress(5,"Opening document");
+    if (
+    window.SkyMediaLoading
+) {
+
+    SkyMediaLoading.start({
+        percent: 5
+    });
+}
+
+
+progress(
+    5,
+    "Opening document"
+);
 
     try{
         const pdfUrl=await resolvePdfUrl(book.pdf);
@@ -349,7 +396,20 @@ renderer.open=async function(book,options={}){
 
         pdf=await task.promise;
 
-        if(token!==openToken || presentation!==presentationToken) return;
+        if(
+    token!==openToken ||
+    presentation!==presentationToken
+){
+
+    if (
+        window.SkyMediaLoading
+    ) {
+
+        SkyMediaLoading.stop();
+    }
+
+    return;
+}
 
         pageCount=pdf.numPages;
 
@@ -403,7 +463,19 @@ renderer.open=async function(book,options={}){
 
         if(token!==openToken) return;
 
-        emit("ready",book,pageCount);
+        if (
+    window.SkyMediaLoading
+) {
+
+    SkyMediaLoading.stop();
+}
+
+
+emit(
+    "ready",
+    book,
+    pageCount
+);
 
         /* Prepare and restore a requested/saved spread after page 1 is visible. */
         if(requestedStart>1){
@@ -422,10 +494,26 @@ renderer.open=async function(book,options={}){
 
     }
     catch(error){
-        if(token!==openToken) return;
-        emit("error",error);
-        throw error;
+
+    if(token!==openToken) return;
+
+
+    if (
+        window.SkyMediaLoading
+    ) {
+
+        SkyMediaLoading.stop();
     }
+
+
+    emit(
+        "error",
+        error
+    );
+
+
+    throw error;
+}
 };
 
 /*-------------------------------------------------------
