@@ -4065,13 +4065,13 @@ function unbindLastPageProtection() {
 
 
     /*
-     * IMPORTANT:
+     * CRITICAL:
      *
-     * Hide the Reader BEFORE Reader.open() begins.
+     * Hide the COMPLETE Share media surface before Reader.open().
      *
-     * Reader/PageFlip can render its first page immediately
-     * during Reader.open(). Hiding it afterward allows one
-     * frame of the page to flash on screen.
+     * PageFlip may render its first page while Reader.open()
+     * is still running. Hiding only #viewerArea is not sufficient
+     * because PageFlip can update/recreate internal elements.
      */
     bookInitialLayoutReady =
         false;
@@ -4082,16 +4082,30 @@ function unbindLastPageProtection() {
     );
 
 
-    viewer.classList.add(
-        "sky-share-book-layout-pending"
+    /*
+     * Open the Reader completely invisibly.
+     */
+    await Reader.open(
+        item
     );
 
 
     /*
-     * Now open the Reader while its surface is already hidden.
+     * Now move the fully initialized Reader surface into
+     * the Share media host.
      */
-    await Reader.open(
-        item
+    moveIntoShareHost(
+        viewer
+    );
+
+
+    viewer.classList.add(
+        "sky-share-responsive-book"
+    );
+
+
+    viewer.classList.add(
+        "sky-share-book-layout-pending"
     );
 
 
@@ -4697,51 +4711,120 @@ function unbindLastPageProtection() {
 
 function setBookInitialVisibility(visible) {
 
+    const host =
+        mediaHost ||
+        document.getElementById(
+            "skyShareMediaHost"
+        );
+
+
     const viewer =
         document.getElementById(
             "viewerArea"
         );
 
-    if (!viewer) {
-        return;
+
+    /*
+     * Hide the entire Share media host.
+     *
+     * This is more reliable than hiding only #viewerArea because
+     * Reader/PageFlip can create or redraw child surfaces during
+     * Reader.open() and Reader.refresh().
+     */
+    if (host) {
+
+        if (visible) {
+
+            host.classList.remove(
+                "sky-share-book-layout-pending"
+            );
+
+            host.style.removeProperty(
+                "visibility"
+            );
+
+            host.style.removeProperty(
+                "opacity"
+            );
+
+        }
+        else {
+
+            host.classList.add(
+                "sky-share-book-layout-pending"
+            );
+
+            host.style.setProperty(
+                "visibility",
+                "hidden",
+                "important"
+            );
+
+            host.style.setProperty(
+                "opacity",
+                "0",
+                "important"
+            );
+
+            host.style.setProperty(
+                "pointer-events",
+                "none",
+                "important"
+            );
+        }
     }
 
 
-    if (visible) {
+    /*
+     * Keep the individual viewer hidden as well.
+     */
+    if (viewer) {
 
-        viewer.classList.remove(
-            "sky-share-book-layout-pending"
-        );
+        if (visible) {
 
-        viewer.style.removeProperty(
-            "visibility"
-        );
+            viewer.classList.remove(
+                "sky-share-book-layout-pending"
+            );
 
-        viewer.style.removeProperty(
-            "opacity"
-        );
+            viewer.style.removeProperty(
+                "visibility"
+            );
 
-    }
-    else {
+            viewer.style.removeProperty(
+                "opacity"
+            );
 
-        viewer.classList.add(
-            "sky-share-book-layout-pending"
-        );
+            viewer.style.removeProperty(
+                "pointer-events"
+            );
 
-        viewer.style.setProperty(
-            "visibility",
-            "hidden",
-            "important"
-        );
+        }
+        else {
 
-        viewer.style.setProperty(
-            "opacity",
-            "0",
-            "important"
-        );
+            viewer.classList.add(
+                "sky-share-book-layout-pending"
+            );
+
+            viewer.style.setProperty(
+                "visibility",
+                "hidden",
+                "important"
+            );
+
+            viewer.style.setProperty(
+                "opacity",
+                "0",
+                "important"
+            );
+
+            viewer.style.setProperty(
+                "pointer-events",
+                "none",
+                "important"
+            );
+        }
     }
 }
-
 
     /* =====================================================
        RESPONSIVE BOOK REFRESH
@@ -4759,184 +4842,229 @@ function setBookInitialVisibility(visible) {
     ===================================================== */
 
     function scheduleBookResponsiveRefresh(
-        delay = 0
+    delay = 0
+) {
+
+    if (!isBookShare()) {
+        return;
+    }
+
+
+    if (
+        shell &&
+        shell.classList.contains(
+            "sky-share-document-closed"
+        )
     ) {
-
-        if (!isBookShare()) {
-            return;
-        }
+        return;
+    }
 
 
-        if (
-            shell &&
-            shell.classList.contains(
-                "sky-share-document-closed"
-            )
-        ) {
-            return;
-        }
+    if (
+        !window.Reader ||
+        typeof Reader.refresh !==
+            "function"
+    ) {
+        return;
+    }
 
 
-        if (
-            !window.Reader ||
-            typeof Reader.refresh !==
-                "function"
-        ) {
-            return;
-        }
+    if (bookResizeTimer) {
 
-
-        if (bookResizeTimer) {
-
-            clearTimeout(
-                bookResizeTimer
-            );
-
-            bookResizeTimer =
-                null;
-        }
-
+        clearTimeout(
+            bookResizeTimer
+        );
 
         bookResizeTimer =
-            setTimeout(
-                function () {
-
-                    bookResizeTimer =
-                        null;
-
-
-                    if (
-                        bookResizeRaf
-                    ) {
-
-                        cancelAnimationFrame(
-                            bookResizeRaf
-                        );
-                    }
-
-
-                    /*
-                     * Wait until the browser has completed
-                     * the current layout pass.
-                     */
-                    bookResizeRaf =
-                        requestAnimationFrame(
-                            function () {
-
-                                bookResizeRaf =
-                                    0;
-
-
-                                if (
-                                    !isBookShare() ||
-                                    (
-                                        shell &&
-                                        shell.classList.contains(
-                                            "sky-share-document-closed"
-                                        )
-                                    )
-                                ) {
-                                    return;
-                                }
-
-
-                                try {
-
-                                    Reader.refresh();
-
-requestAnimationFrame(
-    function () {
-
-        try {
-
-            Reader.refresh();
-
-        }
-        catch (error) {
-
-            console.warn(
-                "[SkyMedia Share] Second responsive Reader refresh:",
-                error
-            );
-        }
-
-        updatePageButtons();
-        updateShareBookIndicator();
-
-        if (!bookInitialLayoutReady) {
-
-    bookInitialLayoutReady = true;
-
-    requestAnimationFrame(
-        function () {
-
-            setBookInitialVisibility(
-                true
-            );
-
-        }
-    );
-}
-
-
+            null;
     }
-);
-
-                                }
-                                catch (error) {
-
-                                    console.warn(
-                                        "[SkyMedia Share] Responsive Reader refresh:",
-                                        error
-                                    );
-                                }
 
 
-                                updatePageButtons();
+    bookResizeTimer =
+        setTimeout(
+            function () {
 
-                                updateShareBookIndicator();
+                bookResizeTimer =
+                    null;
+
+
+                if (bookResizeRaf) {
+
+                    cancelAnimationFrame(
+                        bookResizeRaf
+                    );
+                }
+
+
+                bookResizeRaf =
+                    requestAnimationFrame(
+                        function () {
+
+                            bookResizeRaf =
+                                0;
+
+
+                            if (
+                                !isBookShare() ||
+                                (
+                                    shell &&
+                                    shell.classList.contains(
+                                        "sky-share-document-closed"
+                                    )
+                                )
+                            ) {
+                                return;
+                            }
+
+
+                            try {
+
+                                Reader.refresh();
 
                             }
-                        );
+                            catch (error) {
 
-                },
-                delay
-            );
-    }
+                                console.warn(
+                                    "[SkyMedia Share] Responsive Reader refresh:",
+                                    error
+                                );
+                            }
+
+
+                            updatePageButtons();
+
+                            updateShareBookIndicator();
+
+
+                            /*
+                             * During initial startup, DO NOT reveal the
+                             * book on this first frame.
+                             *
+                             * Give PageFlip another complete browser
+                             * paint cycle before making the media host
+                             * visible.
+                             */
+                            if (
+                                !bookInitialLayoutReady
+                            ) {
+
+                                requestAnimationFrame(
+                                    function () {
+
+                                        requestAnimationFrame(
+                                            function () {
+
+                                                try {
+
+                                                    Reader.refresh();
+
+                                                }
+                                                catch (error) {
+
+                                                    console.warn(
+                                                        "[SkyMedia Share] Final initial Reader refresh:",
+                                                        error
+                                                    );
+                                                }
+
+
+                                                updatePageButtons();
+
+                                                updateShareBookIndicator();
+
+
+                                                /*
+                                                 * The PageFlip surface has now
+                                                 * had its initial refresh while
+                                                 * completely hidden.
+                                                 */
+                                                bookInitialLayoutReady =
+                                                    true;
+
+
+                                                setBookInitialVisibility(
+                                                    true
+                                                );
+
+                                            }
+                                        );
+                                    }
+                                );
+                            }
+
+                        }
+                    );
+
+            },
+            delay
+        );
+}
 
 
     function bindBookResponsiveRefresh() {
 
-        if (bookResponsiveRefreshBound) {
-
-            /*
-             * Still trigger an immediate reflow for the
-             * current viewport.
-             */
-            scheduleBookResponsiveRefresh();
-
-            return;
-        }
-
-
-        bookResponsiveRefreshBound =
-            true;
-
+    if (bookResponsiveRefreshBound) {
 
         /*
-         * -------------------------------------------------
-         * Browser/window resize
-         *
-         * This catches DevTools opening/closing, maximizing,
-         * restoring, resizing the browser, etc.
-         * -------------------------------------------------
+         * Responsive monitoring is already active.
+         * Give the current viewport one settled reflow.
          */
-        window.addEventListener(
+        scheduleBookResponsiveRefresh(
+            80
+        );
+
+        return;
+    }
+
+
+    bookResponsiveRefreshBound =
+        true;
+
+
+    /*
+     * -------------------------------------------------
+     * Browser/window resize
+     *
+     * Handles:
+     *   • DevTools opening/closing
+     *   • Browser resizing
+     *   • Maximizing/restoring
+     *   • Orientation changes
+     * -------------------------------------------------
+     */
+    window.addEventListener(
+        "resize",
+        function () {
+
+            scheduleBookResponsiveRefresh(
+                80
+            );
+
+        },
+        {
+            passive: true
+        }
+    );
+
+
+    /*
+     * -------------------------------------------------
+     * Visual viewport resize
+     *
+     * Useful on mobile browsers where the visual viewport
+     * can change independently of the layout viewport.
+     * -------------------------------------------------
+     */
+    if (
+        window.visualViewport
+    ) {
+
+        window.visualViewport.addEventListener(
             "resize",
             function () {
 
                 scheduleBookResponsiveRefresh(
-                    30
+                    80
                 );
 
             },
@@ -4944,162 +5072,154 @@ requestAnimationFrame(
                 passive: true
             }
         );
+    }
 
 
-        /*
-         * -------------------------------------------------
-         * Visual viewport resize
-         *
-         * Especially useful on mobile browsers and situations
-         * where the layout viewport itself is not the first
-         * thing to change.
-         * -------------------------------------------------
-         */
-        if (
-            window.visualViewport
-        ) {
+    /*
+     * -------------------------------------------------
+     * ResizeObserver
+     *
+     * Watches the actual Share Reader containers so the
+     * PageFlip engine is refreshed whenever their dimensions
+     * change, even when window.resize does not fire.
+     * -------------------------------------------------
+     */
+    if (
+        typeof ResizeObserver ===
+            "function"
+    ) {
 
-            window.visualViewport.addEventListener(
-                "resize",
+        bookResizeObserver =
+            new ResizeObserver(
                 function () {
 
                     scheduleBookResponsiveRefresh(
-                        30
+                        40
                     );
 
-                },
-                {
-                    passive: true
                 }
+            );
+
+
+        const viewer =
+            document.getElementById(
+                "viewerArea"
+            );
+
+
+        if (viewer) {
+
+            bookResizeObserver.observe(
+                viewer
             );
         }
 
 
-        /*
-         * -------------------------------------------------
-         * ResizeObserver
-         *
-         * This is the important part for Share Mode because
-         * the actual Reader container can change size without
-         * a traditional window resize being sufficient.
-         * -------------------------------------------------
-         */
-        if (
-            typeof ResizeObserver ===
-                "function"
-        ) {
+        if (mediaHost) {
 
-            bookResizeObserver =
-                new ResizeObserver(
-                    function () {
-
-                        scheduleBookResponsiveRefresh(
-                            20
-                        );
-
-                    }
-                );
-
-
-            const viewer =
-                document.getElementById(
-                    "viewerArea"
-                );
-
-
-            if (viewer) {
-
-                bookResizeObserver.observe(
-                    viewer
-                );
-            }
-
-
-            if (mediaHost) {
-
-                bookResizeObserver.observe(
-                    mediaHost
-                );
-            }
-
-
-            if (shell) {
-
-                const main =
-                    shell.querySelector(
-                        ".sky-share-main"
-                    );
-
-
-                if (main) {
-
-                    bookResizeObserver.observe(
-                        main
-                    );
-                }
-            }
+            bookResizeObserver.observe(
+                mediaHost
+            );
         }
 
 
-        /*
-         * Initial layout passes.
-         *
-         * These are intentionally staggered because PageFlip,
-         * Share Mode, and the browser layout engine do not all
-         * settle on the same animation frame.
-         */
+        if (shell) {
 
-scheduleBookResponsiveRefresh(60);
+            const main =
+                shell.querySelector(
+                    ".sky-share-main"
+                );
 
-setTimeout(
-    function () {
 
-        scheduleBookResponsiveRefresh(180);
+            if (main) {
 
-    },
-    180
-);
+                bookResizeObserver.observe(
+                    main
+                );
+            }
+        }
     }
 
 
-    function unbindBookResponsiveRefresh() {
+    /*
+     * -------------------------------------------------
+     * SINGLE INITIAL LAYOUT PASS
+     *
+     * The complete Share media host is already hidden
+     * during Reader.open().
+     *
+     * We therefore do NOT need the previous:
+     *
+     *     60ms refresh
+     *     180ms refresh
+     *
+     * sequence, which could cause unnecessary PageFlip
+     * recalculations during startup.
+     *
+     * One settled initial refresh is sufficient.
+     * -------------------------------------------------
+     */
+    scheduleBookResponsiveRefresh(
+        80
+    );
+}
 
-        if (
+
+function unbindBookResponsiveRefresh() {
+
+    /*
+     * Cancel pending timeout.
+     */
+    if (
+        bookResizeTimer
+    ) {
+
+        clearTimeout(
             bookResizeTimer
-        ) {
+        );
 
-            clearTimeout(
-                bookResizeTimer
-            );
-
-            bookResizeTimer =
-                null;
-        }
-
-
-        if (
-            bookResizeRaf
-        ) {
-
-            cancelAnimationFrame(
-                bookResizeRaf
-            );
-
-            bookResizeRaf =
-                0;
-        }
-
-
-        if (
-            bookResizeObserver
-        ) {
-
-            bookResizeObserver.disconnect();
-
-            bookResizeObserver =
-                null;
-        }
+        bookResizeTimer =
+            null;
     }
+
+
+    /*
+     * Cancel pending animation frame.
+     */
+    if (
+        bookResizeRaf
+    ) {
+
+        cancelAnimationFrame(
+            bookResizeRaf
+        );
+
+        bookResizeRaf =
+            0;
+    }
+
+
+    /*
+     * Disconnect ResizeObserver.
+     */
+    if (
+        bookResizeObserver
+    ) {
+
+        bookResizeObserver.disconnect();
+
+        bookResizeObserver =
+            null;
+    }
+
+
+    /*
+     * Allow responsive monitoring to be initialized
+     * again for a subsequent Share session.
+     */
+    bookResponsiveRefreshBound =
+        false;
+}
 
 
 
