@@ -4525,7 +4525,6 @@ body.sky-share-mode.sky-share-book #pageJump {
     bottom: 13% !important;
     width: 120px !important;
     height: auto !important;
-    transform: translate(-50%, -50%) !important;
     object-fit: contain !important;
     pointer-events: none !important;
     z-index: 2 !important;
