@@ -249,9 +249,14 @@ body.sky-share-mode .sky-share-subtitle {
     -webkit-text-fill-color: transparent !important;
 
     text-align: center !important;
-    text-shadow: 0 1px 1px rgba(0, 0, 0, .65);
+
     filter: none !important;
     transform: none !important;
+}
+
+body.sky-share-mode .sky-share-title {
+    text-shadow:
+        0 1px 2px rgba(0,0,0,.55) !important;
 }
 
 body.sky-share-mode .sky-share-title {
@@ -3886,6 +3891,32 @@ body.sky-share-mode.sky-share-controls-hidden .sr-welcome-banner {
     visibility: visible !important;
     opacity: 1 !important;
 }
+
+
+/* =========================================================
+   SHARE BOOK — TOOLBAR CAN TIME OUT
+   ========================================================= */
+
+body.sky-share-mode.sky-share-book #toolbar {
+    transition:
+        opacity .25s ease,
+        visibility .25s ease !important;
+}
+
+/* Normal state */
+body.sky-share-mode.sky-share-book:not(.sky-share-controls-hidden) #toolbar {
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+}
+
+/* Timed-out state */
+body.sky-share-mode.sky-share-book.sky-share-controls-hidden #toolbar {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+
 
 
 /* =========================================================
