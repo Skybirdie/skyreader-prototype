@@ -258,13 +258,7 @@ body.sky-share-mode .sky-share-subtitle {
     transform: none !important;
 }
 
-body.sky-share-mode .sky-share-title {
-    text-shadow:none !important;
-    filter:none !important;
 
-    -webkit-text-stroke:0.1px rgba(0,0,0,1);
-    paint-order:stroke fill;
-}
 
 body.sky-share-mode .sky-share-title {
     position: relative !important;
