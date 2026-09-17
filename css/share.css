@@ -253,7 +253,7 @@ body.sky-share-mode .sky-share-subtitle {
     -webkit-text-fill-color: transparent !important;
 
     text-align: center !important;
-
+    font-weight:1000;
     filter: none !important;
     transform: none !important;
 }
@@ -262,7 +262,7 @@ body.sky-share-mode .sky-share-title {
     text-shadow:none !important;
     filter:none !important;
 
-    -webkit-text-stroke:0.2px rgba(0,0,0,.65);
+    -webkit-text-stroke:0.1px rgba(0,0,0,1);
     paint-order:stroke fill;
 }
 
