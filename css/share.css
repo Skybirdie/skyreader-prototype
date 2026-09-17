@@ -4146,19 +4146,3 @@ body.sky-share-mode.sky-share-book #pageIndicator {
     gap:10px;
 }
 
-body.sky-share-mode.sky-share-book .sky-share-page-title {
-    background:none !important;
-    border:0 !important;
-    padding:0 !important;
-}
-
-body.sky-share-mode.sky-share-book .sky-share-page-count {
-    display:inline-flex;
-    align-items:center;
-    justify-content:center;
-    padding:2px 8px;
-    border:1px solid currentColor;
-    border-radius:4px;
-    line-height:1.2;
-    white-space:nowrap;
-}
