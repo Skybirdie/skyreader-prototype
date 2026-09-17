@@ -6,6 +6,14 @@ SkyReader Video Viewer
 
 Video player + responsive landing
 
+Status indicator:
+    Native video  -> elapsed / total
+                    00:00 / 08:42
+
+YouTube iframe:
+    Playback timing is not available directly from the
+    iframe and therefore does not fabricate a page count.
+
 =========================================================
 */
 
@@ -30,9 +38,212 @@ let resizeObserverBound = false;
 
 
 /*
--------------------------------------------------------
+=========================================================
+ STATUS / TIME DISPLAY
+=========================================================
+*/
+
+/*
+---------------------------------------------------------
+ Format seconds as:
+
+    MM:SS
+
+or, for videos one hour or longer:
+
+    H:MM:SS
+---------------------------------------------------------
+*/
+
+function formatVideoTime(seconds) {
+
+    if (!Number.isFinite(seconds) || seconds < 0) {
+        return "00:00";
+    }
+
+    seconds = Math.floor(seconds);
+
+    const hours =
+        Math.floor(seconds / 3600);
+
+    const minutes =
+        Math.floor((seconds % 3600) / 60);
+
+    const secs =
+        seconds % 60;
+
+    if (hours > 0) {
+
+        return (
+            hours +
+            ":" +
+            String(minutes).padStart(2, "0") +
+            ":" +
+            String(secs).padStart(2, "0")
+        );
+
+    }
+
+    return (
+        String(minutes).padStart(2, "0") +
+        ":" +
+        String(secs).padStart(2, "0")
+    );
+
+}
+
+
+/*
+---------------------------------------------------------
+ Reset the playback timer.
+
+ This deliberately clears the old library position so a
+ video can never display something like "3 / 4".
+---------------------------------------------------------
+*/
+
+function resetVideoTimer() {
+
+    if (!statusIndicatorElement) {
+        return;
+    }
+
+    if (
+        activePlayerType === "video" &&
+        videoElement &&
+        Number.isFinite(videoElement.duration) &&
+        videoElement.duration > 0
+    ) {
+
+        statusIndicatorElement.textContent =
+            "00:00 / " +
+            formatVideoTime(videoElement.duration);
+
+    }
+    else {
+
+        statusIndicatorElement.textContent =
+            "";
+
+    }
+
+}
+
+
+/*
+---------------------------------------------------------
+ Update elapsed / total playback time.
+
+ Only the native <video> element is handled here.
+
+ YouTube iframe playback is intentionally not guessed.
+---------------------------------------------------------
+*/
+
+function updateVideoTimer() {
+
+    if (!statusIndicatorElement) {
+        return;
+    }
+
+    if (
+        activePlayerType !== "video" ||
+        !videoElement ||
+        !currentVideo
+    ) {
+
+        statusIndicatorElement.textContent = "";
+
+        return;
+    }
+
+    const currentTime =
+        Number.isFinite(videoElement.currentTime)
+            ? videoElement.currentTime
+            : 0;
+
+    const duration =
+        Number.isFinite(videoElement.duration) &&
+        videoElement.duration > 0
+            ? videoElement.duration
+            : 0;
+
+    if (!duration) {
+
+        statusIndicatorElement.textContent =
+            formatVideoTime(currentTime);
+
+        return;
+    }
+
+    statusIndicatorElement.textContent =
+        formatVideoTime(currentTime) +
+        " / " +
+        formatVideoTime(duration);
+
+}
+
+
+/*
+---------------------------------------------------------
+ Bind native video timing events.
+
+ These events keep the status bar synchronized with the
+ actual video rather than with the position of the video
+ in the library.
+---------------------------------------------------------
+*/
+
+function bindVideoTimingEvents() {
+
+    if (!videoElement || videoElement.dataset.skyTimingBound) {
+        return;
+    }
+
+    videoElement.dataset.skyTimingBound = "true";
+
+    videoElement.addEventListener(
+        "loadedmetadata",
+        updateVideoTimer
+    );
+
+    videoElement.addEventListener(
+        "durationchange",
+        updateVideoTimer
+    );
+
+    videoElement.addEventListener(
+        "timeupdate",
+        updateVideoTimer
+    );
+
+    videoElement.addEventListener(
+        "progress",
+        updateVideoTimer
+    );
+
+    videoElement.addEventListener(
+        "play",
+        updateVideoTimer
+    );
+
+    videoElement.addEventListener(
+        "pause",
+        updateVideoTimer
+    );
+
+    videoElement.addEventListener(
+        "ended",
+        updateVideoTimer
+    );
+
+}
+
+
+/*
+---------------------------------------------------------
  Initialize
--------------------------------------------------------
+---------------------------------------------------------
 */
 
 function init(options = {}) {
@@ -70,28 +281,94 @@ function init(options = {}) {
         return false;
     }
 
-    const shareButton = document.getElementById("videoViewerShare");
-    if (shareButton && !shareButton.dataset.bound) {
+
+    /*
+    ---------------------------------------------------
+     Bind playback timing
+    ---------------------------------------------------
+    */
+
+    bindVideoTimingEvents();
+
+
+    const shareButton =
+        document.getElementById("videoViewerShare");
+
+    if (
+        shareButton &&
+        !shareButton.dataset.bound
+    ) {
+
         shareButton.dataset.bound = "true";
-        shareButton.addEventListener("click", () => { if (currentVideo && window.ShareManager) ShareManager.share("video", currentVideo); });
-    }
 
-    const closeButton = document.getElementById("videoViewerClose");
-    if (closeButton && !closeButton.dataset.bound) {
-        closeButton.dataset.bound = "true";
-        closeButton.addEventListener("click", closeVideo);
-    }
+        shareButton.addEventListener(
+            "click",
+            () => {
 
-    if (!document.documentElement.dataset.videoEscapeBound) {
-        document.documentElement.dataset.videoEscapeBound = "true";
-        document.addEventListener("keydown", event => {
-            if (event.key !== "Escape") return;
-            if (currentVideo) {
-                event.preventDefault();
-                event.stopPropagation();
-                closeVideo();
+                if (
+                    currentVideo &&
+                    window.ShareManager
+                ) {
+
+                    ShareManager.share(
+                        "video",
+                        currentVideo
+                    );
+
+                }
+
             }
-        }, true);
+        );
+
+    }
+
+
+    const closeButton =
+        document.getElementById("videoViewerClose");
+
+    if (
+        closeButton &&
+        !closeButton.dataset.bound
+    ) {
+
+        closeButton.dataset.bound = "true";
+
+        closeButton.addEventListener(
+            "click",
+            closeVideo
+        );
+
+    }
+
+
+    if (
+        !document.documentElement.dataset.videoEscapeBound
+    ) {
+
+        document.documentElement.dataset.videoEscapeBound =
+            "true";
+
+        document.addEventListener(
+            "keydown",
+            event => {
+
+                if (event.key !== "Escape") {
+                    return;
+                }
+
+                if (currentVideo) {
+
+                    event.preventDefault();
+                    event.stopPropagation();
+
+                    closeVideo();
+
+                }
+
+            },
+            true
+        );
+
     }
 
 
@@ -106,9 +383,11 @@ function init(options = {}) {
         handleMetadata
     );
 
-    // Safety net: a few browsers can report loadedmetadata
-    // before videoWidth/videoHeight are populated. Re-check
-    // once more data has actually arrived.
+    /*
+    Safety net: a few browsers can report loadedmetadata
+    before videoWidth/videoHeight are populated.
+    */
+
     videoElement.addEventListener(
         "loadeddata",
         handleMetadata
@@ -122,22 +401,18 @@ function init(options = {}) {
     */
 
     window.addEventListener(
-    "resize",
-    () => {
+        "resize",
+        () => {
 
-        refreshVideoLayout();
+            refreshVideoLayout();
 
+        }
+    );
 
-
-    }
-);
 
     /*
     ---------------------------------------------------
-     The viewer's own box can change size without a
-     window resize (library drawer opening/closing,
-     focus mode, orientation changes). Watch it directly
-     so the video always re-fits.
+     Viewer resize observer
     ---------------------------------------------------
     */
 
@@ -151,18 +426,28 @@ function init(options = {}) {
 
         const observer =
             new ResizeObserver(() => {
+
                 refreshVideoLayout();
+
             });
 
         observer.observe(viewerElement);
+
     }
 
-    if (!document.documentElement.dataset.videoFullscreenBound) {
-        document.documentElement.dataset.videoFullscreenBound = "true";
+
+    if (
+        !document.documentElement.dataset.videoFullscreenBound
+    ) {
+
+        document.documentElement.dataset.videoFullscreenBound =
+            "true";
+
         document.addEventListener(
             "fullscreenchange",
             () => refreshVideoLayout()
         );
+
     }
 
 
@@ -176,20 +461,18 @@ function init(options = {}) {
 
     renderLanding();
 
+    resetVideoTimer();
 
     return true;
+
 }
 
 
-
-
-
 /*
-=======================================================
+=========================================================
  LANDING
-=======================================================
+=========================================================
 */
-
 
 function renderLanding() {
 
@@ -200,8 +483,8 @@ function renderLanding() {
 
     /*
     ---------------------------------------------------
-     Get the authoritative video collection.
-     ---------------------------------------------------
+     Get authoritative video collection.
+    ---------------------------------------------------
     */
 
     let videos = [];
@@ -235,14 +518,14 @@ function renderLanding() {
         );
 
     const continueSection =
-    landingElement.querySelector(
-        ".video-landing-continue-section"
-    );
+        landingElement.querySelector(
+            ".video-landing-continue-section"
+        );
 
     const mediaRow =
-    landingElement.querySelector(
-        ".video-landing-media-row"
-    );
+        landingElement.querySelector(
+            ".video-landing-media-row"
+        );
 
 
     if (continueContainer) {
@@ -251,19 +534,14 @@ function renderLanding() {
 
 
     if (continueSection) {
-    continueSection.classList.add("is-empty");
-}
+        continueSection.classList.add("is-empty");
+    }
 
-    /*
-     * The media row itself (not just the card inside it) has to
-     * collapse when there is no Watch Again card, or its fixed
-     * 25% height leaves a blank gap between the hero and the
-     * library row below. Toggled alongside continueSection so
-     * both stay in sync.
-     */
+
     if (mediaRow) {
         mediaRow.classList.add("is-empty");
     }
+
 
     if (libraryContainer) {
         libraryContainer.innerHTML = "";
@@ -280,22 +558,40 @@ function renderLanding() {
         return;
     }
 
+
     if (!lastSelectedVideo) {
+
         try {
-            const recent = JSON.parse(localStorage.getItem("skyvideo-recent") || "[]");
-            if (Array.isArray(recent) && recent.length) {
-                lastSelectedVideo = videos.find(video => video.id === recent[0]) || null;
+
+            const recent =
+                JSON.parse(
+                    localStorage.getItem(
+                        "skyvideo-recent"
+                    ) || "[]"
+                );
+
+            if (
+                Array.isArray(recent) &&
+                recent.length
+            ) {
+
+                lastSelectedVideo =
+                    videos.find(
+                        video =>
+                            video.id === recent[0]
+                    ) || null;
+
             }
-        } catch (e) {}
+
+        }
+        catch (e) {}
+
     }
 
 
     /*
     ---------------------------------------------------
      Library
-
-     All videos are displayed as standard circles in
-     a single horizontal scrolling row.
     ---------------------------------------------------
     */
 
@@ -305,9 +601,7 @@ function renderLanding() {
             video => {
 
                 libraryContainer.appendChild(
-                    createLandingCircle(
-                        video
-                    )
+                    createLandingCircle(video)
                 );
 
             }
@@ -319,33 +613,34 @@ function renderLanding() {
     /*
     ---------------------------------------------------
      View Again
-
-     For now use the most recently selected video,
-     when one exists.
     ---------------------------------------------------
     */
 
     if (
-    continueContainer &&
-    continueSection &&
-    lastSelectedVideo
-) {
+        continueContainer &&
+        continueSection &&
+        lastSelectedVideo
+    ) {
 
-    continueContainer.appendChild(
-        createWatchAgainCard(
-            lastSelectedVideo
-        )
-    );
+        continueContainer.appendChild(
+            createWatchAgainCard(
+                lastSelectedVideo
+            )
+        );
 
-    continueSection.classList.remove(
-        "is-empty"
-    );
+        continueSection.classList.remove(
+            "is-empty"
+        );
 
-    if (mediaRow) {
-        mediaRow.classList.remove("is-empty");
+        if (mediaRow) {
+
+            mediaRow.classList.remove(
+                "is-empty"
+            );
+
+        }
+
     }
-
-}
 
 }
 
@@ -353,10 +648,6 @@ function renderLanding() {
 /*
 -------------------------------------------------------
  Watch Again card
-
- Mirrors SkyReader's Read Again card exactly: thumbnail
- on the left, title and a "last watched" line stacked to
- the right — no text overlaid on the thumbnail itself.
 -------------------------------------------------------
 */
 
@@ -394,6 +685,7 @@ function createWatchAgainCard(video) {
     info.className =
         "video-landing-recent-info";
 
+
     const title =
         document.createElement("div");
 
@@ -402,6 +694,7 @@ function createWatchAgainCard(video) {
 
     title.textContent =
         video.title || "";
+
 
     const subtitle =
         document.createElement("div");
@@ -412,11 +705,13 @@ function createWatchAgainCard(video) {
     subtitle.textContent =
         "Last watched";
 
+
     info.appendChild(title);
     info.appendChild(subtitle);
 
     card.appendChild(thumbnail);
     card.appendChild(info);
+
 
     card.addEventListener(
         "click",
@@ -427,9 +722,17 @@ function createWatchAgainCard(video) {
         }
     );
 
+
     return card;
+
 }
 
+
+/*
+-------------------------------------------------------
+ Featured
+-------------------------------------------------------
+*/
 
 function createLandingFeatured(video) {
 
@@ -440,15 +743,6 @@ function createLandingFeatured(video) {
         "video-landing-featured";
 
 
-    /*
-    -------------------------------------------------------
-     Featured watch card
-
-     The landing hero is independent from the featured
-     video. Its logo and title live in the landing markup.
-    -------------------------------------------------------
-    */
-
     const button =
         document.createElement("button");
 
@@ -458,10 +752,6 @@ function createLandingFeatured(video) {
     button.className =
         "video-landing-watch";
 
-
-    /*
-    Thumbnail
-    */
 
     const thumbnail =
         document.createElement("div");
@@ -491,12 +781,6 @@ function createLandingFeatured(video) {
     }
 
 
-    /*
-    -------------------------------------------------------
-     Watch label
-    -------------------------------------------------------
-    */
-
     const watchLabel =
         document.createElement("span");
 
@@ -507,20 +791,9 @@ function createLandingFeatured(video) {
         "Watch";
 
 
-    button.appendChild(
-        thumbnail
-    );
+    button.appendChild(thumbnail);
+    button.appendChild(watchLabel);
 
-    button.appendChild(
-        watchLabel
-    );
-
-
-    /*
-    -------------------------------------------------------
-     Open featured video
-    -------------------------------------------------------
-    */
 
     button.addEventListener(
         "click",
@@ -532,13 +805,12 @@ function createLandingFeatured(video) {
     );
 
 
-    wrapper.appendChild(
-        button
-    );
-
+    wrapper.appendChild(button);
 
     return wrapper;
+
 }
+
 
 /*
 -------------------------------------------------------
@@ -565,12 +837,6 @@ function createLandingCircle(video) {
         "video-landing-circle";
 
 
-    /*
-    ---------------------------------------------------
-     Thumbnail
-    ---------------------------------------------------
-    */
-
     if (video.thumbnail) {
 
         const image =
@@ -593,16 +859,6 @@ function createLandingCircle(video) {
     button.appendChild(circle);
 
 
-    /*
-    ---------------------------------------------------
-     Caption
-
-     Sits below the circle rather than overlaid on top
-     of the thumbnail, matching the Reader section's
-     shelf-card convention.
-    ---------------------------------------------------
-    */
-
     const title =
         document.createElement("span");
 
@@ -614,38 +870,106 @@ function createLandingCircle(video) {
 
     button.appendChild(title);
 
-    const favorite = document.createElement("span");
-    favorite.className = "video-landing-favorite";
-    favorite.setAttribute("role", "button");
-    favorite.setAttribute("tabindex", "0");
-    favorite.setAttribute("aria-label", "Favorite " + (video.title || "video"));
-    function refreshFavorite(){
-        const active = !!(window.VideoFavorites && VideoFavorites.has(video.id));
-        favorite.classList.toggle("is-favorite", active);
-        favorite.textContent = active ? "♥" : "♡";
-        favorite.setAttribute("aria-pressed", String(active));
+
+    const favorite =
+        document.createElement("span");
+
+    favorite.className =
+        "video-landing-favorite";
+
+    favorite.setAttribute(
+        "role",
+        "button"
+    );
+
+    favorite.setAttribute(
+        "tabindex",
+        "0"
+    );
+
+    favorite.setAttribute(
+        "aria-label",
+        "Favorite " +
+        (video.title || "video")
+    );
+
+
+    function refreshFavorite() {
+
+        const active =
+            !!(
+                window.VideoFavorites &&
+                VideoFavorites.has(video.id)
+            );
+
+        favorite.classList.toggle(
+            "is-favorite",
+            active
+        );
+
+        favorite.textContent =
+            active ? "♥" : "♡";
+
+        favorite.setAttribute(
+            "aria-pressed",
+            String(active)
+        );
+
     }
-    function toggleFavorite(event){
+
+
+    function toggleFavorite(event) {
+
         event.preventDefault();
         event.stopPropagation();
-        if(window.VideoFavorites) VideoFavorites.toggle(video.id);
+
+        if (window.VideoFavorites) {
+            VideoFavorites.toggle(video.id);
+        }
+
         refreshFavorite();
-        if(window.VideoLibrary && typeof VideoLibrary.render === "function") VideoLibrary.render();
+
+        if (
+            window.VideoLibrary &&
+            typeof VideoLibrary.render === "function"
+        ) {
+
+            VideoLibrary.render();
+
+        }
+
         renderLanding();
+
     }
-    favorite.addEventListener("click", toggleFavorite);
-    favorite.addEventListener("keydown", event => {
-        if(event.key === "Enter" || event.key === " ") toggleFavorite(event);
-    });
+
+
+    favorite.addEventListener(
+        "click",
+        toggleFavorite
+    );
+
+
+    favorite.addEventListener(
+        "keydown",
+        event => {
+
+            if (
+                event.key === "Enter" ||
+                event.key === " "
+            ) {
+
+                toggleFavorite(event);
+
+            }
+
+        }
+    );
+
+
     button.appendChild(favorite);
+
     refreshFavorite();
 
-
-    /*
-    ---------------------------------------------------
-     Selection
-    ---------------------------------------------------
-    */
 
     button.addEventListener(
         "click",
@@ -658,23 +982,14 @@ function createLandingCircle(video) {
 
 
     return button;
+
 }
 
 
 /*
--------------------------------------------------------
- Open video
--------------------------------------------------------
-*/
-
-/*
--------------------------------------------------------
- Status bar
-
- Mirrors SkyReader's #statusBar: a short status
- message, the current title, and an "N of total"
- indicator against the full (unfiltered) library.
--------------------------------------------------------
+=========================================================
+ STATUS BAR
+=========================================================
 */
 
 function setStatusMessage(message) {
@@ -689,54 +1004,73 @@ function setStatusMessage(message) {
 }
 
 
+/*
+---------------------------------------------------------
+ Update status bar
+
+ The centered message contains the item title.
+
+ The indicator is now playback time for native videos.
+
+ IMPORTANT:
+ We intentionally do NOT use VideoLibrary.getIndex()
+ or VideoLibrary.getCount() here.
+
+ Therefore the video viewer can no longer display:
+
+    3 / 4
+
+as though videos were document pages.
+---------------------------------------------------------
+*/
+
 function updateStatusBar(video) {
 
-    /* The primary status text is the section identity when idle,
-       and the selected item title when an item is open. */
     if (statusMessageElement) {
 
         statusMessageElement.textContent =
-            video ? (video.title || "") : "MMicj";
+            video
+                ? (video.title || "")
+                : "MMicj";
 
     }
 
-    /* Keep the legacy separate title element empty so the title is
-       never duplicated in the centered status row. */
+
+    /*
+    Keep legacy title element empty so the title is
+    never duplicated.
+    */
+
     if (statusTitleElement) {
+
         statusTitleElement.textContent = "";
+
     }
 
-    if (statusIndicatorElement) {
 
-        if (
-            video &&
-            window.VideoLibrary &&
-            typeof VideoLibrary.getIndex === "function"
-        ) {
+    /*
+    Playback indicator
+    */
 
-            const index =
-                VideoLibrary.getIndex(video.id);
+    if (video) {
 
-            const count =
-                VideoLibrary.getCount();
+        updateVideoTimer();
 
-            statusIndicatorElement.textContent =
-                (index > -1 && count > 0)
-                    ? (index + 1) + " / " + count
-                    : "";
+    }
+    else if (statusIndicatorElement) {
 
-        }
-        else {
-
-            statusIndicatorElement.textContent = "";
-
-        }
+        statusIndicatorElement.textContent = "";
 
     }
 
 }
 
 
+/*
+=========================================================
+ PLAYER
+=========================================================
+*/
 
 function ensureIframePlayer() {
 
@@ -744,20 +1078,27 @@ function ensureIframePlayer() {
         return iframeElement;
     }
 
-    iframeElement = document.createElement("iframe");
 
-    iframeElement.id = "videoIframePlayer";
-    iframeElement.className = "video-iframe-player";
+    iframeElement =
+        document.createElement("iframe");
+
+    iframeElement.id =
+        "videoIframePlayer";
+
+    iframeElement.className =
+        "video-iframe-player";
+
 
     iframeElement.setAttribute(
         "allow",
         "autoplay; fullscreen; picture-in-picture"
     );
 
-iframeElement.setAttribute(
-    "referrerpolicy",
-    "strict-origin-when-cross-origin"
-);
+
+    iframeElement.setAttribute(
+        "referrerpolicy",
+        "strict-origin-when-cross-origin"
+    );
 
 
     iframeElement.setAttribute(
@@ -765,130 +1106,327 @@ iframeElement.setAttribute(
         ""
     );
 
+
     iframeElement.setAttribute(
         "frameborder",
         "0"
     );
 
-    iframeElement.style.display = "none";
 
-    if (videoElement && videoElement.parentNode) {
+    iframeElement.style.display =
+        "none";
+
+
+    if (
+        videoElement &&
+        videoElement.parentNode
+    ) {
+
         videoElement.parentNode.insertBefore(
             iframeElement,
             videoElement.nextSibling
         );
+
     }
 
+
     return iframeElement;
+
 }
+
 
 function clearActivePlayer() {
 
     if (videoElement) {
+
         videoElement.pause();
-        videoElement.removeAttribute("src");
+
+        videoElement.removeAttribute(
+            "src"
+        );
+
         videoElement.load();
-        videoElement.style.display = "none";
+
+        videoElement.style.display =
+            "none";
+
     }
 
+
     if (iframeElement) {
-        iframeElement.src = "about:blank";
-        iframeElement.style.display = "none";
+
+        iframeElement.src =
+            "about:blank";
+
+        iframeElement.style.display =
+            "none";
+
     }
+
+
+    if (statusIndicatorElement) {
+
+        statusIndicatorElement.textContent =
+            "";
+
+    }
+
 }
+
 
 function loadVideoPlayer(video) {
 
-    if (!video) return;
+    if (!video) {
+        return;
+    }
 
-const isYouTube =
-    window.ContentContract &&
-    typeof ContentContract.isYouTubeUrl === "function" &&
-    ContentContract.isYouTubeUrl(video.video);
+
+    const isYouTube =
+        window.ContentContract &&
+        typeof ContentContract.isYouTubeUrl === "function" &&
+        ContentContract.isYouTubeUrl(
+            video.video
+        );
+
 
     clearActivePlayer();
 
-if (isYouTube) {
 
-    activePlayerType = "iframe";
+    /*
+    ---------------------------------------------------
+     YouTube
+    ---------------------------------------------------
+    */
 
-    const iframe = ensureIframePlayer();
+    if (isYouTube) {
 
-    iframe.src =
-        window.ContentContract &&
-        typeof ContentContract.toYouTubeEmbedUrl === "function"
-            ? ContentContract.toYouTubeEmbedUrl(video.video)
-            : video.video;
+        activePlayerType =
+            "iframe";
 
-    iframe.style.display = "block";
-    iframe.style.width = "100%";
-    iframe.style.height = "100%";
-    iframe.style.maxWidth = "100%";
-    iframe.style.maxHeight = "100%";
 
-    return;
-}
+        const iframe =
+            ensureIframePlayer();
 
-    // Everything else is treated as a normal video URL.
-    activePlayerType = "video";
 
-    if (!videoElement) return;
+        iframe.src =
+            window.ContentContract &&
+            typeof ContentContract.toYouTubeEmbedUrl === "function"
+                ? ContentContract.toYouTubeEmbedUrl(
+                    video.video
+                )
+                : video.video;
 
-    videoElement.style.display = "block";
-    videoElement.src = video.video;
+
+        iframe.style.display =
+            "block";
+
+        iframe.style.width =
+            "100%";
+
+        iframe.style.height =
+            "100%";
+
+        iframe.style.maxWidth =
+            "100%";
+
+        iframe.style.maxHeight =
+            "100%";
+
+
+        /*
+        We cannot read YouTube playback position from
+        the iframe without loading the YouTube IFrame API.
+
+        Do not display a fake page count.
+        */
+
+        if (statusIndicatorElement) {
+
+            statusIndicatorElement.textContent =
+                "";
+
+        }
+
+
+        return;
+
+    }
+
+
+    /*
+    ---------------------------------------------------
+     Normal video file
+    ---------------------------------------------------
+    */
+
+    activePlayerType =
+        "video";
+
+
+    if (!videoElement) {
+        return;
+    }
+
+
+    videoElement.style.display =
+        "block";
+
+
+    videoElement.src =
+        video.video;
+
+
+    /*
+    Start with a clean timer.
+    */
+
+    if (statusIndicatorElement) {
+
+        statusIndicatorElement.textContent =
+            "00:00 / 00:00";
+
+    }
+
+
     videoElement.load();
 
-    const playRequest = videoElement.play();
+
+    const playRequest =
+        videoElement.play();
+
 
     if (
         playRequest &&
         typeof playRequest.catch === "function"
     ) {
+
         playRequest.catch(() => {});
+
     }
+
 }
 
 
+/*
+=========================================================
+ RECENT
+=========================================================
+*/
 
 function recordRecentVideo(video) {
-    if (!video || !video.id) return;
-    const key = "skyvideo-recent";
+
+    if (!video || !video.id) {
+        return;
+    }
+
+
+    const key =
+        "skyvideo-recent";
+
+
     let ids = [];
+
+
     try {
-        const value = JSON.parse(localStorage.getItem(key) || "[]");
-        ids = Array.isArray(value) ? value : [];
-    } catch (e) {}
-    ids = ids.filter(id => id !== video.id);
-    ids.unshift(video.id);
-    try { localStorage.setItem(key, JSON.stringify(ids.slice(0, 50))); }
+
+        const value =
+            JSON.parse(
+                localStorage.getItem(key) || "[]"
+            );
+
+        ids =
+            Array.isArray(value)
+                ? value
+                : [];
+
+    }
     catch (e) {}
+
+
+    ids =
+        ids.filter(
+            id => id !== video.id
+        );
+
+
+    ids.unshift(
+        video.id
+    );
+
+
+    try {
+
+        localStorage.setItem(
+            key,
+            JSON.stringify(
+                ids.slice(0, 50)
+            )
+        );
+
+    }
+    catch (e) {}
+
 }
 
+
+/*
+=========================================================
+ MEDIA MANAGER
+=========================================================
+*/
 
 function stopForMediaManager() {
 
     clearActivePlayer();
 
-    currentVideo = null;
-    activePlayerType = "video";
+
+    currentVideo =
+        null;
+
+
+    activePlayerType =
+        "video";
+
 
     if (titleElement) {
-        titleElement.textContent = "";
+
+        titleElement.textContent =
+            "";
+
     }
+
 
     updateStatusBar(null);
 
+
     if (viewerElement) {
-        viewerElement.classList.remove("has-video");
+
+        viewerElement.classList.remove(
+            "has-video"
+        );
+
     }
+
 
     if (landingElement) {
-        landingElement.classList.remove("hidden");
+
+        landingElement.classList.remove(
+            "hidden"
+        );
+
     }
 
+
     renderLanding();
+
 }
 
+
+/*
+=========================================================
+ OPEN VIDEO
+=========================================================
+*/
 
 function openVideo(video) {
 
@@ -896,28 +1434,34 @@ function openVideo(video) {
         return;
     }
 
+
     if (
         window.MediaManager &&
         typeof MediaManager.claim === "function"
     ) {
+
         MediaManager.claim(
             "video",
             stopForMediaManager
         );
+
     }
+
 
     currentVideo =
         video;
 
+
     lastSelectedVideo =
         video;
 
+
     recordRecentVideo(video);
+
 
     /*
     ---------------------------------------------------
-     Close the narrow library exactly as SkyReader does
-     when a book is selected.
+     Close narrow library drawer.
     ---------------------------------------------------
     */
 
@@ -925,7 +1469,9 @@ function openVideo(video) {
         window.VideoUI &&
         typeof VideoUI.closeDrawer === "function"
     ) {
+
         VideoUI.closeDrawer();
+
     }
 
 
@@ -942,8 +1488,20 @@ function openVideo(video) {
 
     }
 
-    updateStatusBar(video);
 
+    /*
+    Clear old timer BEFORE loading the new video.
+    */
+
+    if (statusIndicatorElement) {
+
+        statusIndicatorElement.textContent =
+            "00:00 / 00:00";
+
+    }
+
+
+    updateStatusBar(video);
 
 
     /*
@@ -963,11 +1521,12 @@ function openVideo(video) {
 
     /*
     ---------------------------------------------------
-     Reset current source
+     Load source
     ---------------------------------------------------
     */
 
-loadVideoPlayer(video);
+    loadVideoPlayer(video);
+
 
     /*
     ---------------------------------------------------
@@ -986,20 +1545,14 @@ loadVideoPlayer(video);
 
     refreshVideoLayout();
 
-    // Re-run once the browser has actually committed the
-    // "has-video" layout (guards against measuring the
-    // viewer's box on the same tick it became visible).
-    window.requestAnimationFrame(() => {
-        refreshVideoLayout();
-    });
 
+    window.requestAnimationFrame(
+        () => {
 
-    /*
-    ---------------------------------------------------
-     Keep landing's View Again item current.
-    ---------------------------------------------------
-    */
+            refreshVideoLayout();
 
+        }
+    );
 
 
     renderLanding();
@@ -1008,9 +1561,9 @@ loadVideoPlayer(video);
 
 
 /*
--------------------------------------------------------
- Close video
--------------------------------------------------------
+=========================================================
+ CLOSE VIDEO
+=========================================================
 */
 
 function closeVideo() {
@@ -1019,35 +1572,56 @@ function closeVideo() {
         return;
     }
 
-/* The video may have been sent into true browser fullscreen — either
-   the <video> element itself, or the YouTube iframe when playing a
-   remote embed. Every legitimate close route (close button, Escape,
-   selecting another video) funnels through here, so this is the one
-   place that needs to release fullscreen, or the app is left looking
-   fullscreen with no video underneath it. */
-if (
-    document.fullscreenElement &&
-    (document.fullscreenElement === videoElement ||
-     document.fullscreenElement === iframeElement)
-) {
-    document.exitFullscreen?.().catch(() => {});
-}
 
-clearActivePlayer();
+    /*
+    Release true browser fullscreen first.
+    */
 
-if (
-    window.MediaManager &&
-    typeof MediaManager.release === "function"
-) {
-    MediaManager.release("video");
-}
+    if (
+        document.fullscreenElement &&
+        (
+            document.fullscreenElement === videoElement ||
+            document.fullscreenElement === iframeElement
+        )
+    ) {
 
-currentVideo = null;
-activePlayerType = "video";
+        document.exitFullscreen?.().catch(
+            () => {}
+        );
+
+    }
+
+
+    clearActivePlayer();
+
+
+    if (
+        window.MediaManager &&
+        typeof MediaManager.release === "function"
+    ) {
+
+        MediaManager.release(
+            "video"
+        );
+
+    }
+
+
+    currentVideo =
+        null;
+
+
+    activePlayerType =
+        "video";
+
 
     if (titleElement) {
-        titleElement.textContent = "";
+
+        titleElement.textContent =
+            "";
+
     }
+
 
     updateStatusBar(null);
 
@@ -1059,6 +1633,7 @@ activePlayerType = "video";
         );
 
     }
+
 
     /*
     ---------------------------------------------------
@@ -1072,37 +1647,55 @@ activePlayerType = "video";
             "hidden"
         );
 
+
         if (window.__skyVideoLandingTimer) {
+
             window.clearTimeout(
                 window.__skyVideoLandingTimer
             );
+
         }
 
+
         window.__skyVideoLandingTimer =
-            window.setTimeout(() => {
+            window.setTimeout(
+                () => {
 
-                if (currentVideo) {
-                    return;
-                }
+                    if (currentVideo) {
+                        return;
+                    }
 
-                landingElement.classList.remove(
-                    "hidden"
-                );
+                    landingElement.classList.remove(
+                        "hidden"
+                    );
 
-            }, 1000);
+                },
+                1000
+            );
+
     }
 
+
     renderLanding();
+
 }
 
 
 /*
--------------------------------------------------------
- Metadata
--------------------------------------------------------
+=========================================================
+ METADATA
+=========================================================
 */
 
 function handleMetadata() {
+
+    /*
+    Update playback timer immediately when duration
+    becomes available.
+    */
+
+    updateVideoTimer();
+
 
     const width =
         videoElement.videoWidth;
@@ -1140,26 +1733,9 @@ function handleMetadata() {
 
 
 /*
--------------------------------------------------------
- Compute the exact box the video should render at
-
- Sizes the <video> element itself to the largest
- rectangle that (a) fits inside the viewer's available
- content area and (b) preserves the source's aspect
- ratio exactly (no cropping, no distortion).
-
- This is deliberately NOT done by stretching the
- element to 100%/100% and letting object-fit:contain
- "shrink" the picture inside it — that leaves letterboxed
- dead-space *inside* the element's own box, which is what
- makes the native controls bar (and its gradient) spill
- past the visible edges of the picture. Sizing the element
- itself to the content rectangle keeps native controls
- flush with the actual video, and still lets a
- low-resolution source scale UP to fill the viewer,
- since we're computing the box from the container size,
- not from the video's native pixel dimensions.
--------------------------------------------------------
+=========================================================
+ COMPUTE VIDEO BOX
+=========================================================
 */
 
 function computeVideoBoxSize() {
@@ -1168,123 +1744,192 @@ function computeVideoBoxSize() {
         return null;
     }
 
+
     const styles =
-        window.getComputedStyle(viewerElement);
+        window.getComputedStyle(
+            viewerElement
+        );
 
-    const paddingTop = parseFloat(styles.paddingTop) || 0;
-    const paddingBottom = parseFloat(styles.paddingBottom) || 0;
-    const paddingLeft = parseFloat(styles.paddingLeft) || 0;
-    const paddingRight = parseFloat(styles.paddingRight) || 0;
 
-    // Small breathing-room gutter, matching the previous
-    // "calc(100% - 16px)" visual spacing.
-    const GUTTER = 16;
+    const paddingTop =
+        parseFloat(styles.paddingTop) || 0;
+
+    const paddingBottom =
+        parseFloat(styles.paddingBottom) || 0;
+
+    const paddingLeft =
+        parseFloat(styles.paddingLeft) || 0;
+
+    const paddingRight =
+        parseFloat(styles.paddingRight) || 0;
+
+
+    const GUTTER =
+        16;
+
 
     const availableWidth =
         viewerElement.clientWidth -
-        paddingLeft - paddingRight - GUTTER;
+        paddingLeft -
+        paddingRight -
+        GUTTER;
+
 
     const availableHeight =
         viewerElement.clientHeight -
-        paddingTop - paddingBottom - GUTTER;
+        paddingTop -
+        paddingBottom -
+        GUTTER;
 
-    if (availableWidth <= 0 || availableHeight <= 0) {
+
+    if (
+        availableWidth <= 0 ||
+        availableHeight <= 0
+    ) {
+
         return null;
+
     }
 
+
     const ratio =
-        parseFloat(viewerElement.dataset.videoRatio) ||
+        parseFloat(
+            viewerElement.dataset.videoRatio
+        ) ||
         (16 / 9);
+
 
     let width;
     let height;
 
-    if (availableWidth / availableHeight > ratio) {
-        // Viewer is relatively wider than the video —
-        // height is the limiting dimension.
-        height = availableHeight;
-        width = height * ratio;
-    } else {
-        // Viewer is relatively taller than the video —
-        // width is the limiting dimension.
-        width = availableWidth;
-        height = width / ratio;
+
+    if (
+        availableWidth /
+        availableHeight >
+        ratio
+    ) {
+
+        height =
+            availableHeight;
+
+        width =
+            height * ratio;
+
+    }
+    else {
+
+        width =
+            availableWidth;
+
+        height =
+            width / ratio;
+
     }
 
-    return { width, height };
+
+    return {
+        width,
+        height
+    };
+
 }
 
 
 /*
--------------------------------------------------------
- Refresh video layout
--------------------------------------------------------
+=========================================================
+ REFRESH VIDEO LAYOUT
+=========================================================
 */
 
 function refreshVideoLayout() {
 
-    if (!viewerElement || !videoElement) {
+    if (
+        !viewerElement ||
+        !videoElement
+    ) {
+
         return;
+
     }
 
 
     /*
     -------------------------------------------------------
      No active video
-
-     Keep the video completely out of the landing layout.
     -------------------------------------------------------
     */
 
-if (!currentVideo) {
+    if (!currentVideo) {
 
-    if (videoElement) {
-        videoElement.style.display = "none";
+        if (videoElement) {
+
+            videoElement.style.display =
+                "none";
+
+        }
+
+
+        if (iframeElement) {
+
+            iframeElement.style.display =
+                "none";
+
+        }
+
+
+        return;
+
     }
-
-    if (iframeElement) {
-        iframeElement.style.display = "none";
-    }
-
-    return;
-}
-
-if (activePlayerType === "iframe") {
-
-    if (videoElement) {
-        videoElement.style.display = "none";
-    }
-
-    if (iframeElement) {
-        iframeElement.style.display = "block";
-        iframeElement.style.width = "100%";
-        iframeElement.style.height = "100%";
-    }
-
-    return;
-}
 
 
     /*
     -------------------------------------------------------
-     Active video
+     YouTube iframe
+    -------------------------------------------------------
+    */
 
-     The viewer remains fixed.
+    if (activePlayerType === "iframe") {
 
-     The <video> element itself is sized to the exact
-     rectangle that fills the viewer while preserving the
-     source's aspect ratio — no cropping, no distortion,
-     and no letterboxed slack inside the element (which
-     would otherwise let native controls overhang past the
-     visible picture).
+        if (videoElement) {
+
+            videoElement.style.display =
+                "none";
+
+        }
+
+
+        if (iframeElement) {
+
+            iframeElement.style.display =
+                "block";
+
+            iframeElement.style.width =
+                "100%";
+
+            iframeElement.style.height =
+                "100%";
+
+        }
+
+
+        return;
+
+    }
+
+
+    /*
+    -------------------------------------------------------
+     Native video
     -------------------------------------------------------
     */
 
     videoElement.style.display =
         "block";
 
+
     const box =
         computeVideoBoxSize();
+
 
     if (box) {
 
@@ -1294,15 +1939,17 @@ if (activePlayerType === "iframe") {
         videoElement.style.height =
             box.height + "px";
 
-    } else {
+    }
+    else {
 
-        // Fallback if the viewer isn't laid out yet.
         videoElement.style.width =
             "100%";
 
         videoElement.style.height =
             "100%";
+
     }
+
 
     videoElement.style.maxWidth =
         "100%";
@@ -1312,13 +1959,14 @@ if (activePlayerType === "iframe") {
 
     videoElement.style.objectFit =
         "contain";
+
 }
 
 
 /*
--------------------------------------------------------
- Playback
--------------------------------------------------------
+=========================================================
+ PLAYBACK
+=========================================================
 */
 
 function play() {
@@ -1328,6 +1976,7 @@ function play() {
     }
 
     return videoElement.play();
+
 }
 
 
@@ -1338,6 +1987,7 @@ function pause() {
     }
 
     videoElement.pause();
+
 }
 
 
@@ -1361,9 +2011,9 @@ function togglePlay() {
 
 
 /*
--------------------------------------------------------
- Mute
--------------------------------------------------------
+=========================================================
+ MUTE
+=========================================================
 */
 
 function setMuted(value) {
@@ -1391,36 +2041,46 @@ function toggleMute() {
 
 
 /*
--------------------------------------------------------
- Fullscreen
--------------------------------------------------------
+=========================================================
+ FULLSCREEN
+=========================================================
 */
 
 function fullscreen() {
-
 
     const target =
         activePlayerType === "iframe"
             ? iframeElement
             : videoElement;
 
-    if (!target) return;
 
-    if (document.fullscreenElement) {
-        document.exitFullscreen();
+    if (!target) {
         return;
     }
 
-    if (target.requestFullscreen) {
-        target.requestFullscreen();
+
+    if (document.fullscreenElement) {
+
+        document.exitFullscreen();
+
+        return;
+
     }
+
+
+    if (target.requestFullscreen) {
+
+        target.requestFullscreen();
+
+    }
+
 }
 
 
 /*
--------------------------------------------------------
- Current video
--------------------------------------------------------
+=========================================================
+ CURRENT VIDEO
+=========================================================
 */
 
 function getCurrentVideo() {
@@ -1431,22 +2091,27 @@ function getCurrentVideo() {
 
 
 /*
--------------------------------------------------------
- Public API
--------------------------------------------------------
+=========================================================
+ PUBLIC API
+=========================================================
 */
 
 return {
 
     init,
+
     openVideo,
+
     closeVideo,
 
     play,
+
     pause,
+
     togglePlay,
 
     setMuted,
+
     toggleMute,
 
     fullscreen,
@@ -1458,3 +2123,4 @@ return {
 };
 
 })();
+
