@@ -9,7 +9,7 @@
 
  Behavior
  • One message at a time.
- • Each message remains visible for 2.5 seconds.
+ • Each message remains visible for 3 seconds.
  • Sequence loops while loading continues.
  • Existing loading GIF remains untouched.
  • The current message can be retrieved by any viewer.
@@ -20,7 +20,7 @@
 
 window.SkyMediaLoading = (function () {
 
-    const MESSAGE_INTERVAL = 2500;
+    const MESSAGE_INTERVAL = 3500;
 
 
     const MESSAGES = [

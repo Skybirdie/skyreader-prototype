@@ -578,264 +578,384 @@ function stopShareLoading() {
 
     function createClosedGoButton() {
 
-        if (!closedPanel) {
-            return null;
-        }
+    if (!closedPanel) {
+        return null;
+    }
 
 
-        let button =
-            closedPanel.querySelector(
-                ".sky-share-closed-go-button"
-            );
-
-
-        if (button) {
-
-            updateClosedGoButtonLayout();
-
-            return button;
-        }
-
-
-        button =
-            document.createElement("a");
-
-
-        button.className =
-            "sky-share-closed-go-button";
-
-
-        button.href =
-            GLIDE_MEDIA_URL;
-
-
-        button.target =
-            "_blank";
-
-
-        button.rel =
-            "noopener noreferrer";
-
-
-        button.setAttribute(
-            "aria-label",
-            "Open Meditation Mornings"
+    let button =
+        closedPanel.querySelector(
+            ".sky-share-closed-go-button"
         );
 
 
-        button.style.setProperty(
-            "position",
-            "absolute",
-            "important"
-        );
-
-        button.style.setProperty(
-            "left",
-            "50%",
-            "important"
-        );
-
-        button.style.setProperty(
-            "top",
-            "50%",
-            "important"
-        );
-
-        button.style.setProperty(
-            "transform",
-            "translate(-50%, -50%)",
-            "important"
-        );
-
-        button.style.setProperty(
-            "height",
-            "auto",
-            "important"
-        );
-
-        button.style.setProperty(
-            "padding",
-            "0",
-            "important"
-        );
-
-        button.style.setProperty(
-            "margin",
-            "0",
-            "important"
-        );
-
-        button.style.setProperty(
-            "border",
-            "0",
-            "important"
-        );
-
-        button.style.setProperty(
-            "outline",
-            "none",
-            "important"
-        );
-
-        button.style.setProperty(
-            "text-decoration",
-            "none",
-            "important"
-        );
-
-        button.style.setProperty(
-            "cursor",
-            "pointer",
-            "important"
-        );
-
-        button.style.setProperty(
-            "box-sizing",
-            "border-box",
-            "important"
-        );
-
-        button.style.setProperty(
-            "z-index",
-            "10000",
-            "important"
-        );
-
-        button.style.setProperty(
-            "display",
-            "block",
-            "important"
-        );
-
-        button.style.setProperty(
-            "pointer-events",
-            "auto",
-            "important"
-        );
-
-
-        const picture =
-            document.createElement(
-                "picture"
-            );
-
-
-        const mobileSource =
-            document.createElement(
-                "source"
-            );
-
-
-        mobileSource.media =
-            "(max-width: 700px)";
-
-
-        mobileSource.srcset =
-            new URL(
-                "/assets/go-button-mobile.png",
-                window.location.origin
-            ).href;
-
-
-        picture.appendChild(
-            mobileSource
-        );
-
-
-        const image =
-            document.createElement(
-                "img"
-            );
-
-
-        image.src =
-            new URL(
-                "/assets/go-button.png",
-                window.location.origin
-            ).href;
-
-
-        image.alt =
-            "Open Meditation Mornings";
-
-
-        image.draggable =
-            false;
-
-
-        image.style.setProperty(
-            "display",
-            "block",
-            "important"
-        );
-
-        image.style.setProperty(
-            "width",
-            "100%",
-            "important"
-        );
-
-        image.style.setProperty(
-            "height",
-            "auto",
-            "important"
-        );
-
-        image.style.setProperty(
-            "max-width",
-            "100%",
-            "important"
-        );
-
-        image.style.setProperty(
-            "max-height",
-            "100vh",
-            "important"
-        );
-
-        image.style.setProperty(
-            "object-fit",
-            "contain",
-            "important"
-        );
-
-        image.style.setProperty(
-            "pointer-events",
-            "none",
-            "important"
-        );
-
-        image.style.setProperty(
-            "user-select",
-            "none",
-            "important"
-        );
-
-        image.style.setProperty(
-            "-webkit-user-drag",
-            "none",
-            "important"
-        );
-
-
-        picture.appendChild(
-            image
-        );
-
-        button.appendChild(
-            picture
-        );
-
-        closedPanel.appendChild(
-            button
-        );
-
+    if (button) {
 
         updateClosedGoButtonLayout();
 
-
         return button;
     }
+
+
+    button =
+        document.createElement("a");
+
+
+    button.className =
+        "sky-share-closed-go-button";
+
+
+    button.href =
+        GLIDE_MEDIA_URL;
+
+
+    button.target =
+        "_blank";
+
+
+    button.rel =
+        "noopener noreferrer";
+
+
+    button.setAttribute(
+        "aria-label",
+        "Open Meditation Mornings"
+    );
+
+
+    button.style.setProperty(
+        "position",
+        "absolute",
+        "important"
+    );
+
+    button.style.setProperty(
+        "left",
+        "50%",
+        "important"
+    );
+
+    button.style.setProperty(
+        "top",
+        "50%",
+        "important"
+    );
+
+    button.style.setProperty(
+        "transform",
+        "translate(-50%, -50%)",
+        "important"
+    );
+
+    button.style.setProperty(
+        "height",
+        "auto",
+        "important"
+    );
+
+    button.style.setProperty(
+        "padding",
+        "0",
+        "important"
+    );
+
+    button.style.setProperty(
+        "margin",
+        "0",
+        "important"
+    );
+
+    button.style.setProperty(
+        "border",
+        "0",
+        "important"
+    );
+
+    button.style.setProperty(
+        "outline",
+        "none",
+        "important"
+    );
+
+    button.style.setProperty(
+        "text-decoration",
+        "none",
+        "important"
+    );
+
+    button.style.setProperty(
+        "cursor",
+        "pointer",
+        "important"
+    );
+
+    button.style.setProperty(
+        "box-sizing",
+        "border-box",
+        "important"
+    );
+
+    button.style.setProperty(
+        "z-index",
+        "10000",
+        "important"
+    );
+
+    button.style.setProperty(
+        "display",
+        "block",
+        "important"
+    );
+
+    button.style.setProperty(
+        "pointer-events",
+        "auto",
+        "important"
+    );
+
+
+    const picture =
+        document.createElement(
+            "picture"
+        );
+
+
+    const mobileSource =
+        document.createElement(
+            "source"
+        );
+
+
+    mobileSource.media =
+        "(max-width: 700px)";
+
+
+    mobileSource.srcset =
+        new URL(
+            "/assets/go-button-mobile.png",
+            window.location.origin
+        ).href;
+
+
+    picture.appendChild(
+        mobileSource
+    );
+
+
+    const image =
+        document.createElement(
+            "img"
+        );
+
+
+    image.src =
+        new URL(
+            "/assets/go-button.png",
+            window.location.origin
+        ).href;
+
+
+    image.alt =
+        "Open Meditation Mornings";
+
+
+    image.draggable =
+        false;
+
+
+    image.style.setProperty(
+        "display",
+        "block",
+        "important"
+    );
+
+    image.style.setProperty(
+        "width",
+        "100%",
+        "important"
+    );
+
+    image.style.setProperty(
+        "height",
+        "auto",
+        "important"
+    );
+
+    image.style.setProperty(
+        "max-width",
+        "100%",
+        "important"
+    );
+
+    image.style.setProperty(
+        "max-height",
+        "100vh",
+        "important"
+    );
+
+    image.style.setProperty(
+        "object-fit",
+        "contain",
+        "important"
+    );
+
+    image.style.setProperty(
+        "pointer-events",
+        "none",
+        "important"
+    );
+
+    image.style.setProperty(
+        "user-select",
+        "none",
+        "important"
+    );
+
+    image.style.setProperty(
+        "-webkit-user-drag",
+        "none",
+        "important"
+    );
+
+
+    picture.appendChild(
+        image
+    );
+
+    button.appendChild(
+        picture
+    );
+
+
+    /* =====================================================
+       OVERLAY GIF
+       -----------------------------------------------------
+       60px wide; height remains automatic to preserve the
+       GIF's native aspect ratio. pointer-events:none keeps
+       the underlying Go button fully clickable.
+    ===================================================== */
+
+    const gif =
+        document.createElement(
+            "img"
+        );
+
+
+    gif.src =
+        new URL(
+            "/assets/go-button-gif.gif",
+            window.location.origin
+        ).href;
+
+
+    gif.alt =
+        "";
+
+
+    gif.setAttribute(
+        "aria-hidden",
+        "true"
+    );
+
+
+    gif.draggable =
+        false;
+
+
+    gif.style.setProperty(
+        "position",
+        "absolute",
+        "important"
+    );
+
+    gif.style.setProperty(
+        "left",
+        "50%",
+        "important"
+    );
+
+    gif.style.setProperty(
+        "top",
+        "50%",
+        "important"
+    );
+
+    gif.style.setProperty(
+        "transform",
+        "translate(-50%, -50%)",
+        "important"
+    );
+
+    gif.style.setProperty(
+        "width",
+        "60px",
+        "important"
+    );
+
+    gif.style.setProperty(
+        "height",
+        "auto",
+        "important"
+    );
+
+    gif.style.setProperty(
+        "max-width",
+        "none",
+        "important"
+    );
+
+    gif.style.setProperty(
+        "max-height",
+        "none",
+        "important"
+    );
+
+    gif.style.setProperty(
+        "object-fit",
+        "contain",
+        "important"
+    );
+
+    gif.style.setProperty(
+        "pointer-events",
+        "none",
+        "important"
+    );
+
+    gif.style.setProperty(
+        "user-select",
+        "none",
+        "important"
+    );
+
+    gif.style.setProperty(
+        "-webkit-user-drag",
+        "none",
+        "important"
+    );
+
+    gif.style.setProperty(
+        "z-index",
+        "2",
+        "important"
+    );
+
+
+    button.appendChild(
+        gif
+    );
+
+
+    closedPanel.appendChild(
+        button
+    );
+
+
+    updateClosedGoButtonLayout();
+
+
+    return button;
+}
 
 
     /* =====================================================
