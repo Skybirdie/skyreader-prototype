@@ -4318,12 +4318,32 @@ body.sky-share-mode.sky-share-book
 }
 
 
-/*
- * The viewer is temporarily hidden by ShareViewer while
- * PageFlip establishes its initial dimensions.
- */
+/* =========================================================
+   SHARE BOOK — INITIAL LAYOUT HIDDEN
+   ========================================================= */
+
+body.sky-share-mode.sky-share-book
+.sky-share-media-host.sky-share-book-layout-pending {
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+
 body.sky-share-mode.sky-share-book
 #viewerArea.sky-share-book-layout-pending {
     visibility: hidden !important;
     opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+
+/*
+ * No animated movement during initial PageFlip setup.
+ */
+body.sky-share-mode.sky-share-book
+#viewerArea,
+body.sky-share-mode.sky-share-book
+#viewerArea * {
+    transition: none !important;
 }
