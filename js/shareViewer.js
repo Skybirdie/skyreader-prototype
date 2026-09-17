@@ -4112,10 +4112,6 @@ function unbindLastPageProtection() {
 
 
         viewer.classList.add(
-    "sky-share-responsive-book"
-);
-
-        viewer.classList.add(
             "sky-share-mounted-viewer"
         );
 
@@ -4922,19 +4918,19 @@ function scheduleBookResponsiveRefresh(
                             }
 
 
-                            /*
-                             * Only refresh if the actual Share
-                             * media area changed size.
-                             */
+                            const rect =
+                                mediaHost.getBoundingClientRect();
+
+
                             const width =
                                 Math.round(
-                                    mediaHost.getBoundingClientRect().width
+                                    rect.width
                                 );
 
 
                             const height =
                                 Math.round(
-                                    mediaHost.getBoundingClientRect().height
+                                    rect.height
                                 );
 
 
@@ -4947,12 +4943,23 @@ function scheduleBookResponsiveRefresh(
 
 
                             /*
-                             * Ignore observer callbacks caused
-                             * by PageFlip internals when the
-                             * actual available Share size has
-                             * not changed.
+                             * IMPORTANT:
+                             *
+                             * Always perform the FIRST refresh.
+                             *
+                             * During initial loading,
+                             * bookInitialLayoutReady is false.
+                             *
+                             * After the first stable layout has been
+                             * revealed, ordinary resize events can use
+                             * the dimension comparison below.
                              */
+                            const initialLayout =
+                                !bookInitialLayoutReady;
+
+
                             if (
+                                !initialLayout &&
                                 width ===
                                     bookResponsiveLastWidth &&
                                 height ===
@@ -4992,14 +4999,16 @@ function scheduleBookResponsiveRefresh(
 
 
                             /*
-                             * Initial startup:
+                             * INITIAL BOOK REVEAL
                              *
-                             * The complete media host is hidden,
-                             * so PageFlip can establish its geometry
-                             * without showing the initial frame.
+                             * Reader.refresh() has now run while
+                             * the entire media host is hidden.
+                             *
+                             * Give the browser two paint cycles to
+                             * settle PageFlip before revealing it.
                              */
                             if (
-                                !bookInitialLayoutReady
+                                initialLayout
                             ) {
 
                                 requestAnimationFrame(
@@ -5015,6 +5024,16 @@ function scheduleBookResponsiveRefresh(
                                                 }
 
 
+                                                if (
+                                                    shell &&
+                                                    shell.classList.contains(
+                                                        "sky-share-document-closed"
+                                                    )
+                                                ) {
+                                                    return;
+                                                }
+
+
                                                 try {
 
                                                     Reader.refresh();
@@ -5023,7 +5042,7 @@ function scheduleBookResponsiveRefresh(
                                                 catch (error) {
 
                                                     console.warn(
-                                                        "[SkyMedia Share] Initial Reader refresh:",
+                                                        "[SkyMedia Share] Final initial Reader refresh:",
                                                         error
                                                     );
 
@@ -5061,10 +5080,6 @@ function scheduleBookResponsiveRefresh(
 function bindBookResponsiveRefresh() {
 
     if (bookResponsiveRefreshBound) {
-
-        /*
-         * Responsive monitoring is already active.
-         */
         return;
     }
 
@@ -5074,37 +5089,23 @@ function bindBookResponsiveRefresh() {
 
 
     /*
-     * Establish the current media-host dimensions before
-     * any resize event is processed.
+     * Reset the remembered dimensions.
+     *
+     * This is important because the FIRST refresh must
+     * always happen, even when the current dimensions
+     * already match the eventual Share dimensions.
      */
-    if (mediaHost) {
-
-        const rect =
-            mediaHost.getBoundingClientRect();
+    bookResponsiveLastWidth =
+        0;
 
 
-        bookResponsiveLastWidth =
-            Math.round(
-                rect.width
-            );
-
-
-        bookResponsiveLastHeight =
-            Math.round(
-                rect.height
-            );
-    }
+    bookResponsiveLastHeight =
+        0;
 
 
     /*
      * -------------------------------------------------
      * Browser / window resize
-     *
-     * Handles:
-     *   • DevTools opening/closing
-     *   • Browser resizing
-     *   • Maximize / restore
-     *   • Orientation changes
      * -------------------------------------------------
      */
     window.addEventListener(
@@ -5149,15 +5150,9 @@ function bindBookResponsiveRefresh() {
 
     /*
      * -------------------------------------------------
-     * ResizeObserver
+     * Observe ONLY the stable Share media host.
      *
-     * ONLY observe the stable Share media host.
-     *
-     * Do NOT observe:
-     *   #viewerArea
-     *   .sky-share-main
-     *
-     * Those can change during PageFlip navigation.
+     * Do NOT observe #viewerArea or .sky-share-main.
      * -------------------------------------------------
      */
     if (
@@ -5186,7 +5181,10 @@ function bindBookResponsiveRefresh() {
 
     /*
      * -------------------------------------------------
-     * SINGLE INITIAL REFRESH
+     * FIRST INITIAL REFRESH
+     *
+     * bookInitialLayoutReady is false here, so the
+     * first Reader.refresh() is guaranteed to execute.
      * -------------------------------------------------
      */
     scheduleBookResponsiveRefresh(
@@ -5194,6 +5192,51 @@ function bindBookResponsiveRefresh() {
     );
 }
 
+
+function unbindBookResponsiveRefresh() {
+
+    if (bookResizeTimer) {
+
+        clearTimeout(
+            bookResizeTimer
+        );
+
+        bookResizeTimer =
+            null;
+    }
+
+
+    if (bookResizeRaf) {
+
+        cancelAnimationFrame(
+            bookResizeRaf
+        );
+
+        bookResizeRaf =
+            0;
+    }
+
+
+    if (bookResizeObserver) {
+
+        bookResizeObserver.disconnect();
+
+        bookResizeObserver =
+            null;
+    }
+
+
+    bookResponsiveRefreshBound =
+        false;
+
+
+    bookResponsiveLastWidth =
+        0;
+
+
+    bookResponsiveLastHeight =
+        0;
+}
 
 function unbindBookResponsiveRefresh() {
 
