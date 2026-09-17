@@ -260,7 +260,7 @@ body.sky-share-mode .sky-share-subtitle {
 
 body.sky-share-mode .sky-share-title {
     text-shadow: none !important;
-    filter: drop-shadow(0 2px 0 rgba(0,0,0,.65)) !important;
+    filter: drop-shadow(0 1px 0 rgba(0,0,0,1)) !important;
 }
 
 body.sky-share-mode .sky-share-title {
@@ -4004,22 +4004,24 @@ body.sky-share-mode .sky-share-title {
 }
 
 
-/* Reader Share welcome banner */
-body.sky-share-mode.sky-share-book .sr-welcome-banner {
-    position: fixed !important;
+/* =========================================================
+   SHARE BOOK — STATUS + WELCOME BARS
+   They must touch with no gap.
+   ========================================================= */
 
+body.sky-share-mode.sky-share-book #statusBar {
+    position: fixed !important;
     left: 0 !important;
     right: 0 !important;
-    bottom: 0 !important;
+    bottom: 21px !important;
 
     width: 100vw !important;
-
-    height: 21px !important;
-    min-height: 21px !important;
-    max-height: 21px !important;
+    height: 30px !important;
+    min-height: 30px !important;
 
     margin: 0 !important;
-    padding: 0 !important;
+    padding: 0 12px !important;
+    box-sizing: border-box !important;
 
     display: flex !important;
     align-items: center !important;
@@ -4028,11 +4030,36 @@ body.sky-share-mode.sky-share-book .sr-welcome-banner {
     visibility: visible !important;
     opacity: 1 !important;
 
+    z-index: 1000020 !important;
+
+    border: 0 !important;
+}
+
+body.sky-share-mode.sky-share-book .sr-welcome-banner {
+    position: fixed !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+
+    width: 100vw !important;
+    height: 21px !important;
+    min-height: 21px !important;
+    max-height: 21px !important;
+
+    margin: 0 !important;
+    padding: 0 !important;
     box-sizing: border-box !important;
-    overflow: visible !important;
+
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+
+    visibility: visible !important;
+    opacity: 1 !important;
 
     z-index: 1000030 !important;
-    pointer-events: none !important;
+
+    border: 0 !important;
 }
 
 
@@ -4059,39 +4086,7 @@ body.sky-share-mode.sky-share-book .sr-welcome-banner {
 
 }
 
-/* =========================================================
-   SHARE BOOK — KEEP THE REAL READER STATUS BAR VISIBLE
-   ========================================================= */
 
-body.sky-share-mode.sky-share-book #statusBar {
-    position: fixed !important;
-    left: 0 !important;
-    right: 0 !important;
-    bottom: var(--sky-share-welcome-height, 22px) !important;
-
-    width: 100vw !important;
-    height: var(--sky-share-status-height, 30px) !important;
-    min-height: var(--sky-share-status-height, 30px) !important;
-    max-height: var(--sky-share-status-height, 30px) !important;
-
-    margin: 0 !important;
-    padding: 0 12px !important;
-
-    box-sizing: border-box !important;
-
-    display: flex !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-
-    align-items: center !important;
-    justify-content: center !important;
-
-    overflow: visible !important;
-
-    z-index: 1000020 !important;
-
-    pointer-events: auto !important;
-}
 
 
 /*
@@ -4114,4 +4109,23 @@ body.sky-share-mode.sky-share-book.sky-share-controls-hidden #statusBar #pageInd
     display: flex !important;
     visibility: visible !important;
     opacity: 1 !important;
+}
+
+
+/* =========================================================
+   SHARE BOOK — FORCE PAGE/TITLE INDICATOR VISIBLE
+   ========================================================= */
+
+body.sky-share-mode.sky-share-book #statusBar #pageIndicator {
+    display: inline-flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: static !important;
+    width: auto !important;
+    height: auto !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    transform: none !important;
 }
