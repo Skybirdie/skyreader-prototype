@@ -73,6 +73,10 @@ window.ShareViewer = (function () {
     let controlsIdleTimer = null;
     let controlsActivityBound = false;
 
+    let shareClosing = false;
+
+    let mediaCloseClickBound = false;
+
     let bookGestureBound = false;
     let bookWheelTarget = null;
     let bookTouchTarget = null;
@@ -2072,16 +2076,19 @@ window.ShareViewer = (function () {
     }
 
 
-    /* =====================================================
+        /* =====================================================
        STOP NON-BOOK MEDIA
     ===================================================== */
 
     function stopNonBookMedia() {
 
         /*
-         * Ask the owning viewer to close if it exposes a close
-         * method. Errors are deliberately ignored so that a
-         * missing close API never prevents the Share closed state.
+         * VideoViewer.close() and SlideshowViewer.close()
+         * have been bridged above.
+         *
+         * shareClosing === true while this function runs,
+         * so the bridge passes through to each viewer's
+         * original close implementation.
          */
 
         if (
@@ -2129,8 +2136,7 @@ window.ShareViewer = (function () {
 
 
         /*
-         * Also stop any HTML5 video/audio elements that remain
-         * mounted in the Share surface.
+         * Stop any remaining HTML5 media.
          */
         if (mediaHost) {
 
@@ -3066,217 +3072,316 @@ window.ShareViewer = (function () {
     }
 
 
-    /* =====================================================
+        /* =====================================================
        CLOSE
     ===================================================== */
 
     function close() {
 
-        stopPageWatcher();
-
-        detachBookZoom();
-
-        stopControlsIdleTimer();
-
-        unbindBookGestures();
-
-        exitFullscreen();
-
         /*
-         * FIRST hide all item-specific controls for ALL
-         * share types.
+         * Ignore duplicate close requests.
          */
-        hideSharedItemControls();
+        if (shareClosing) {
+            return;
+        }
 
 
         /*
-         * Stop video/slideshow ownership before hiding the
-         * media surface.
+         * There is nothing more to close if the common
+         * Share closed state is already active.
          */
-        stopNonBookMedia();
+        if (
+            shell &&
+            shell.classList.contains(
+                "sky-share-document-closed"
+            )
+        ) {
+            return;
+        }
 
 
-        /*
-         * Book cleanup.
-         */
+        shareClosing =
+            true;
+
+
         try {
 
-            if (
-                isBookShare() &&
-                window.Reader &&
-                typeof Reader.close ===
-                    "function" &&
-                Reader.isOpen()
-            ) {
+            stopPageWatcher();
 
-                Reader.close({
-                    playSound: false
-                });
+            detachBookZoom();
+
+            stopControlsIdleTimer();
+
+            unbindBookGestures();
+
+            exitFullscreen();
+
+
+            /*
+             * FIRST:
+             * hide all item-specific controls for every
+             * supported shared media type.
+             */
+            hideSharedItemControls();
+
+
+            /*
+             * Stop Video / Slideshow while shareClosing is true.
+             *
+             * The viewer close bridges therefore call their
+             * original viewer cleanup methods instead of
+             * recursively calling ShareViewer.close().
+             */
+            stopNonBookMedia();
+
+
+            /*
+             * Book cleanup.
+             */
+            try {
+
+                if (
+                    isBookShare() &&
+                    window.Reader &&
+                    typeof Reader.close ===
+                        "function" &&
+                    Reader.isOpen()
+                ) {
+
+                    Reader.close({
+                        playSound: false
+                    });
+                }
+
+            }
+            catch (error) {
+
+                console.warn(
+                    "[SkyMedia Share] Reader close cleanup:",
+                    error
+                );
             }
 
-        }
-        catch (error) {
 
-            console.warn(
-                "[SkyMedia Share] Reader close cleanup:",
-                error
-            );
-        }
+            /*
+             * Reader.close() may restore normal Reader surfaces.
+             * Reapply Share isolation.
+             */
+            isolateApplication();
 
 
-        /*
-         * Re-hide anything restored by Reader.close().
-         */
-        isolateApplication();
+            /*
+             * Hide standard Reader surfaces.
+             */
+            [
+                "#workspace",
+                "#topBar",
+                "#topSearchGroup",
+                "#topBarRightControls",
+                "#library",
+                "#libraryPanel",
+                "#readerLibrary",
+                "#readerDrawer",
+                "#toolbar",
+                "#viewerArea",
+                "#statusBar"
+            ].forEach(
+                selector => {
 
+                    document
+                        .querySelectorAll(
+                            selector
+                        )
+                        .forEach(
+                            el => {
 
-        /*
-         * Hide all standard Reader surfaces that could have
-         * been restored.
-         */
-        [
-            "#workspace",
-            "#topBar",
-            "#topSearchGroup",
-            "#topBarRightControls",
-            "#library",
-            "#libraryPanel",
-            "#readerLibrary",
-            "#readerDrawer",
-            "#toolbar",
-            "#viewerArea",
-            "#statusBar"
-        ].forEach(
-            selector => {
+                                el.style.setProperty(
+                                    "display",
+                                    "none",
+                                    "important"
+                                );
 
-                document
-                    .querySelectorAll(
-                        selector
-                    )
-                    .forEach(
-                        el => {
+                                el.style.setProperty(
+                                    "visibility",
+                                    "hidden",
+                                    "important"
+                                );
 
-                            el.style.setProperty(
-                                "display",
-                                "none",
-                                "important"
-                            );
+                                el.style.setProperty(
+                                    "opacity",
+                                    "0",
+                                    "important"
+                                );
 
-                            el.style.setProperty(
-                                "visibility",
-                                "hidden",
-                                "important"
-                            );
-
-                            el.style.setProperty(
-                                "pointer-events",
-                                "none",
-                                "important"
-                            );
-                        }
-                    );
-            }
-        );
-
-
-        /*
-         * Hide Video and Slideshow surfaces/control systems
-         * explicitly as well.
-         */
-        [
-            "#videoTopBar",
-            "#videoControls",
-            "#videoViewerControls",
-            "#videoPlayerControls",
-            ".video-controls",
-            ".video-player-controls",
-            ".video-control-bar",
-            ".video-toolbar",
-
-            "#slideshowViewer",
-            "#slideshowViewerControls",
-            "#slideshowControls",
-            ".slideshow-top-bar",
-            ".slideshow-controls",
-            ".slideshow-control-bar",
-            ".slideshow-toolbar",
-            ".slideshow-buttons"
-        ].forEach(
-            selector => {
-
-                document
-                    .querySelectorAll(
-                        selector
-                    )
-                    .forEach(
-                        el => {
-
-                            el.style.setProperty(
-                                "display",
-                                "none",
-                                "important"
-                            );
-
-                            el.style.setProperty(
-                                "visibility",
-                                "hidden",
-                                "important"
-                            );
-
-                            el.style.setProperty(
-                                "opacity",
-                                "0",
-                                "important"
-                            );
-
-                            el.style.setProperty(
-                                "pointer-events",
-                                "none",
-                                "important"
-                            );
-                        }
-                    );
-            }
-        );
-
-
-        /*
-         * Hide Welcome banner after closing.
-         */
-        document
-            .querySelectorAll(
-                ".sr-welcome-banner"
-            )
-            .forEach(
-                el => {
-
-                    el.style.setProperty(
-                        "display",
-                        "none",
-                        "important"
-                    );
-
-                    el.style.setProperty(
-                        "visibility",
-                        "hidden",
-                        "important"
-                    );
+                                el.style.setProperty(
+                                    "pointer-events",
+                                    "none",
+                                    "important"
+                                );
+                            }
+                        );
                 }
             );
 
 
-        /*
-         * Finally hide the mounted media host so no old
-         * video/slideshow/book surface can sit above the
-         * closed-state button.
-         */
-        hideSharedItemSurfaces();
+            /*
+             * Hide Video surfaces and controls.
+             */
+            [
+                "#videoTopBar",
+                "#videoToolbar",
+                "#videoControls",
+                "#videoViewerControls",
+                "#videoPlayerControls",
+                ".video-controls",
+                ".video-player-controls",
+                ".video-control-bar",
+                ".video-toolbar"
+            ].forEach(
+                selector => {
+
+                    document
+                        .querySelectorAll(
+                            selector
+                        )
+                        .forEach(
+                            el => {
+
+                                el.style.setProperty(
+                                    "display",
+                                    "none",
+                                    "important"
+                                );
+
+                                el.style.setProperty(
+                                    "visibility",
+                                    "hidden",
+                                    "important"
+                                );
+
+                                el.style.setProperty(
+                                    "opacity",
+                                    "0",
+                                    "important"
+                                );
+
+                                el.style.setProperty(
+                                    "pointer-events",
+                                    "none",
+                                    "important"
+                                );
+                            }
+                        );
+                }
+            );
 
 
-        /*
-         * Show common closed state.
-         */
-        showClosedPanel();
+            /*
+             * Hide Slideshow surfaces and controls.
+             */
+            [
+                "#slideshowTopBar",
+                "#slideshowToolbar",
+                "#slideshowControls",
+                "#slideshowViewerControls",
+                ".slideshow-top-bar",
+                ".slideshow-controls",
+                ".slideshow-control-bar",
+                ".slideshow-toolbar",
+                ".slideshow-buttons"
+            ].forEach(
+                selector => {
+
+                    document
+                        .querySelectorAll(
+                            selector
+                        )
+                        .forEach(
+                            el => {
+
+                                el.style.setProperty(
+                                    "display",
+                                    "none",
+                                    "important"
+                                );
+
+                                el.style.setProperty(
+                                    "visibility",
+                                    "hidden",
+                                    "important"
+                                );
+
+                                el.style.setProperty(
+                                    "opacity",
+                                    "0",
+                                    "important"
+                                );
+
+                                el.style.setProperty(
+                                    "pointer-events",
+                                    "none",
+                                    "important"
+                                );
+                            }
+                        );
+                }
+            );
+
+
+            /*
+             * Hide the welcome banner.
+             */
+            document
+                .querySelectorAll(
+                    ".sr-welcome-banner"
+                )
+                .forEach(
+                    el => {
+
+                        el.style.setProperty(
+                            "display",
+                            "none",
+                            "important"
+                        );
+
+                        el.style.setProperty(
+                            "visibility",
+                            "hidden",
+                            "important"
+                        );
+                    }
+                );
+
+
+            /*
+             * Hide the actual mounted media surface.
+             */
+            hideSharedItemSurfaces();
+
+
+            /*
+             * ONE common closed state for:
+             *
+             *   Book
+             *   Video
+             *   Slideshow
+             */
+            showClosedPanel();
+
+        }
+        catch (error) {
+
+            console.error(
+                "[SkyMedia Share] Close cleanup:",
+                error
+            );
+
+        }
+        finally {
+
+            shareClosing =
+                false;
+        }
     }
 
 
@@ -3856,6 +3961,260 @@ window.ShareViewer = (function () {
         }
     }
 
+    /* =====================================================
+       VIDEO / SLIDESHOW CLOSE BRIDGES
+
+       Reader close is ShareViewer-owned.
+
+       Video and Slideshow have their own viewer-owned
+       close paths, so bridge those paths back into the
+       common Share closed-state handler.
+    ===================================================== */
+
+    function bindViewerCloseBridges() {
+
+        /*
+         * VIDEO
+         */
+        if (
+            window.VideoViewer &&
+            typeof VideoViewer.close ===
+                "function"
+        ) {
+
+            if (
+                !VideoViewer._skyShareOriginalClose
+            ) {
+
+                const originalClose =
+                    VideoViewer.close;
+
+
+                VideoViewer._skyShareOriginalClose =
+                    originalClose;
+
+
+                VideoViewer.close =
+                    function (...args) {
+
+                        /*
+                         * When Share Mode owns a video,
+                         * its normal viewer close must become
+                         * ShareViewer.close().
+                         */
+                        if (
+                            started &&
+                            isVideoShare() &&
+                            !shareClosing &&
+                            !shell?.classList.contains(
+                                "sky-share-document-closed"
+                            )
+                        ) {
+
+                            close();
+
+                            return;
+                        }
+
+
+                        /*
+                         * During ShareViewer.close(), permit
+                         * the real viewer cleanup to run.
+                         */
+                        return originalClose.apply(
+                            this,
+                            args
+                        );
+                    };
+            }
+        }
+
+
+        /*
+         * SLIDESHOW
+         */
+        if (
+            window.SlideshowViewer &&
+            typeof SlideshowViewer.close ===
+                "function"
+        ) {
+
+            if (
+                !SlideshowViewer._skyShareOriginalClose
+            ) {
+
+                const originalClose =
+                    SlideshowViewer.close;
+
+
+                SlideshowViewer._skyShareOriginalClose =
+                    originalClose;
+
+
+                SlideshowViewer.close =
+                    function (...args) {
+
+                        if (
+                            started &&
+                            isSlideshowShare() &&
+                            !shareClosing &&
+                            !shell?.classList.contains(
+                                "sky-share-document-closed"
+                            )
+                        ) {
+
+                            close();
+
+                            return;
+                        }
+
+
+                        return originalClose.apply(
+                            this,
+                            args
+                        );
+                    };
+            }
+        }
+    }
+
+
+    function bindMediaCloseClickBridge() {
+
+        if (mediaCloseClickBound) {
+            return;
+        }
+
+
+        mediaCloseClickBound =
+            true;
+
+
+        document.addEventListener(
+            "click",
+            function (event) {
+
+                if (!started) {
+                    return;
+                }
+
+
+                if (shareClosing) {
+                    return;
+                }
+
+
+                if (
+                    shell &&
+                    shell.classList.contains(
+                        "sky-share-document-closed"
+                    )
+                ) {
+                    return;
+                }
+
+
+                /*
+                 * Only Video and Slideshow need this bridge.
+                 */
+                if (
+                    !isVideoShare() &&
+                    !isSlideshowShare()
+                ) {
+                    return;
+                }
+
+
+                const target =
+                    event.target;
+
+
+                if (
+                    !target ||
+                    !target.closest
+                ) {
+                    return;
+                }
+
+
+                const button =
+                    target.closest(
+                        "button, a, [role='button'], [data-action]"
+                    );
+
+
+                if (!button) {
+                    return;
+                }
+
+
+                /*
+                 * Examine the common ways close buttons
+                 * identify themselves.
+                 */
+                const metadata =
+                    [
+                        button.id,
+                        button.className,
+                        button.getAttribute(
+                            "aria-label"
+                        ),
+                        button.getAttribute(
+                            "title"
+                        ),
+                        button.getAttribute(
+                            "data-action"
+                        )
+                    ]
+                    .filter(Boolean)
+                    .join(" ");
+
+
+                /*
+                 * Do not mistake fullscreen controls for
+                 * the document-close control.
+                 */
+                if (
+                    /fullscreen/i.test(
+                        metadata
+                    )
+                ) {
+                    return;
+                }
+
+
+                /*
+                 * Catch close controls even when the viewer
+                 * doesn't expose a close() API.
+                 */
+                if (
+                    !/close/i.test(
+                        metadata
+                    )
+                ) {
+                    return;
+                }
+
+
+                event.preventDefault();
+                event.stopPropagation();
+
+
+                if (
+                    typeof event.stopImmediatePropagation ===
+                        "function"
+                ) {
+
+                    event.stopImmediatePropagation();
+                }
+
+
+                close();
+
+            },
+            true
+        );
+    }
 
     /* =====================================================
        VIDEO
@@ -3928,9 +4287,18 @@ window.ShareViewer = (function () {
         }
 
 
-        return VideoViewer.openVideo(
+                await VideoViewer.openVideo(
             item
         );
+
+
+        /*
+         * Video is now open and its own viewer has
+         * established its controls. Bridge its close
+         * path into ShareViewer.
+         */
+        bindViewerCloseBridges();
+        bindMediaCloseClickBridge();
     }
 
 
@@ -4022,9 +4390,18 @@ window.ShareViewer = (function () {
         );
 
 
-        await SlideshowViewer.open(
+                await SlideshowViewer.open(
             item
         );
+
+
+        /*
+         * Slideshow is now open and its own viewer has
+         * established its controls. Bridge its close
+         * path into ShareViewer.
+         */
+        bindViewerCloseBridges();
+        bindMediaCloseClickBridge();
     }
 
 
