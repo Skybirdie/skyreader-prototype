@@ -18,13 +18,30 @@
  • Existing Reader wheel navigation retained.
  • Last-page mouse click cannot close the book in Share Mode.
  • X closes the document but does NOT return to Reader landing.
- • X shows the large Open Meditation Mornings button.
+ • X shows the large Open Meditation Mornings image button.
  • Fullscreen keeps background.jpg.
  • Share header disappears in fullscreen.
  • Status bar remains directly below the symmetrical page gap.
  • Welcome banner remains directly below status bar.
  • Existing Reader page indicator is preserved and explicitly
    synchronized by Share Mode after the Reader surface is moved.
+
+ BOOK STATUS FORMAT
+ --------------------------------------------------------
+      Book Title        [ 2–3 / 24 ]
+
+ • Book title is plain text.
+ • Page/spread count is the only content inside #pageIndicator.
+ • The title is NOT placed inside #pageIndicator.
+
+ CLOSED STATE
+ --------------------------------------------------------
+ • Existing small bottom-right Open Meditation Mornings
+   button is unchanged.
+ • A separate large assets/go-button.png image is centered.
+ • Large image links to Meditation Mornings.
+ • Large image preserves its own aspect ratio.
+ • CSS controls its responsive size and floating animation.
 =========================================================
 */
 
@@ -41,6 +58,7 @@ window.ShareViewer = (function () {
     let statusElement = null;
 
     let closedPanel = null;
+
     let bookControlsBound = false;
     let pageStateTimer = null;
 
@@ -69,16 +87,23 @@ window.ShareViewer = (function () {
        BASIC HELPERS
     ===================================================== */
 
-    function createElement(tag, className, text) {
+    function createElement(
+        tag,
+        className,
+        text
+    ) {
 
-        const el = document.createElement(tag);
+        const el =
+            document.createElement(tag);
 
         if (className) {
-            el.className = className;
+            el.className =
+                className;
         }
 
         if (text !== undefined) {
-            el.textContent = text;
+            el.textContent =
+                text;
         }
 
         return el;
@@ -87,11 +112,12 @@ window.ShareViewer = (function () {
 
     function isBookShare() {
 
-        const section = String(
-            activeTarget?.section ||
-            activeItem?.type ||
-            ""
-        ).toLowerCase();
+        const section =
+            String(
+                activeTarget?.section ||
+                activeItem?.type ||
+                ""
+            ).toLowerCase();
 
         return (
             section === "reader" ||
@@ -102,7 +128,9 @@ window.ShareViewer = (function () {
 
     function sectionLabel(section) {
 
-        switch (String(section || "").toLowerCase()) {
+        switch (
+            String(section || "").toLowerCase()
+        ) {
 
             case "reader":
             case "book":
@@ -124,307 +152,394 @@ window.ShareViewer = (function () {
     /* =====================================================
        SHARE BOOK PAGE INDICATOR
 
-       The normal Reader already owns #pageIndicator and
-       ui.js already knows how to calculate spread labels.
+       The Reader already owns:
 
-       Share Mode moves #statusBar out of its original Reader
-       location. That can interfere with the normal UI timing.
+           #readerTitle
+           #pageIndicator
 
-       Therefore Share Mode explicitly reasserts the existing
-       Reader indicator after mounting and while navigating.
+       We deliberately keep those as separate elements.
 
-       IMPORTANT:
-       We do NOT create a second page-count element.
+       Result:
 
-       The actual Reader #pageIndicator remains the source of
-       truth.
+           Book Title      [ 2–3 / 24 ]
+
+       The title is NOT inserted into #pageIndicator.
     ===================================================== */
 
     function updateShareBookIndicator() {
 
-    if (!isBookShare()) {
-        return;
-    }
-
-
-    if (
-        !window.Reader ||
-        typeof Reader.currentPage !== "function" ||
-        typeof Reader.pages !== "function"
-    ) {
-        return;
-    }
-
-
-    const indicator =
-        document.getElementById("pageIndicator");
-
-    if (!indicator) {
-        return;
-    }
-
-
-    /*
-    -------------------------------------------------------
-     Let the normal Reader UI establish its page/spread
-     information first.
-    -------------------------------------------------------
-    */
-
-    if (
-        typeof window.updatePageIndicator ===
-            "function"
-    ) {
-
-        try {
-
-            window.updatePageIndicator();
-
+        if (!isBookShare()) {
+            return;
         }
-        catch (error) {
 
-            console.warn(
-                "[SkyMedia Share] Reader page indicator refresh:",
-                error
+
+        if (
+            !window.Reader ||
+            typeof Reader.currentPage !==
+                "function" ||
+            typeof Reader.pages !==
+                "function"
+        ) {
+            return;
+        }
+
+
+        const indicator =
+            document.getElementById(
+                "pageIndicator"
             );
 
+
+        /*
+         * The normal Reader title element.
+         */
+        const readerTitle =
+            document.getElementById(
+                "readerTitle"
+            );
+
+
+        /*
+         * Get the authoritative Reader book.
+         */
+        const book =
+            typeof Reader.book ===
+                "function"
+                ? Reader.book()
+                : null;
+
+
+        const title =
+            String(
+                book?.title ||
+                activeItem?.title ||
+                ""
+            ).trim();
+
+
+        /*
+         * ---------------------------------------------------
+         * TITLE
+         *
+         * Keep the title completely separate from the
+         * page-number indicator.
+         * ---------------------------------------------------
+         */
+
+        if (readerTitle) {
+
+            readerTitle.textContent =
+                title;
+
+            readerTitle.hidden =
+                false;
+
+            readerTitle.removeAttribute(
+                "aria-hidden"
+            );
+
+            readerTitle.style.removeProperty(
+                "display"
+            );
+
+            readerTitle.style.removeProperty(
+                "visibility"
+            );
+
+            readerTitle.style.removeProperty(
+                "opacity"
+            );
         }
 
-    }
+
+        if (!indicator) {
+            return;
+        }
 
 
-    const page =
-        Number(
-            Reader.currentPage()
-        ) || 1;
+        /*
+        -------------------------------------------------------
+         Let the normal Reader UI establish its spread
+         information first.
+        -------------------------------------------------------
+        */
 
+        if (
+            typeof window.updatePageIndicator ===
+                "function"
+        ) {
 
-    const pages =
-        Number(
-            Reader.pages()
-        ) || 0;
+            try {
 
-
-    /*
-    -------------------------------------------------------
-     Preserve the Reader's established spread label.
-     -------------------------------------------------------
-    */
-
-    let label = "";
-
-
-    if (
-        typeof Reader.spread === "function"
-    ) {
-
-        try {
-
-            const spread =
-                Reader.spread();
-
-
-            if (
-                spread &&
-                spread.label !== undefined &&
-                spread.label !== null
-            ) {
-
-                label =
-                    String(
-                        spread.label
-                    ).trim();
+                window.updatePageIndicator();
 
             }
+            catch (error) {
 
+                console.warn(
+                    "[SkyMedia Share] Reader page indicator refresh:",
+                    error
+                );
+
+            }
         }
-        catch (error) {
 
-            console.warn(
-                "[SkyMedia Share] Reader spread lookup:",
-                error
-            );
 
+        const page =
+            Number(
+                Reader.currentPage()
+            ) || 1;
+
+
+        const pages =
+            Number(
+                Reader.pages()
+            ) || 0;
+
+
+        /*
+        -------------------------------------------------------
+         Preserve the Reader's established spread label.
+        -------------------------------------------------------
+        */
+
+        let label = "";
+
+
+        if (
+            typeof Reader.spread ===
+                "function"
+        ) {
+
+            try {
+
+                const spread =
+                    Reader.spread();
+
+
+                if (
+                    spread &&
+                    spread.label !==
+                        undefined &&
+                    spread.label !==
+                        null
+                ) {
+
+                    label =
+                        String(
+                            spread.label
+                        ).trim();
+                }
+
+            }
+            catch (error) {
+
+                console.warn(
+                    "[SkyMedia Share] Reader spread lookup:",
+                    error
+                );
+
+            }
         }
 
+
+        if (!label) {
+
+            label =
+                String(page);
+        }
+
+
+        /*
+        -------------------------------------------------------
+         IMPORTANT
+
+         #pageIndicator contains ONLY:
+
+             2–3 / 24
+
+         It does NOT contain the title.
+        -------------------------------------------------------
+        */
+
+        indicator.textContent =
+            label +
+            " / " +
+            (pages || "");
+
+
+        /*
+        -------------------------------------------------------
+         Restore the actual Reader indicator after the
+         Reader status bar has been moved into Share Mode.
+        -------------------------------------------------------
+        */
+
+        indicator.hidden =
+            false;
+
+
+        indicator.removeAttribute(
+            "aria-hidden"
+        );
+
+
+        indicator.tabIndex =
+            0;
+
+
+        indicator.style.removeProperty(
+            "display"
+        );
+
+
+        indicator.style.removeProperty(
+            "visibility"
+        );
+
+
+        indicator.style.removeProperty(
+            "opacity"
+        );
+
+
+        indicator.classList.add(
+            "pageIndicatorActive"
+        );
     }
 
 
-    if (!label) {
+    /* =====================================================
+       LARGE CLOSED-STATE GO BUTTON
+    ===================================================== */
 
-        label =
-            String(page);
+    function createClosedGoButton() {
 
-    }
+        /*
+        -------------------------------------------------------
+         closedPanel MUST already exist before this function
+         is called.
+        -------------------------------------------------------
+        */
 
-
-    /*
-    -------------------------------------------------------
-     IMPORTANT:
-     #pageIndicator contains ONLY the page information.
-
-     The book title is NOT placed inside this element.
-
-     This keeps Share Book consistent with Video Viewer,
-     where the title and indicator are separate elements.
-    -------------------------------------------------------
-    */
-
-    indicator.textContent =
-        label +
-        " / " +
-        (pages || "");
+        if (!closedPanel) {
+            return null;
+        }
 
 
-    /*
-    -------------------------------------------------------
-     Restore the actual Reader indicator after the
-     Reader status bar has been moved into Share Mode.
-    -------------------------------------------------------
-    */
-
-    indicator.hidden =
-        false;
-
-
-    indicator.removeAttribute(
-        "aria-hidden"
-    );
-
-
-    indicator.tabIndex =
-        0;
-
-
-    indicator.style.removeProperty(
-        "display"
-    );
-
-
-    indicator.style.removeProperty(
-        "visibility"
-    );
-
-
-    indicator.style.removeProperty(
-        "opacity"
-    );
-
-
-    indicator.classList.add(
-        "pageIndicatorActive"
-    );
-
-}
-
-function createClosedGoButton() {
-
-    /*
-    -------------------------------------------------------
-     Do not create duplicates.
-    -------------------------------------------------------
-    */
-
-    if (closedPanel) {
+        /*
+        -------------------------------------------------------
+         Do not create duplicates.
+        -------------------------------------------------------
+        */
 
         const existing =
             closedPanel.querySelector(
                 ".sky-share-closed-go-button"
             );
 
+
         if (existing) {
             return existing;
         }
 
-    }
+
+        /*
+        -------------------------------------------------------
+         Create the large image button.
+         -------------------------------------------------------
+        */
+
+        const button =
+            document.createElement(
+                "a"
+            );
 
 
-    /*
-    -------------------------------------------------------
-     Create the large button.
-    -------------------------------------------------------
-    */
-
-    const button =
-        document.createElement("a");
+        button.className =
+            "sky-share-closed-go-button";
 
 
-    button.className =
-        "sky-share-closed-go-button";
+        button.href =
+            GLIDE_MEDIA_URL;
 
 
-    button.href =
-        GLIDE_MEDIA_URL;
+        /*
+         Use the same page rather than opening another
+         browser tab.
+        */
+
+        button.target =
+            "_self";
 
 
-    button.target =
-        "_self";
+        button.rel =
+            "noopener noreferrer";
 
 
-    button.rel =
-        "noopener";
+        button.setAttribute(
+            "aria-label",
+            "Open Meditation Mornings"
+        );
 
 
-    button.setAttribute(
-        "aria-label",
-        "Open Meditation Mornings"
-    );
+        /*
+        -------------------------------------------------------
+         Image
+         -------------------------------------------------------
+        */
+
+        const image =
+            document.createElement(
+                "img"
+            );
 
 
-    /*
-    -------------------------------------------------------
-     Image
-    -------------------------------------------------------
-    */
+        /*
+         Absolute application-relative path.
 
-const image =
-    document.createElement("img");
+         This is important because the previous relative
+         URL could resolve incorrectly depending on the
+         current Share URL.
+        */
 
-image.src =
-    new URL(
-        "assets/go-button.png",
-        window.location.href
-    ).href;
-
-image.alt =
-    "Open Meditation Mornings";
-
-image.draggable =
-    false;
-
-button.appendChild(
-    image
-);
+        image.src =
+            "/assets/go-button.png";
 
 
-    /*
-    -------------------------------------------------------
-     Add to the existing closed panel.
+        image.alt =
+            "Open Meditation Mornings";
 
-     This does NOT modify the existing smaller
-     Open Meditation Mornings button.
-    -------------------------------------------------------
-    */
 
-    if (closedPanel) {
+        image.draggable =
+            false;
+
+
+        image.decoding =
+            "async";
+
+
+        button.appendChild(
+            image
+        );
+
+
+        /*
+        -------------------------------------------------------
+         Add ONLY the image button to the closed panel.
+
+         The existing bottom-right text button is NOT touched.
+        -------------------------------------------------------
+        */
 
         closedPanel.appendChild(
             button
         );
 
-    }
-    else {
 
-        document.body.appendChild(
-            button
-        );
-
+        return button;
     }
 
-
-    return button;
-
-}
 
     /* =====================================================
        SHARE SHELL
@@ -436,81 +551,116 @@ button.appendChild(
             return;
         }
 
-        shell = createElement(
-            "div",
-            "sky-share-shell"
+
+        shell =
+            createElement(
+                "div",
+                "sky-share-shell"
+            );
+
+
+        shell.id =
+            "skyShareShell";
+
+
+        const header =
+            createElement(
+                "header",
+                "sky-share-header"
+            );
+
+
+        const brand =
+            createElement(
+                "div",
+                "sky-share-brand"
+            );
+
+
+        const section =
+            createElement(
+                "div",
+                "sky-share-section"
+            );
+
+
+        header.appendChild(
+            brand
         );
 
-        shell.id = "skyShareShell";
 
-
-        const header = createElement(
-            "header",
-            "sky-share-header"
-        );
-
-        const brand = createElement(
-            "div",
-            "sky-share-brand"
-        );
-
-        const section = createElement(
-            "div",
-            "sky-share-section"
-        );
-
-        header.appendChild(brand);
-        header.appendChild(section);
-
-
-        const main = createElement(
-            "main",
-            "sky-share-main"
+        header.appendChild(
+            section
         );
 
 
-        const heading = createElement(
-            "div",
-            "sky-share-heading"
+        const main =
+            createElement(
+                "main",
+                "sky-share-main"
+            );
+
+
+        const heading =
+            createElement(
+                "div",
+                "sky-share-heading"
+            );
+
+
+        titleElement =
+            createElement(
+                "h1",
+                "sky-share-title"
+            );
+
+
+        subtitleElement =
+            createElement(
+                "div",
+                "sky-share-subtitle"
+            );
+
+
+        heading.appendChild(
+            titleElement
         );
 
-        titleElement = createElement(
-            "h1",
-            "sky-share-title"
+
+        heading.appendChild(
+            subtitleElement
         );
 
-        subtitleElement = createElement(
-            "div",
-            "sky-share-subtitle"
-        );
 
-        heading.appendChild(titleElement);
-        heading.appendChild(subtitleElement);
-
-
-        mediaHost = createElement(
-            "div",
-            "sky-share-media-host"
-        );
-
-        mediaHost.id = "skyShareMediaHost";
+        mediaHost =
+            createElement(
+                "div",
+                "sky-share-media-host"
+            );
 
 
-        statusElement = createElement(
-            "div",
-            "sky-share-status"
-        );
+        mediaHost.id =
+            "skyShareMediaHost";
+
+
+        statusElement =
+            createElement(
+                "div",
+                "sky-share-status"
+            );
 
 
         /*
-         * Reuse the existing primary logo from index.html.
-         * Move the existing element into the Share shell so it
-         * remains visible when #workspace is isolated.
-         */
+        -------------------------------------------------------
+         Reuse existing primary logo.
+        -------------------------------------------------------
+        */
+
         const primaryLogo =
             document.getElementById(
                 "workspacePrimaryLogo"
             );
+
 
         if (primaryLogo) {
 
@@ -518,8 +668,10 @@ button.appendChild(
                 "sky-share-primary-logo"
             );
 
+
             primaryLogo.style.display =
                 "block";
+
 
             shell.appendChild(
                 primaryLogo
@@ -528,48 +680,61 @@ button.appendChild(
 
 
         /*
-         * Persistent bottom-right Share button.
-         *
-         * This is separate from the central closed-state button
-         * created later by showClosedPanel().
-         */
-        const actions = createElement(
-            "div",
-            "sky-share-actions"
-        );
+        -------------------------------------------------------
+         Existing persistent bottom-right button.
 
-        const openButton = createElement(
-            "a",
-            "sky-share-open-button",
-            "Open Meditation Mornings"
-        );
+         DO NOT CHANGE THIS BUTTON.
+        -------------------------------------------------------
+        */
+
+        const actions =
+            createElement(
+                "div",
+                "sky-share-actions"
+            );
+
+
+        const openButton =
+            createElement(
+                "a",
+                "sky-share-open-button",
+                "Open Meditation Mornings"
+            );
+
 
         openButton.href =
             GLIDE_MEDIA_URL;
 
+
         openButton.target =
             "_blank";
+
 
         openButton.rel =
             "noopener noreferrer";
 
 
-        const closeButton = createElement(
-            "button",
-            "sky-share-close-button",
-            "×"
-        );
+        const closeButton =
+            createElement(
+                "button",
+                "sky-share-close-button",
+                "×"
+            );
+
 
         closeButton.type =
             "button";
+
 
         closeButton.setAttribute(
             "aria-label",
             "Close"
         );
 
+
         closeButton.title =
             "Close";
+
 
         closeButton.addEventListener(
             "click",
@@ -581,6 +746,7 @@ button.appendChild(
             openButton
         );
 
+
         actions.appendChild(
             closeButton
         );
@@ -590,9 +756,11 @@ button.appendChild(
             heading
         );
 
+
         main.appendChild(
             mediaHost
         );
+
 
         main.appendChild(
             statusElement
@@ -603,9 +771,11 @@ button.appendChild(
             header
         );
 
+
         shell.appendChild(
             main
         );
+
 
         shell.appendChild(
             actions
@@ -680,6 +850,7 @@ button.appendChild(
                             el.dataset.skyShareHidden =
                                 "true";
 
+
                             el.style.setProperty(
                                 "display",
                                 "none",
@@ -701,6 +872,7 @@ button.appendChild(
                     el.dataset.skyShareHidden =
                         "true";
 
+
                     el.style.setProperty(
                         "display",
                         "none",
@@ -717,13 +889,18 @@ button.appendChild(
 
     function moveIntoShareHost(element) {
 
-        if (!element || !mediaHost) {
+        if (
+            !element ||
+            !mediaHost
+        ) {
             return;
         }
+
 
         mediaHost.appendChild(
             element
         );
+
 
         element.style.removeProperty(
             "display"
@@ -738,18 +915,26 @@ button.appendChild(
     function replaceButton(id) {
 
         const oldButton =
-            document.getElementById(id);
+            document.getElementById(
+                id
+            );
+
 
         if (!oldButton) {
             return null;
         }
 
+
         const newButton =
-            oldButton.cloneNode(true);
+            oldButton.cloneNode(
+                true
+            );
+
 
         oldButton.replaceWith(
             newButton
         );
+
 
         return newButton;
     }
@@ -766,23 +951,26 @@ button.appendChild(
                 "muteButton"
             );
 
+
         if (!button) {
             return;
         }
 
 
-        const muted = !!(
-            window.AudioController &&
-            typeof AudioController.isMuted ===
-                "function" &&
-            AudioController.isMuted()
-        );
+        const muted =
+            !!(
+                window.AudioController &&
+                typeof AudioController.isMuted ===
+                    "function" &&
+                AudioController.isMuted()
+            );
 
 
         const use =
             button.querySelector(
                 "use"
             );
+
 
         if (use) {
 
@@ -800,6 +988,7 @@ button.appendChild(
             muted
         );
 
+
         button.classList.toggle(
             "is-muted",
             muted
@@ -813,12 +1002,14 @@ button.appendChild(
                 : "false"
         );
 
+
         button.setAttribute(
             "aria-label",
             muted
                 ? "Unmute"
                 : "Mute"
         );
+
 
         button.title =
             muted
@@ -838,6 +1029,7 @@ button.appendChild(
                 "viewerFullscreenButton"
             );
 
+
         if (!button) {
             return;
         }
@@ -852,6 +1044,7 @@ button.appendChild(
             button.querySelector(
                 "use"
             );
+
 
         if (use) {
 
@@ -871,12 +1064,14 @@ button.appendChild(
                 : "false"
         );
 
+
         button.setAttribute(
             "aria-label",
             active
                 ? "Exit fullscreen"
                 : "Fullscreen"
         );
+
 
         button.title =
             active
@@ -936,8 +1131,10 @@ button.appendChild(
             const hidden =
                 page <= 1;
 
+
             previous.hidden =
                 hidden;
+
 
             previous.setAttribute(
                 "aria-hidden",
@@ -954,8 +1151,10 @@ button.appendChild(
                 pages > 0 &&
                 page >= pages;
 
+
             next.hidden =
                 hidden;
+
 
             next.setAttribute(
                 "aria-hidden",
@@ -967,8 +1166,7 @@ button.appendChild(
 
 
         /*
-         * Keep page information synchronized at the same time
-         * as Previous / Next state.
+         * Keep title and page information synchronized.
          */
         updateShareBookIndicator();
     }
@@ -1003,7 +1201,9 @@ button.appendChild(
                 pageStateTimer
             );
 
-            pageStateTimer = null;
+
+            pageStateTimer =
+                null;
         }
     }
 
@@ -1088,31 +1288,38 @@ button.appendChild(
         }
 
 
-        bookControlsBound = true;
+        bookControlsBound =
+            true;
 
 
         /*
          * Replace Reader buttons before rearranging them.
          */
+
         replaceButton(
             "previousButton"
         );
+
 
         replaceButton(
             "nextButton"
         );
 
+
         replaceButton(
             "muteButton"
         );
+
 
         replaceButton(
             "readerShareButton"
         );
 
+
         replaceButton(
             "viewerFullscreenButton"
         );
+
 
         replaceButton(
             "readerCloseButton"
@@ -1120,11 +1327,13 @@ button.appendChild(
 
 
         /*
-         * Rotate and bookmark are deliberately removed.
+         * Rotate and bookmark deliberately removed.
          */
+
         replaceButton(
             "rotateButton"
         );
+
 
         replaceButton(
             "bookmarkAddButton"
@@ -1136,25 +1345,30 @@ button.appendChild(
                 "previousButton"
             );
 
+
         const next =
             document.getElementById(
                 "nextButton"
             );
+
 
         const mute =
             document.getElementById(
                 "muteButton"
             );
 
+
         const share =
             document.getElementById(
                 "readerShareButton"
             );
 
+
         const fullscreen =
             document.getElementById(
                 "viewerFullscreenButton"
             );
+
 
         const closeButton =
             document.getElementById(
@@ -1163,8 +1377,9 @@ button.appendChild(
 
 
         /*
-         * Previous and Next become independent controls.
+         * Previous / Next become independent controls.
          */
+
         if (previous) {
 
             mediaHost.appendChild(
@@ -1182,10 +1397,11 @@ button.appendChild(
 
 
         /*
-         * Toolbar now contains ONLY:
+         * Toolbar contains ONLY:
          *
          * Mute | Share | Fullscreen | X
          */
+
         toolbar.replaceChildren(
             mute,
             share,
@@ -1234,6 +1450,7 @@ button.appendChild(
                     updatePageButtons,
                     80
                 );
+
 
                 setTimeout(
                     updatePageButtons,
@@ -1292,6 +1509,7 @@ button.appendChild(
                     updatePageButtons,
                     80
                 );
+
 
                 setTimeout(
                     updatePageButtons,
@@ -1356,9 +1574,6 @@ button.appendChild(
                         "function"
                 ) {
 
-                    /*
-                     * Existing KV / short-link implementation.
-                     */
                     await ShareManager.share(
                         "reader",
                         book
@@ -1387,7 +1602,8 @@ button.appendChild(
 
                     exitFullscreen();
 
-                } else {
+                }
+                else {
 
                     enterFullscreen();
                 }
@@ -1412,6 +1628,7 @@ button.appendChild(
 
 
         updateMuteIcon();
+
         updatePageButtons();
 
         startPageWatcher();
@@ -1430,8 +1647,9 @@ button.appendChild(
 
 
         /*
-         * Ctrl+wheel belongs to the zoom controller.
+         * Ctrl+wheel belongs to zoom.
          */
+
         if (event.ctrlKey) {
             return;
         }
@@ -1463,13 +1681,15 @@ button.appendChild(
         }
 
 
-        bookWheelLocked = true;
+        bookWheelLocked =
+            true;
 
 
         setTimeout(
             () => {
 
-                bookWheelLocked = false;
+                bookWheelLocked =
+                    false;
 
             },
             250
@@ -1480,7 +1700,8 @@ button.appendChild(
 
             SRNavigation.next();
 
-        } else if (event.deltaY < 0) {
+        }
+        else if (event.deltaY < 0) {
 
             SRNavigation.previous();
         }
@@ -1490,6 +1711,7 @@ button.appendChild(
             updatePageButtons,
             80
         );
+
 
         setTimeout(
             updatePageButtons,
@@ -1502,7 +1724,8 @@ button.appendChild(
 
         if (!isBookShare()) {
 
-            bookTouchTracking = false;
+            bookTouchTracking =
+                false;
 
             return;
         }
@@ -1511,9 +1734,13 @@ button.appendChild(
         /*
          * Pinch / two-finger gestures belong to zoom.
          */
-        if (event.touches.length !== 1) {
 
-            bookTouchTracking = false;
+        if (
+            event.touches.length !== 1
+        ) {
+
+            bookTouchTracking =
+                false;
 
             return;
         }
@@ -1531,16 +1758,20 @@ button.appendChild(
             )
         ) {
 
-            bookTouchTracking = false;
+            bookTouchTracking =
+                false;
 
             return;
         }
 
 
-        bookTouchTracking = true;
+        bookTouchTracking =
+            true;
+
 
         bookTouchStartX =
             event.touches[0].clientX;
+
 
         bookTouchStartY =
             event.touches[0].clientY;
@@ -1570,6 +1801,7 @@ button.appendChild(
         /*
          * Ignore vertical movement.
          */
+
         if (
             Math.abs(dx) >
                 BOOK_TOUCH_THRESHOLD &&
@@ -1589,7 +1821,8 @@ button.appendChild(
         }
 
 
-        bookTouchTracking = false;
+        bookTouchTracking =
+            false;
 
 
         if (!isBookShare()) {
@@ -1649,8 +1882,9 @@ button.appendChild(
 
 
         /*
-         * Stop the synthesized click after a successful swipe.
+         * Stop synthesized click after successful swipe.
          */
+
         bookSuppressClickUntil =
             Date.now() + 500;
 
@@ -1662,7 +1896,8 @@ button.appendChild(
 
             SRNavigation.next();
 
-        } else {
+        }
+        else {
 
             SRNavigation.previous();
         }
@@ -1673,6 +1908,7 @@ button.appendChild(
             80
         );
 
+
         setTimeout(
             updatePageButtons,
             500
@@ -1680,7 +1916,9 @@ button.appendChild(
     }
 
 
-    function onBookTouchClickCapture(event) {
+    function onBookTouchClickCapture(
+        event
+    ) {
 
         if (
             Date.now() <
@@ -1690,7 +1928,8 @@ button.appendChild(
             event.preventDefault();
             event.stopPropagation();
 
-            bookSuppressClickUntil = 0;
+            bookSuppressClickUntil =
+                0;
         }
     }
 
@@ -1702,7 +1941,8 @@ button.appendChild(
         }
 
 
-        bookGestureBound = true;
+        bookGestureBound =
+            true;
 
 
         bookWheelTarget =
@@ -1798,7 +2038,8 @@ button.appendChild(
         }
 
 
-        bookGestureBound = false;
+        bookGestureBound =
+            false;
 
 
         if (bookWheelTarget) {
@@ -1838,9 +2079,16 @@ button.appendChild(
         }
 
 
-        bookWheelTarget = null;
-        bookTouchTarget = null;
-        bookTouchTracking = false;
+        bookWheelTarget =
+            null;
+
+
+        bookTouchTarget =
+            null;
+
+
+        bookTouchTracking =
+            false;
 
 
         if (window.SRNavigation) {
@@ -1933,17 +2181,16 @@ button.appendChild(
             "sky-share-document-closed"
         );
 
-if (closedPanel) {
 
-    closedPanel.style.display =
-        "flex";
+        /*
+        -------------------------------------------------------
+         CREATE THE PANEL FIRST.
 
-    closedPanel.hidden =
-        false;
-
-}
-
-createClosedGoButton();
+         This is the critical correction from the previous
+         version. The large image button must be placed INSIDE
+         this panel.
+        -------------------------------------------------------
+        */
 
         if (!closedPanel) {
 
@@ -1955,32 +2202,14 @@ createClosedGoButton();
 
 
             /*
-             * SECOND central button.
+             * Do NOT create another text
+             * "Open Meditation Mornings" button here.
+
+             * The existing small bottom-right button is already
+             * in .sky-share-actions.
+
+             * The closed panel gets only the large image button.
              */
-            const centerButton =
-                createElement(
-                    "a",
-                    "sky-share-closed-open-button",
-                    "Open Meditation Mornings"
-                );
-
-
-            centerButton.href =
-                GLIDE_MEDIA_URL;
-
-
-            centerButton.target =
-                "_blank";
-
-
-            centerButton.rel =
-                "noopener noreferrer";
-
-
-            closedPanel.appendChild(
-                centerButton
-            );
-
 
             shell
                 .querySelector(
@@ -1990,6 +2219,16 @@ createClosedGoButton();
                     closedPanel
                 );
         }
+
+
+        /*
+        -------------------------------------------------------
+         Ensure the large image button exists AFTER the panel
+         has been created.
+        -------------------------------------------------------
+        */
+
+        createClosedGoButton();
 
 
         closedPanel.hidden =
@@ -2033,7 +2272,8 @@ createClosedGoButton();
                 });
             }
 
-        } catch (error) {
+        }
+        catch (error) {
 
             console.warn(
                 "[SkyMedia Share] Reader close cleanup:",
@@ -2044,8 +2284,9 @@ createClosedGoButton();
 
         /*
          * Reader.close() normally restores Reader landing.
-         * Share Mode must immediately reassert its own isolation.
+         * Share Mode immediately reasserts its isolation.
          */
+
         isolateApplication();
 
 
@@ -2053,6 +2294,7 @@ createClosedGoButton();
          * Hide normal Reader surfaces that Reader.close()
          * may have restored.
          */
+
         [
             "#workspace",
             "#topBar",
@@ -2104,7 +2346,10 @@ createClosedGoButton();
 
         /*
          * Share shell remains visible.
+         *
+         * showClosedPanel() creates the large image button.
          */
+
         showClosedPanel();
     }
 
@@ -2143,6 +2388,7 @@ createClosedGoButton();
                     controlsIdleTimer =
                         null;
 
+
                     document.body.classList.add(
                         "sky-share-controls-hidden"
                     );
@@ -2180,7 +2426,8 @@ createClosedGoButton();
         }
 
 
-        controlsActivityBound = true;
+        controlsActivityBound =
+            true;
 
 
         [
@@ -2216,7 +2463,9 @@ createClosedGoButton();
                 controlsIdleTimer
             );
 
-            controlsIdleTimer = null;
+
+            controlsIdleTimer =
+                null;
         }
 
 
@@ -2337,8 +2586,9 @@ createClosedGoButton();
 
 
         /*
-         * Open through the existing Reader first.
+         * Open through existing Reader.
          */
+
         await Reader.open(
             item
         );
@@ -2347,6 +2597,7 @@ createClosedGoButton();
         /*
          * Move live Reader surface into Share Mode.
          */
+
         moveIntoShareHost(
             viewer
         );
@@ -2360,6 +2611,7 @@ createClosedGoButton();
         /*
          * Move Reader toolbar into Share Mode.
          */
+
         const toolbar =
             document.getElementById(
                 "toolbar"
@@ -2375,10 +2627,9 @@ createClosedGoButton();
 
 
         /*
-         * Move the REAL Reader status bar.
-         *
-         * We do not create another page counter.
+         * Move REAL Reader status bar.
          */
+
         const status =
             document.getElementById(
                 "statusBar"
@@ -2414,6 +2665,43 @@ createClosedGoButton();
             status.style.removeProperty(
                 "display"
             );
+
+
+            /*
+             * Explicitly restore title and page indicator.
+             */
+
+            const readerTitle =
+                document.getElementById(
+                    "readerTitle"
+                );
+
+
+            if (readerTitle) {
+
+                readerTitle.hidden =
+                    false;
+
+
+                readerTitle.removeAttribute(
+                    "aria-hidden"
+                );
+
+
+                readerTitle.style.removeProperty(
+                    "display"
+                );
+
+
+                readerTitle.style.removeProperty(
+                    "visibility"
+                );
+
+
+                readerTitle.style.removeProperty(
+                    "opacity"
+                );
+            }
 
 
             const pageIndicator =
@@ -2457,10 +2745,6 @@ createClosedGoButton();
 
             if (pageJump) {
 
-                /*
-                 * ui.js continues to own its actual open/closed
-                 * state.
-                 */
                 pageJump.style.removeProperty(
                     "display"
                 );
@@ -2476,6 +2760,7 @@ createClosedGoButton();
         /*
          * Welcome remains immediately below status.
          */
+
         const welcome =
             document.querySelector(
                 ".sr-welcome-banner"
@@ -2493,6 +2778,7 @@ createClosedGoButton();
         /*
          * Tell SRNavigation which book Share Mode owns.
          */
+
         if (window.SRNavigation) {
 
             if (
@@ -2527,9 +2813,9 @@ createClosedGoButton();
 
 
         /*
-         * Let the normal Reader UI refresh its own indicator,
-         * then Share Mode explicitly reasserts it.
+         * Normal Reader UI refresh.
          */
+
         if (
             typeof window.updatePageIndicator ===
                 "function"
@@ -2538,6 +2824,13 @@ createClosedGoButton();
             window.updatePageIndicator();
         }
 
+
+        /*
+         * Share Mode now restores BOTH:
+         *
+         *   title
+         *   page indicator
+         */
 
         updateShareBookIndicator();
 
@@ -2565,12 +2858,15 @@ createClosedGoButton();
         /*
          * Existing SkyMediaZoom controller.
          */
+
         attachBookZoom();
+
 
         setTimeout(
             attachBookZoom,
             150
         );
+
 
         setTimeout(
             attachBookZoom,
@@ -2581,6 +2877,7 @@ createClosedGoButton();
         /*
          * Share Mode wheel and touch navigation.
          */
+
         bindBookGestures();
     }
 
@@ -2863,8 +3160,9 @@ createClosedGoButton();
 
 
         /*
-         * Book-specific Share CSS depends on this class.
+         * Book-specific Share CSS.
          */
+
         document.body.classList.toggle(
             "sky-share-book",
             section === "reader" ||
@@ -2873,8 +3171,9 @@ createClosedGoButton();
 
 
         /*
-         * Share heading title.
+         * Share header title.
          */
+
         titleElement.textContent =
             String(
                 item.title ||
@@ -2949,11 +3248,12 @@ createClosedGoButton();
 
 
         /*
-         * Book Share uses the REAL Reader #statusBar.
+         * Book Share uses REAL Reader status bar.
          *
-         * Video and slideshow continue using their own status
-         * systems.
+         * Video and slideshow continue using their own
+         * status systems.
          */
+
         if (
             !isBookShare() &&
             statusElement
@@ -2995,7 +3295,8 @@ createClosedGoButton();
         }
 
 
-        started = true;
+        started =
+            true;
 
 
         activeItem =
@@ -3028,15 +3329,15 @@ createClosedGoButton();
              * Hide normal application only AFTER the shared
              * item has successfully opened.
              */
+
             isolateApplication();
 
 
             /*
              * Reader status bar and page indicator were moved
-             * outside #workspace. Reassert them after isolation
-             * because some existing Reader UI code may have run
-             * between Reader.open() and this point.
+             * outside #workspace. Reassert them after isolation.
              */
+
             if (isBookShare()) {
 
                 const status =
@@ -3074,9 +3375,11 @@ createClosedGoButton();
 
                 /*
                  * IMPORTANT:
-                 * Call the LOCAL Share helper, not a nonexistent
-                 * global updatePageButtons().
+                 *
+                 * This restores BOTH the title and the page
+                 * indicator.
                  */
+
                 updatePageButtons();
 
                 updateShareBookIndicator();
@@ -3090,9 +3393,11 @@ createClosedGoButton();
                 "999999";
 
 
-        } catch (error) {
+        }
+        catch (error) {
 
-            started = false;
+            started =
+                false;
 
 
             console.error(
@@ -3117,14 +3422,17 @@ createClosedGoButton();
         close,
 
         isStarted() {
+
             return started;
         },
 
         getItem() {
+
             return activeItem;
         },
 
         getTarget() {
+
             return activeTarget;
         }
     };
