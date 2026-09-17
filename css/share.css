@@ -167,7 +167,7 @@ body.sky-share-mode .sky-share-section {
 
 body.sky-share-mode #workspacePrimaryLogo {
     position: absolute;
-    top: clamp(35px, 4vw, 40px);
+    top: 45px;
     left: clamp(15px, 1.2vw, 25px);
 
     width: clamp(70px, 7vw, 120px);
@@ -1817,7 +1817,7 @@ body.sky-share-mode .app-switch-button {
  */
 
 .sky-share-open-button {
-    position: absolute;
+    position: fixed;
     bottom: clamp(35px, 4vw, 40px);
     right: clamp(15px, 1.2vw, 25px);
 
@@ -3548,7 +3548,7 @@ body.sky-share-mode.sky-share-document-closed
 
 body.sky-share-mode #workspacePrimaryLogo {
     position: absolute;
-    top: clamp(35px, 4vw, 40px);
+    top: 45px;
     left: clamp(15px, 1.2vw, 25px);
 
     width: clamp(70px, 7vw, 120px);
@@ -3566,6 +3566,13 @@ body.sky-share-mode #workspacePrimaryLogo {
     pointer-events: none !important;
 }
 
+@media (max-width:700px) {
+
+body.sky-share-mode #workspacePrimaryLogo {
+        top: 35px !important;
+    }
+
+}
 
 /*
  * Reassert the original persistent bottom-right button at the
@@ -3591,7 +3598,7 @@ body.sky-share-mode .sky-share-actions {
 
 body.sky-share-mode .sky-share-open-button {
 
-    position: absolute !important;
+    position: fixed !important;
     bottom: clamp(35px, 4vw, 40px);
     right: clamp(15px, 1.2vw, 25px);
     left: auto !important;

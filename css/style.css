@@ -189,7 +189,7 @@ html:fullscreen #topBar{
 
 #workspacePrimaryLogo {
     position: absolute;
-    top: clamp(35px, 4vw, 40px);
+    top: 45px;
     left: clamp(15px, 1.2vw, 25px);
 
     width: clamp(70px, 7vw, 120px);
@@ -2728,7 +2728,7 @@ max-width:35vw;
 
 #workspacePrimaryLogo {
     position: fixed !important;
-    top: clamp(35px, 4vw, 40px) !important;
+    top: 45px !important;
     left: clamp(10px, 1.5vw, 20px) !important;
     width: clamp(70px, 7vw, 120px) !important;
     height: auto !important;
@@ -2741,7 +2741,7 @@ max-width:35vw;
 @media (max-width:700px) {
 
     #workspacePrimaryLogo {
-        top: clamp(35px,4vw,40px) !important;
+        top: 35px !important;
         left: 8px !important;
         width: 72px !important;
         z-index: 10000 !important;
