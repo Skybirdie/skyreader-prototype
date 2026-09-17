@@ -4038,81 +4038,79 @@ function unbindLastPageProtection() {
 
     async function prepareBook(item) {
 
-        if (
-            !window.Reader ||
-            typeof Reader.open !==
-                "function"
-        ) {
+    if (
+        !window.Reader ||
+        typeof Reader.open !==
+            "function"
+    ) {
 
-            throw new Error(
-                "Share Mode: Reader.open() unavailable."
-            );
-        }
-
-
-        if (mediaHost) {
-
-    mediaHost.style.setProperty(
-        "width",
-        "100%",
-        "important"
-    );
-
-    mediaHost.style.setProperty(
-        "height",
-        "100%",
-        "important"
-    );
-
-    mediaHost.style.setProperty(
-        "min-width",
-        "0",
-        "important"
-    );
-
-    mediaHost.style.setProperty(
-        "min-height",
-        "0",
-        "important"
-    );
-
-    mediaHost.style.setProperty(
-        "box-sizing",
-        "border-box",
-        "important"
-    );
-}
+        throw new Error(
+            "Share Mode: Reader.open() unavailable."
+        );
+    }
 
 
-        const viewer =
-            document.getElementById(
-                "viewerArea"
-            );
-
-
-        if (!viewer) {
-
-            throw new Error(
-                "Share Mode: #viewerArea not found."
-            );
-        }
-
-
-        await Reader.open(
-            item
+    const viewer =
+        document.getElementById(
+            "viewerArea"
         );
 
 
-       bookInitialLayoutReady =
-    false;
+    if (!viewer) {
 
-setBookInitialVisibility(
-    false
-);
-
-        moveIntoShareHost(
-            viewer
+        throw new Error(
+            "Share Mode: #viewerArea not found."
         );
+    }
+
+
+    /*
+     * IMPORTANT:
+     *
+     * Hide the Reader BEFORE Reader.open() begins.
+     *
+     * Reader/PageFlip can render its first page immediately
+     * during Reader.open(). Hiding it afterward allows one
+     * frame of the page to flash on screen.
+     */
+    bookInitialLayoutReady =
+        false;
+
+
+    setBookInitialVisibility(
+        false
+    );
+
+
+    viewer.classList.add(
+        "sky-share-book-layout-pending"
+    );
+
+
+    /*
+     * Now open the Reader while its surface is already hidden.
+     */
+    await Reader.open(
+        item
+    );
+
+
+    /*
+     * Move the fully initialized Reader surface into
+     * the Share media host.
+     */
+    moveIntoShareHost(
+        viewer
+    );
+
+
+    viewer.classList.add(
+        "sky-share-responsive-book"
+    );
+
+    viewer.classList.add(
+        "sky-share-book-layout-pending"
+    );
 
 
         viewer.classList.add(
