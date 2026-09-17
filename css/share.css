@@ -634,7 +634,7 @@ body.sky-share-mode .sky-share-subtitle {
 
     margin-left: auto !important;
     margin-right: auto !important;
-    text-color: linear-gradient(90deg, #43cea2 0%, #185a9d 100%);
+    color: linear-gradient(180deg, #00FA9A 0%, #20B2AA 50%, #2c5364 100%);
     text-align: center !important;
 }
 
@@ -3545,7 +3545,7 @@ body.sky-share-mode .sky-share-actions {
 body.sky-share-mode .sky-share-open-button {
 
     position: fixed !important;
-    bottom: clamp(35px, 4vw, 40px) !important;
+    bottom: clamp(50px, 5vw, 60px) !important;
     right: clamp(10px, 1.5vw, 20px) !important;
     left: auto !important;
     top: auto !important;
@@ -3566,7 +3566,7 @@ body.sky-share-mode .sky-share-open-button {
     background-position: center !important;
     background-repeat: no-repeat !important;
     background-size: contain !important;
-    background-color: rgba(216,239,238,.80) !important;
+    background-color: rgba(216,239,238,.30) !important;
     box-sizing: border-box !important;
     overflow: hidden !important;
     font-size: 0 !important;
