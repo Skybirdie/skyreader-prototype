@@ -4272,3 +4272,68 @@ body.sky-share-mode.sky-share-book #statusBar #pageIndicator {
     }
 
 }
+
+
+/* =========================================================
+   MOBILE SHARE BOOK POSITION
+
+   Make the shared book use the same centered media region
+   as Video and Slideshow.
+   ========================================================= */
+
+@media (max-width: 700px) {
+
+    body.sky-share-mode.sky-share-book
+    .sky-share-main {
+        display: flex !important;
+        flex-direction: column !important;
+
+        min-height: 0 !important;
+        height: 100% !important;
+    }
+
+
+    body.sky-share-mode.sky-share-book
+    .sky-share-media-host {
+        display: flex !important;
+        flex-direction: column !important;
+
+        flex: 1 1 auto !important;
+
+        min-width: 0 !important;
+        min-height: 0 !important;
+
+        width: 100% !important;
+        height: 100% !important;
+
+        margin: 0 !important;
+        padding: 0 !important;
+
+        box-sizing: border-box !important;
+
+        overflow: hidden !important;
+    }
+
+
+    body.sky-share-mode.sky-share-book
+    #viewerArea {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+
+        flex: 1 1 auto !important;
+
+        min-width: 0 !important;
+        min-height: 0 !important;
+
+        width: 100% !important;
+        height: auto !important;
+
+        margin: 0 !important;
+        padding: 0 !important;
+
+        box-sizing: border-box !important;
+
+        position: relative !important;
+    }
+}
