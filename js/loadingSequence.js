@@ -5,16 +5,16 @@
  SkyMedia Loading Sequence
 
  Shared loading-message service for Reader / Video /
- Slideshow and other SkyMedia media loaders.
+ Slideshow / Share Mode and other SkyMedia media loaders.
 
  Behavior
  • One message at a time.
- • Each message remains visible for 3 seconds.
+ • Each message remains visible for 3.5 seconds.
  • Sequence loops while loading continues.
  • Existing loading GIF remains untouched.
- • The current message can be retrieved by any viewer.
- • Emits a DOM event so the common loading UI can update.
- • Also supports an optional callback.
+ • Current message can be retrieved at any time.
+ • Emits a DOM event.
+ • Supports optional callback.
 =========================================================
 */
 
@@ -22,8 +22,8 @@ window.SkyMediaLoading = (function () {
 
     const MESSAGE_INTERVAL = 3500;
 
-
     const MESSAGES = [
+
         "1. In the beginning was the Word,",
         "and the Word was with God,",
         "and the Word was God.",
@@ -56,47 +56,53 @@ window.SkyMediaLoading = (function () {
 
 
     let active = false;
+
     let timer = null;
+
     let index = 0;
+
     let currentText = "";
+
     let currentPercent = 0;
+
     let callback = null;
 
+
+    /* =====================================================
+       EMIT
+    ===================================================== */
 
     function emit() {
 
         const detail = {
-            text: currentText,
-            percent: currentPercent,
+
+            text:
+                currentText,
+
+            percent:
+                currentPercent,
+
             index,
-            total: MESSAGES.length,
+
+            total:
+                MESSAGES.length,
+
             active
         };
 
 
-        /*
-         * App-wide custom event.
-         *
-         * A central loading UI can listen with:
-         *
-         * document.addEventListener(
-         *     "skymedia:loading-message",
-         *     event => { ... }
-         * );
-         */
         document.dispatchEvent(
+
             new CustomEvent(
                 "skymedia:loading-message",
                 {
                     detail
                 }
             )
+
         );
 
 
-        /*
-         * Optional direct callback.
-         */
         if (
             typeof callback ===
                 "function"
@@ -110,8 +116,7 @@ window.SkyMediaLoading = (function () {
                     detail
                 );
 
-            }
-            catch (error) {
+            } catch (error) {
 
                 console.warn(
                     "[SkyMedia Loading] Callback failed:",
@@ -122,12 +127,15 @@ window.SkyMediaLoading = (function () {
     }
 
 
+    /* =====================================================
+       SHOW MESSAGE
+    ===================================================== */
+
     function showMessage() {
 
         if (!active) {
             return;
         }
-
 
         currentText =
             MESSAGES[index];
@@ -138,12 +146,9 @@ window.SkyMediaLoading = (function () {
 
         index++;
 
-
-        /*
-         * Loop indefinitely while the item is still loading.
-         */
         if (
-            index >= MESSAGES.length
+            index >=
+            MESSAGES.length
         ) {
 
             index = 0;
@@ -151,10 +156,15 @@ window.SkyMediaLoading = (function () {
     }
 
 
-    function start(options = {}) {
+    /* =====================================================
+       START
+    ===================================================== */
+
+    function start(
+        options = {}
+    ) {
 
         stop();
-
 
         active = true;
 
@@ -165,7 +175,6 @@ window.SkyMediaLoading = (function () {
                 options.percent
             ) || 0;
 
-
         callback =
             typeof options.onMessage ===
                 "function"
@@ -173,24 +182,22 @@ window.SkyMediaLoading = (function () {
                 : null;
 
 
-        /*
-         * Show the first message immediately.
-         */
         showMessage();
 
 
         timer =
             window.setInterval(
+
                 function () {
 
                     if (!active) {
                         return;
                     }
 
-
                     showMessage();
 
                 },
+
                 MESSAGE_INTERVAL
             );
 
@@ -199,12 +206,17 @@ window.SkyMediaLoading = (function () {
     }
 
 
-    function update(percent) {
+    /* =====================================================
+       UPDATE
+    ===================================================== */
+
+    function update(
+        percent
+    ) {
 
         if (!active) {
             return;
         }
-
 
         currentPercent =
             Number.isFinite(
@@ -214,13 +226,13 @@ window.SkyMediaLoading = (function () {
                 : currentPercent;
 
 
-        /*
-         * Update the progress value without changing
-         * the current Scripture line.
-         */
         emit();
     }
 
+
+    /* =====================================================
+       STOP
+    ===================================================== */
 
     function stop() {
 
@@ -233,54 +245,62 @@ window.SkyMediaLoading = (function () {
                 timer
             );
 
-            timer =
-                null;
+            timer = null;
         }
 
 
-        callback =
-            null;
+        callback = null;
 
 
-        currentText =
-            "";
+        currentText = "";
 
 
-        currentPercent =
-            100;
+        currentPercent = 100;
 
 
-        /*
-         * Tell the common loading UI that loading has ended.
-         */
         document.dispatchEvent(
+
             new CustomEvent(
                 "skymedia:loading-message",
                 {
                     detail: {
+
                         text: "",
+
                         percent: 100,
+
                         index: -1,
-                        total: MESSAGES.length,
+
+                        total:
+                            MESSAGES.length,
+
                         active: false
                     }
                 }
             )
+
         );
     }
 
 
+    /* =====================================================
+       STATE
+    ===================================================== */
+
     function isActive() {
+
         return active;
     }
 
 
     function message() {
+
         return currentText;
     }
 
 
     function messages() {
+
         return MESSAGES.slice();
     }
 
@@ -288,10 +308,15 @@ window.SkyMediaLoading = (function () {
     return {
 
         start,
+
         update,
+
         stop,
+
         isActive,
+
         message,
+
         messages,
 
         interval:
