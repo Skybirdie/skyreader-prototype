@@ -610,8 +610,7 @@ async function startShareMode(){
     /*
      * Legacy contract shares already have their complete item
      * contract supplied by the Worker.
-     *
-     * Direct-ID shares do not.
+
      *
      * Manifest.load() handles both cases because the Manifest/
      * GlideContract layer is responsible for deciding whether

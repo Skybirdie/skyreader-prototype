@@ -5121,96 +5121,99 @@ async function prepareVideo(item) {
 
     async function prepareSlideshow(item) {
 
-        if (
-            typeof SlideshowLibrary ===
-                "undefined"
-        ) {
-
-            throw new Error(
-                "Share Mode: SlideshowLibrary unavailable."
-            );
-        }
-
-
-        if (
-            typeof SlideshowViewer ===
-                "undefined"
-        ) {
-
-            throw new Error(
-                "Share Mode: SlideshowViewer unavailable."
-            );
-        }
-
-
-        if (
-            typeof SlideshowLibrary.init ===
-                "function"
-        ) {
-
-            SlideshowLibrary.init();
-        }
-
-
-        if (
-            typeof Manifest !==
-                "undefined" &&
-            Manifest.slideshows &&
-            typeof Manifest.slideshows.load ===
-                "function"
-        ) {
-
-            await Manifest.slideshows.load();
-        }
-
-
-        if (
-            typeof SlideshowViewer.init ===
-                "function"
-        ) {
-
-            SlideshowViewer.init();
-        }
-
-
-        if (
-            typeof SlideshowUI !==
-                "undefined" &&
-            typeof SlideshowUI.init ===
-                "function"
-        ) {
-
-            SlideshowUI.init();
-        }
-
-
-        const viewer =
-            document.getElementById(
-                "slideshowViewer"
-            );
-
-
-        if (!viewer) {
-
-            throw new Error(
-                "Share Mode: #slideshowViewer not found."
-            );
-        }
-
-
-        moveIntoShareHost(
-            viewer
-        );
-
-
-        await SlideshowViewer.open(item);
-await waitForSharedSlideshowReady();
-
-
-        bindViewerCloseBridges();
-
-        bindMediaCloseClickBridge();
+    if (typeof SlideshowLibrary === "undefined") {
+        throw new Error("Share Mode: SlideshowLibrary unavailable.");
     }
+
+    if (typeof SlideshowViewer === "undefined") {
+        throw new Error("Share Mode: SlideshowViewer unavailable.");
+    }
+
+    if (typeof SlideshowLibrary.init === "function") {
+        SlideshowLibrary.init();
+    }
+
+    if (
+        typeof Manifest !== "undefined" &&
+        Manifest.slideshows &&
+        typeof Manifest.slideshows.load === "function"
+    ) {
+        await Manifest.slideshows.load();
+    }
+
+    if (typeof SlideshowViewer.init === "function") {
+        const initialized = SlideshowViewer.init();
+
+        if (initialized === false) {
+            throw new Error(
+                "Share Mode: SlideshowViewer could not initialize."
+            );
+        }
+    }
+
+    if (
+        typeof SlideshowUI !== "undefined" &&
+        typeof SlideshowUI.init === "function"
+    ) {
+        SlideshowUI.init();
+    }
+
+    const viewer = document.getElementById("slideshowViewer");
+
+    if (!viewer) {
+        throw new Error("Share Mode: #slideshowViewer not found.");
+    }
+
+    /*
+     * The Worker catalog supplies the authoritative ContentContract
+     * representation:
+     *
+     *     media: [...]
+     *
+     * SlideshowViewer, however, operates on the runtime slideshow
+     * representation:
+     *
+     *     source: "images"
+     *     slides: [{ image: "..." }, ...]
+     *
+     * Use the existing SlideshowContract compatibility layer rather
+     * than duplicating that conversion here.
+     */
+    let slideshowItem = item;
+
+    if (
+        typeof SlideshowContract !== "undefined" &&
+        typeof SlideshowContract.normalize === "function"
+    ) {
+        slideshowItem = SlideshowContract.normalize(item, 0);
+    }
+
+    if (!slideshowItem) {
+        throw new Error(
+            "Share Mode: Unable to normalize slideshow."
+        );
+    }
+
+    if (
+        slideshowItem.source !== "pdf" &&
+        (
+            !Array.isArray(slideshowItem.slides) ||
+            slideshowItem.slides.length === 0
+        )
+    ) {
+        throw new Error(
+            "Share Mode: Slideshow contains no usable slides."
+        );
+    }
+
+    moveIntoShareHost(viewer);
+
+    await SlideshowViewer.open(slideshowItem);
+    await waitForSharedSlideshowReady();
+
+    bindViewerCloseBridges();
+    bindMediaCloseClickBridge();
+}
 
 
     /* =====================================================
