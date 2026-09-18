@@ -6,42 +6,38 @@
    KV-BACKED SHARE LINK ARCHITECTURE
    ---------------------------------
 
-   The Share button creates a FIRST-USE URL containing:
+   The Share button creates a FIRST-USE request containing:
 
        ?k=<16-character-key>
        &contractz=sr2.<FULL-COLLECTION>
        &section=<reader|video|slideshow>
        &id=<item-id>
 
-   Example:
+   That request is sent to the Cloudflare Worker at:
+
+       /__sky_share_prime
+
+   The Worker:
+
+       1. validates the key against the complete contract
+       2. stores the COMPLETE contract in MEDIA_KV
+       3. returns the clean Share Mode URL:
+
+          /share/<key>/<section>/<id>
+
+   The final shared URL therefore contains no contract:
 
        https://skyreader-prototype.sliburd81.workers.dev/
-       ?k=33328C6C09DAF837
-       &contractz=sr2.FULL_COLLECTION
-       &section=reader
-       &id=test2202609120557
-
-   Cloudflare Worker then:
-
-       1. receives the full contract
-       2. stores it in MEDIA_KV under the key
-       3. redirects to:
-
-          ?k=33328C6C09DAF837
-          &section=reader
-          &id=test2202609120557
-
-   When that short URL is opened later, Cloudflare:
-
-       1. retrieves the full contract from KV
-       2. injects contractz into the SkyMedia page
-       3. preserves section + id
-       4. SkyMedia opens the requested item
+       share/<key>/<section>/<id>
 
    IMPORTANT:
 
-   - The COMPLETE collection is preserved.
+   - The COMPLETE collection is preserved in KV.
    - We do NOT create a one-item contract.
+   - The Generator remains responsible for supplying the
+     complete contract to SkyMedia.
+   - The Share button does NOT depend on Glide seeing the
+     share request.
    - No /api/shorten endpoint is required.
    - Existing deep-link reading logic remains available.
    ========================================================= */
@@ -56,13 +52,20 @@ window.ShareManager = (function () {
   /*
     The Cloudflare Worker / SkyMedia base URL.
 
-    This is deliberately explicit so that the Share button
-    always creates a share link pointing at the deployed
-    SkyMedia application rather than depending on whatever
-    page happens to contain the embedded application.
+    This is deliberately explicit so the Share button always
+    creates a link pointing at the deployed SkyMedia application
+    rather than depending on the Glide page containing the app.
   */
   const SKYMEDIA_BASE_URL =
     "https://skyreader-prototype.sliburd81.workers.dev";
+
+
+  /*
+    Worker endpoint responsible for storing the complete
+    contract in MEDIA_KV and returning the clean Share Mode URL.
+  */
+  const SHARE_PRIME_PATH =
+    "/__sky_share_prime";
 
 
   /* =========================================================
@@ -162,13 +165,12 @@ window.ShareManager = (function () {
 
 
     /*
-      Some SkyMedia startup configurations may have already
+      Some SkyMedia startup configurations may already have
       decoded the contract into a global variable.
 
-      Try a few safe possibilities without changing the
-      application's existing contract system.
+      Try a safe Manifest getter without changing the existing
+      contract system.
     */
-
     try {
 
       if (
@@ -240,7 +242,8 @@ window.ShareManager = (function () {
 
 
   /*
-    Generate the same 16-character key used by Glide.
+    Generate the same 16-character key used by the Generator
+    and Cloudflare Worker.
   */
   function makeKVKey(payload) {
 
@@ -333,7 +336,7 @@ window.ShareManager = (function () {
       Generate the deterministic KV key from the EXACT
       contract payload.
 
-      This matches the Glide generator and Cloudflare Worker.
+      This MUST match both the Generator and Worker.
     */
     const kvKey =
       makeKVKey(
@@ -346,10 +349,8 @@ window.ShareManager = (function () {
 
       IMPORTANT:
 
-      The contract remains in this URL on first use.
-
-      Cloudflare needs it so that it can put the contract
-      into MEDIA_KV.
+      The complete contract remains in this temporary URL
+      because the Worker needs it to prime MEDIA_KV.
     */
     const url =
       new URL(
@@ -395,50 +396,157 @@ window.ShareManager = (function () {
   async function shorten(longUrl) {
 
     if (!longUrl) {
-      throw new Error("ShareManager: missing share URL.");
-    }
-
-    const url = new URL(longUrl);
-    const key = url.searchParams.get("k");
-    const contractz = url.searchParams.get("contractz");
-    const section = url.searchParams.get("section") || "";
-    const id = url.searchParams.get("id") || "";
-
-    if (!key || !contractz) {
-      throw new Error("ShareManager: incomplete first-use URL.");
-    }
-
-    const response = await fetch(
-      SKYMEDIA_BASE_URL + "/__sky_share_prime",
-      {
-        method: "POST",
-        mode: "cors",
-        cache: "no-store",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          k: key,
-          contractz,
-          section,
-          id
-        })
-      }
-    );
-
-    if (!response.ok) {
-      let detail = "";
-      try { detail = (await response.json())?.error || ""; } catch (_) {}
       throw new Error(
-        "ShareManager: unable to create the short share link" +
-        (detail ? " — " + detail : " (" + response.status + ")")
+        "ShareManager: missing share URL."
       );
     }
 
-    const data = await response.json();
 
-    if (!data || typeof data.url !== "string" || !data.url) {
-      throw new Error("ShareManager: Worker returned an invalid short share link.");
+    const url =
+      new URL(
+        longUrl
+      );
+
+
+    const key =
+      url.searchParams.get(
+        "k"
+      );
+
+
+    const contractz =
+      url.searchParams.get(
+        "contractz"
+      );
+
+
+    const section =
+      normalizeSection(
+        url.searchParams.get(
+          "section"
+        )
+      );
+
+
+    const id =
+      String(
+        url.searchParams.get(
+          "id"
+        ) || ""
+      ).trim();
+
+
+    if (
+      !key ||
+      !contractz
+    ) {
+
+      throw new Error(
+        "ShareManager: incomplete first-use URL."
+      );
     }
 
+
+    if (!section) {
+
+      throw new Error(
+        "ShareManager: missing section."
+      );
+    }
+
+
+    if (!id) {
+
+      throw new Error(
+        "ShareManager: missing item id."
+      );
+    }
+
+
+    /*
+      Send the COMPLETE contract to the Worker.
+
+      The Worker validates:
+
+          makeKey(contractz) === key
+
+      and then stores the contract in MEDIA_KV.
+    */
+    const response =
+      await fetch(
+        SKYMEDIA_BASE_URL +
+          SHARE_PRIME_PATH,
+        {
+          method: "POST",
+          mode: "cors",
+          cache: "no-store",
+          headers: {
+            "Content-Type":
+              "application/json"
+          },
+          body: JSON.stringify({
+            k: key,
+            contractz,
+            section,
+            id
+          })
+        }
+      );
+
+
+    if (!response.ok) {
+
+      let detail = "";
+
+      try {
+
+        const body =
+          await response.json();
+
+        detail =
+          body &&
+          body.error
+            ? String(body.error)
+            : "";
+
+      } catch (_) {
+        // Ignore non-JSON error responses.
+      }
+
+
+      throw new Error(
+        "ShareManager: unable to create the short share link" +
+        (
+          detail
+            ? " — " + detail
+            : " (" + response.status + ")"
+        )
+      );
+    }
+
+
+    const data =
+      await response.json();
+
+
+    if (
+      !data ||
+      typeof data.url !== "string" ||
+      !data.url
+    ) {
+
+      throw new Error(
+        "ShareManager: Worker returned an invalid short share link."
+      );
+    }
+
+
+    /*
+      The Worker is now authoritative.
+
+      Return exactly the URL it generated rather than
+      reconstructing the Share Mode route locally.
+    */
     return data.url;
   }
 
@@ -447,40 +555,101 @@ window.ShareManager = (function () {
      SHARE FEEDBACK TOAST
      ========================================================= */
 
-  function showShareToast(message, kind = "info") {
-    let toast = document.getElementById("skymediaShareToast");
+  function showShareToast(
+    message,
+    kind = "info"
+  ) {
+
+    let toast =
+      document.getElementById(
+        "skymediaShareToast"
+      );
+
 
     /*
       A fullscreen element lives in the browser's top layer.
       Anything outside that element can be hidden behind it.
+
       When the document itself is fullscreen, append the toast
-      there so it remains visible. For video fullscreen (where
-      a <video> element cannot contain children), the native
-      browser controls remain authoritative and the toast falls
-      back to the nearest document-level overlay.
+      there so it remains visible.
+
+      For video fullscreen, the native browser controls remain
+      authoritative and the toast falls back to the document
+      overlay.
     */
-    const fs = document.fullscreenElement;
-    const host = fs && fs !== document.documentElement &&
-                 fs instanceof HTMLElement ? fs : document.body;
+    const fs =
+      document.fullscreenElement;
+
+
+    const host =
+      fs &&
+      fs !== document.documentElement &&
+      fs instanceof HTMLElement
+        ? fs
+        : document.body;
+
 
     if (!toast) {
-      toast = document.createElement("div");
-      toast.id = "skymediaShareToast";
-      toast.className = "skymedia-share-toast";
+
+      toast =
+        document.createElement(
+          "div"
+        );
+
+      toast.id =
+        "skymediaShareToast";
+
+      toast.className =
+        "skymedia-share-toast";
     }
 
-    if (toast.parentElement !== host) host.appendChild(toast);
 
-    toast.textContent = message;
-    toast.dataset.kind = kind;
-    toast.classList.remove("visible");
+    if (
+      toast.parentElement !==
+      host
+    ) {
+
+      host.appendChild(
+        toast
+      );
+    }
+
+
+    toast.textContent =
+      message;
+
+
+    toast.dataset.kind =
+      kind;
+
+
+    toast.classList.remove(
+      "visible"
+    );
+
+
     void toast.offsetWidth;
-    toast.classList.add("visible");
 
-    clearTimeout(toast._hideTimer);
-    toast._hideTimer = setTimeout(() => {
-      toast.classList.remove("visible");
-    }, 2800);
+
+    toast.classList.add(
+      "visible"
+    );
+
+
+    clearTimeout(
+      toast._hideTimer
+    );
+
+
+    toast._hideTimer =
+      setTimeout(
+        () => {
+          toast.classList.remove(
+            "visible"
+          );
+        },
+        2800
+      );
   }
 
 
@@ -518,13 +687,16 @@ window.ShareManager = (function () {
     textarea.value =
       text;
 
+
     textarea.setAttribute(
       "readonly",
       ""
     );
 
+
     textarea.style.position =
       "fixed";
+
 
     textarea.style.opacity =
       "0";
@@ -538,7 +710,8 @@ window.ShareManager = (function () {
     textarea.select();
 
 
-    let copied = false;
+    let copied =
+      false;
 
 
     try {
@@ -550,7 +723,8 @@ window.ShareManager = (function () {
 
     } catch (_) {
 
-      copied = false;
+      copied =
+        false;
     }
 
 
@@ -571,80 +745,216 @@ window.ShareManager = (function () {
   ) {
 
     try {
-      if (!item || !item.id) {
-        throw new Error("ShareManager: cannot share an item without an id.");
-      }
-
-      const normalizedSection = normalizeSection(section);
-      const firstUseUrl = buildLongUrl(normalizedSection, item.id);
 
       /*
-        The short URL itself can be constructed synchronously from
-        the deterministic key. Start KV priming immediately, but do
-        not wait for the network before invoking navigator.share.
-        This preserves the browser's user-activation window.
+        -------------------------------------------------------
+        1. VALIDATE THE ITEM
+        -------------------------------------------------------
       */
-      const firstUse = new URL(firstUseUrl);
-      const shareUrl = new URL(SKYMEDIA_BASE_URL);
-      shareUrl.searchParams.set("k", firstUse.searchParams.get("k"));
-      shareUrl.searchParams.set("section", firstUse.searchParams.get("section"));
-      shareUrl.searchParams.set("id", firstUse.searchParams.get("id"));
-      const shortUrl = shareUrl.toString();
+      if (
+        !item ||
+        !item.id
+      ) {
 
-      const primePromise = shorten(firstUseUrl);
-
-      if (navigator.share && typeof navigator.share === "function") {
-        try {
-          await navigator.share({
-            title: item.title || "SkyMedia",
-            text: item.title
-              ? `View ${item.title} in SkyMedia`
-              : "View this item in SkyMedia",
-            url: shortUrl
-          });
-
-          /* Ensure KV is actually ready before reporting success. */
-          try {
-            await primePromise;
-            showShareToast("Share link sent.", "success");
-          } catch (primeError) {
-            showShareToast("Share opened, but the link could not be prepared.", "error");
-            console.error(primeError);
-          }
-
-          return shortUrl;
-        } catch (error) {
-          if (error && error.name === "AbortError") {
-            /* User cancelled; do not claim success. */
-            showShareToast("Share cancelled.", "info");
-            return shortUrl;
-          }
-          /* Other native-share failures fall through to clipboard. */
-        }
+        throw new Error(
+          "ShareManager: cannot share an item without an id."
+        );
       }
 
+
+      const normalizedSection =
+        normalizeSection(
+          section
+        );
+
+
+      if (!normalizedSection) {
+
+        throw new Error(
+          "ShareManager: missing section."
+        );
+      }
+
+
+      /*
+        -------------------------------------------------------
+        2. BUILD THE FIRST-USE REQUEST
+        -------------------------------------------------------
+
+        This contains the COMPLETE contract.
+
+        It is NOT the URL we give to the user.
+      */
+      const firstUseUrl =
+        buildLongUrl(
+          normalizedSection,
+          item.id
+        );
+
+
+      /*
+        -------------------------------------------------------
+        3. PRIME KV
+        -------------------------------------------------------
+
+        IMPORTANT CHANGE:
+
+        We now wait for the Worker to finish storing the
+        complete contract before exposing the share URL.
+
+        This eliminates the race condition in which a recipient
+        could receive the URL before MEDIA_KV was ready.
+      */
       let preparedUrl;
+
       try {
-        preparedUrl = await primePromise;
+
+        preparedUrl =
+          await shorten(
+            firstUseUrl
+          );
+
       } catch (error) {
-        showShareToast("Unable to create share link.", "error");
-        console.error(error);
+
+        showShareToast(
+          "Unable to create share link.",
+          "error"
+        );
+
+
+        console.error(
+          "ShareManager: KV share preparation failed.",
+          error
+        );
+
+
         return null;
       }
 
-      const copied = await copyToClipboard(preparedUrl);
+
+      /*
+        -------------------------------------------------------
+        4. NATIVE WEB SHARE
+        -------------------------------------------------------
+
+        At this point the URL is already backed by KV.
+
+        The browser therefore receives the final clean
+        Share Mode URL.
+      */
+      if (
+        navigator.share &&
+        typeof navigator.share ===
+          "function"
+      ) {
+
+        try {
+
+          await navigator.share({
+            title:
+              item.title ||
+              "SkyMedia",
+
+            text:
+              item.title
+                ? `View ${item.title} in SkyMedia`
+                : "View this item in SkyMedia",
+
+            url:
+              preparedUrl
+          });
+
+
+          showShareToast(
+            "Share link sent.",
+            "success"
+          );
+
+
+          return preparedUrl;
+
+        } catch (error) {
+
+          /*
+            User cancelled the native share sheet.
+
+            Do not report success, but keep the prepared URL
+            available to the caller.
+          */
+          if (
+            error &&
+            error.name ===
+              "AbortError"
+          ) {
+
+            showShareToast(
+              "Share cancelled.",
+              "info"
+            );
+
+
+            return preparedUrl;
+          }
+
+
+          /*
+            Any other native-share failure falls through to
+            clipboard.
+          */
+        }
+      }
+
+
+      /*
+        -------------------------------------------------------
+        5. CLIPBOARD FALLBACK
+        -------------------------------------------------------
+      */
+
+      const copied =
+        await copyToClipboard(
+          preparedUrl
+        );
+
 
       if (copied) {
-        showShareToast("Link copied.", "success");
+
+        showShareToast(
+          "Link copied.",
+          "success"
+        );
+
+
         return preparedUrl;
       }
 
-      showShareToast("Share link created, but could not copy it.", "error");
+
+      /*
+        The Worker has successfully created the link even if
+        the browser could not copy it.
+      */
+      showShareToast(
+        "Share link created, but could not copy it.",
+        "error"
+      );
+
+
       return preparedUrl;
 
     } catch (error) {
-      showShareToast("Unable to create share link.", "error");
-      console.error(error);
+
+      showShareToast(
+        "Unable to create share link.",
+        "error"
+      );
+
+
+      console.error(
+        "ShareManager: share failed.",
+        error
+      );
+
+
       return null;
     }
   }
@@ -788,6 +1098,7 @@ window.ShareManager = (function () {
             null
           );
         }
+
       }
 
     } catch (_) {
@@ -863,6 +1174,7 @@ window.ShareManager = (function () {
             item
           );
 
+
           return true;
         }
       }
@@ -898,6 +1210,7 @@ window.ShareManager = (function () {
           await window.VideoViewer.openVideo(
             item
           );
+
 
           return true;
         }
@@ -935,6 +1248,7 @@ window.ShareManager = (function () {
             item
           );
 
+
           return true;
         }
       }
@@ -945,6 +1259,7 @@ window.ShareManager = (function () {
         "ShareManager: unable to open deep link.",
         error
       );
+
 
       return false;
     }
@@ -960,7 +1275,9 @@ window.ShareManager = (function () {
 
   function isShareMode() {
 
-    const target = readTarget();
+    const target =
+      readTarget();
+
 
     return !!(
       target &&
