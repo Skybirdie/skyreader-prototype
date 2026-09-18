@@ -1,13 +1,35 @@
 "use strict";
 
+/*
+=========================================================
+ SkyMedia Share Manager
+ --------------------------------------------------------
+ PURPOSE
+
+ 1. Create an isolated SR2 share contract containing ONLY
+    the selected item.
+
+ 2. Preserve section + id in the URL.
+
+ 3. On a shared URL, locate the selected item using the
+    existing SkyMedia Manifest/GlideContract machinery.
+
+ 4. Hand the item to the EXISTING ShareViewer.
+
+ IMPORTANT
+
+ - This does NOT use Cloudflare KV.
+ - This does NOT create a catalog.
+ - This does NOT rebuild ShareViewer.
+ - This does NOT fall back to the normal Front Page viewer.
+=========================================================
+*/
+
 window.ShareManager = (function () {
 
     const CONTRACT_PARAM = "contractz";
     const SECTION_PARAM = "section";
     const ID_PARAM = "id";
-
-    const SHARE_PRIME_PATH =
-        "/__sky_share_prime";
 
 
     /* =====================================================
@@ -52,7 +74,7 @@ window.ShareManager = (function () {
 
 
     /* =====================================================
-       STRING / MEDIA NORMALIZATION
+       STRING CLEANUP
     ===================================================== */
 
     function cleanString(value) {
@@ -68,6 +90,10 @@ window.ShareManager = (function () {
     }
 
 
+    /* =====================================================
+       MEDIA NORMALIZATION
+    ===================================================== */
+
     function normalizeMedia(media) {
 
         if (Array.isArray(media)) {
@@ -82,7 +108,11 @@ window.ShareManager = (function () {
 
 
     /* =====================================================
-       ONE-ITEM SHARE CONTRACT
+       BUILD MINIMAL AUTHORITATIVE ITEM
+
+       ONLY the selected item is serialized.
+
+       Runtime fields are intentionally omitted.
     ===================================================== */
 
     function buildMinimalItem(item) {
@@ -128,6 +158,13 @@ window.ShareManager = (function () {
                 cleanString(item.date)
         };
 
+
+        /*
+         * Preserve dateAdd if present.
+         *
+         * date remains the authoritative visibility date.
+         */
+
         if (
             item.dateAdd !== undefined &&
             item.dateAdd !== null &&
@@ -135,17 +172,18 @@ window.ShareManager = (function () {
         ) {
 
             result.dateAdd =
-                cleanString(
-                    item.dateAdd
-                );
+                cleanString(item.dateAdd);
         }
+
 
         return result;
     }
 
 
     /* =====================================================
-       SR2 ENCODE
+       ENCODE SELECTED ITEM
+
+       Uses the EXISTING SR2 codec.
     ===================================================== */
 
     function encodeSelectedItem(item) {
@@ -162,8 +200,10 @@ window.ShareManager = (function () {
             );
         }
 
+
         const minimalItem =
             buildMinimalItem(item);
+
 
         if (
             !minimalItem ||
@@ -175,125 +215,50 @@ window.ShareManager = (function () {
             );
         }
 
-        return GlideContract.codec.encode(
-            [minimalItem]
-        );
+
+        return GlideContract.codec.encode([
+            minimalItem
+        ]);
     }
 
 
     /* =====================================================
-       PRIME WORKER
+       BASE URL
 
-       The browser sends the SR2 contract.
-
-       Worker calculates the key and returns:
-
-           /s/<key>
+       Remove the current query/hash so the original full
+       Glide contract is NOT copied into the share link.
     ===================================================== */
 
-    async function primeShare(
-        payload,
-        section,
-        id
-    ) {
+    function baseUrl() {
 
-        const endpoint =
+        const url =
             new URL(
-                SHARE_PRIME_PATH,
-                window.location.origin
+                window.location.href
             );
 
-        const response =
-            await fetch(
-                endpoint.toString(),
-                {
-                    method: "POST",
+        url.search = "";
+        url.hash = "";
 
-                    headers: {
-                        "Content-Type":
-                            "application/json"
-                    },
-
-                    body:
-                        JSON.stringify({
-                            contractz:
-                                payload,
-
-                            section:
-                                normalizeSection(
-                                    section
-                                ),
-
-                            id:
-                                cleanString(id)
-                        })
-                }
-            );
-
-        if (!response.ok) {
-
-            let message =
-                "Share link could not be created.";
-
-            try {
-
-                const data =
-                    await response.json();
-
-                if (
-                    data &&
-                    data.error
-                ) {
-                    message =
-                        data.error;
-                }
-
-            } catch (_) {}
-
-            throw new Error(
-                message
-            );
-        }
-
-        const data =
-            await response.json();
-
-        if (
-            !data ||
-            !data.url
-        ) {
-
-            throw new Error(
-                "Share server did not return a share URL."
-            );
-        }
-
-        return String(
-            data.url
-        );
+        return url.toString();
     }
 
 
     /* =====================================================
-       BUILD SHARE URL
-
-       Kept as an async public function for compatibility
-       with any existing code that may call ShareManager.buildUrl().
+       BUILD ISOLATED SHARE URL
     ===================================================== */
 
-    async function buildUrl(
+    function buildUrl(
         section,
         id,
         item
     ) {
 
         const normalizedSection =
-            normalizeSection(
-                section
-            );
+            normalizeSection(section);
 
         const normalizedId =
             cleanString(id);
+
 
         if (!normalizedSection) {
 
@@ -302,6 +267,7 @@ window.ShareManager = (function () {
             );
         }
 
+
         if (!normalizedId) {
 
             throw new Error(
@@ -309,30 +275,44 @@ window.ShareManager = (function () {
             );
         }
 
+
         const payload =
-            encodeSelectedItem(
-                item
+            encodeSelectedItem(item);
+
+
+        const url =
+            new URL(
+                baseUrl()
             );
 
-        return primeShare(
-            payload,
-            normalizedSection,
+
+        url.searchParams.set(
+            CONTRACT_PARAM,
+            payload
+        );
+
+
+        url.searchParams.set(
+            SECTION_PARAM,
+            normalizedSection
+        );
+
+
+        url.searchParams.set(
+            ID_PARAM,
             normalizedId
         );
+
+
+        return url.toString();
     }
 
 
     /* =====================================================
-       SILENT CLIPBOARD
-
-       IMPORTANT:
-       NO alert().
-       NO browser popup.
+       CLIPBOARD
     ===================================================== */
 
-    async function copyToClipboard(
-        text
-    ) {
+    async function copyToClipboard(text) {
 
         if (
             navigator.clipboard &&
@@ -351,11 +331,12 @@ window.ShareManager = (function () {
             } catch (error) {
 
                 console.warn(
-                    "[ShareManager] Clipboard API failed:",
+                    "Clipboard API failed:",
                     error
                 );
             }
         }
+
 
         try {
 
@@ -364,8 +345,7 @@ window.ShareManager = (function () {
                     "textarea"
                 );
 
-            textarea.value =
-                text;
+            textarea.value = text;
 
             textarea.setAttribute(
                 "readonly",
@@ -399,7 +379,7 @@ window.ShareManager = (function () {
         } catch (error) {
 
             console.warn(
-                "[ShareManager] Clipboard fallback failed:",
+                "Clipboard fallback failed:",
                 error
             );
 
@@ -427,10 +407,10 @@ window.ShareManager = (function () {
             );
         }
 
+
         const normalizedSection =
-            normalizeSection(
-                section
-            );
+            normalizeSection(section);
+
 
         if (!normalizedSection) {
 
@@ -439,31 +419,31 @@ window.ShareManager = (function () {
             );
         }
 
-        if (
-            !cleanString(item.id)
-        ) {
+
+        if (!cleanString(item.id)) {
 
             throw new Error(
                 "Cannot share: selected item has no id."
             );
         }
 
+
         const url =
-            await buildUrl(
+            buildUrl(
                 normalizedSection,
                 item.id,
                 item
             );
 
+
         const title =
-            cleanString(
-                item.title
-            ) ||
+            cleanString(item.title) ||
             "SkyMedia";
 
-        /* -------------------------------------------------
-           Native share
-        ------------------------------------------------- */
+
+        /*
+         * Native device share.
+         */
 
         if (
             navigator.share &&
@@ -474,9 +454,12 @@ window.ShareManager = (function () {
             try {
 
                 await navigator.share({
-                    title,
+
+                    title: title,
+
                     text: title,
-                    url
+
+                    url: url
                 });
 
                 return url;
@@ -484,55 +467,64 @@ window.ShareManager = (function () {
             } catch (error) {
 
                 /*
-                 * A user cancellation is not an error
-                 * for our purposes. Fall through to the
-                 * silent clipboard path.
+                 * Continue to clipboard if the native share
+                 * sheet was cancelled or unavailable.
                  */
 
-                console.log(
-                    "[ShareManager] Native share was not completed."
+                console.warn(
+                    "Native share was not completed:",
+                    error
                 );
             }
         }
 
-        /* -------------------------------------------------
-           Clipboard fallback
 
-           NO alert.
-        ------------------------------------------------- */
+        /*
+         * Clipboard.
+         */
 
         const copied =
-            await copyToClipboard(
-                url
-            );
+            await copyToClipboard(url);
+
 
         if (copied) {
 
-            /*
-             * Deliberately silent.
-             *
-             * ShareViewer already owns the polished
-             * non-blocking feedback system.
-             */
+            try {
 
-            console.info(
-                "[ShareManager] Share link copied."
-            );
+                alert(
+                    "Share link copied to clipboard."
+                );
+
+            } catch (error) {
+
+                console.log(
+                    "Share link copied to clipboard."
+                );
+            }
 
             return url;
         }
 
+
         /*
-         * Do not use window.prompt().
-         * Do not use alert().
-         *
-         * Return the URL so callers can still handle it.
+         * Last resort.
          */
 
-        console.warn(
-            "[ShareManager] Could not copy share link:",
-            url
-        );
+        try {
+
+            window.prompt(
+                "Copy this share link:",
+                url
+            );
+
+        } catch (error) {
+
+            console.log(
+                "Share URL:",
+                url
+            );
+        }
+
 
         return url;
     }
@@ -540,62 +532,15 @@ window.ShareManager = (function () {
 
     /* =====================================================
        READ SHARE TARGET
-
-       New short links:
-           /s/<key>
-
-       Worker bootstrap supplies:
-           window.__SKY_SHARE_TARGET
-
-       Legacy links still supported:
-           ?contractz=...&section=...&id=...
     ===================================================== */
 
     function readTarget() {
-
-        if (
-            window.__SKY_SHARE_TARGET &&
-            typeof window.__SKY_SHARE_TARGET ===
-                "object"
-        ) {
-
-            const target =
-                window.__SKY_SHARE_TARGET;
-
-            const section =
-                normalizeSection(
-                    target.section
-                );
-
-            const id =
-                cleanString(
-                    target.id
-                );
-
-            if (
-                section &&
-                id
-            ) {
-
-                return {
-
-                    section,
-                    id,
-
-                    contract:
-                        window.SkyMediaContract ||
-                        null,
-
-                    short:
-                        true
-                };
-            }
-        }
 
         const url =
             new URL(
                 window.location.href
             );
+
 
         return {
 
@@ -616,16 +561,13 @@ window.ShareManager = (function () {
             contract:
                 url.searchParams.get(
                     CONTRACT_PARAM
-                ),
-
-            short:
-                false
+                )
         };
     }
 
 
     /* =====================================================
-       SHARE DEEP LINK DETECTION
+       IS THIS A SHARE DEEP LINK?
     ===================================================== */
 
     function isShareDeepLink() {
@@ -634,47 +576,31 @@ window.ShareManager = (function () {
             readTarget();
 
         return !!(
+            target.contract &&
             target.section &&
-            target.id &&
-            (
-                target.contract ||
-                target.short
-            )
+            target.id
         );
     }
 
 
     /* =====================================================
-       SECTION → MANIFEST TYPE
+       SECTION -> MANIFEST TYPE
     ===================================================== */
 
-    function sectionType(
-        section
-    ) {
+    function sectionType(section) {
 
         const normalized =
-            normalizeSection(
-                section
-            );
+            normalizeSection(section);
 
-        if (
-            normalized ===
-            "reader"
-        ) {
+        if (normalized === "reader") {
             return "book";
         }
 
-        if (
-            normalized ===
-            "video"
-        ) {
+        if (normalized === "video") {
             return "video";
         }
 
-        if (
-            normalized ===
-            "slideshow"
-        ) {
+        if (normalized === "slideshow") {
             return "slideshow";
         }
 
@@ -683,30 +609,40 @@ window.ShareManager = (function () {
 
 
     /* =====================================================
-       FIND ITEM IN MANIFEST
+       FIND ITEM IN EXISTING MANIFEST
     ===================================================== */
 
     function findManifestItem(
         target
     ) {
 
-        if (!window.Manifest) {
+        if (
+            !window.Manifest
+        ) {
             return null;
         }
+
 
         const wantedId =
             cleanString(
                 target.id
             );
 
+
         if (!wantedId) {
             return null;
         }
+
 
         const type =
             sectionType(
                 target.section
             );
+
+
+        /*
+         * First use the type-specific Manifest collection.
+         */
 
         if (
             typeof Manifest.content ===
@@ -720,19 +656,23 @@ window.ShareManager = (function () {
                         type
                     );
 
-                if (
-                    Array.isArray(items)
-                ) {
+
+                if (Array.isArray(items)) {
 
                     const match =
                         items.find(
-                            item =>
-                                item &&
-                                cleanString(
-                                    item.id
-                                ) ===
-                                wantedId
+                            function (item) {
+
+                                return (
+                                    item &&
+                                    cleanString(
+                                        item.id
+                                    ) ===
+                                    wantedId
+                                );
+                            }
                         );
+
 
                     if (match) {
                         return match;
@@ -748,6 +688,11 @@ window.ShareManager = (function () {
             }
         }
 
+
+        /*
+         * Fallback to Manifest.all().
+         */
+
         if (
             typeof Manifest.all ===
                 "function"
@@ -758,19 +703,23 @@ window.ShareManager = (function () {
                 const items =
                     Manifest.all();
 
-                if (
-                    Array.isArray(items)
-                ) {
+
+                if (Array.isArray(items)) {
 
                     const match =
                         items.find(
-                            item =>
-                                item &&
-                                cleanString(
-                                    item.id
-                                ) ===
-                                wantedId
+                            function (item) {
+
+                                return (
+                                    item &&
+                                    cleanString(
+                                        item.id
+                                    ) ===
+                                    wantedId
+                                );
+                            }
                         );
+
 
                     if (match) {
                         return match;
@@ -786,12 +735,20 @@ window.ShareManager = (function () {
             }
         }
 
+
         return null;
     }
 
 
     /* =====================================================
-       WAIT FOR MANIFEST
+       WAIT FOR MANIFEST ITEM
+
+       The Worker bootstrap supplies the one-item contract.
+       The normal application then processes that contract
+       into Manifest.
+
+       We allow that existing process to finish before
+       handing control to ShareViewer.
     ===================================================== */
 
     function waitForManifestItem(
@@ -800,10 +757,11 @@ window.ShareManager = (function () {
     ) {
 
         return new Promise(
-            resolve => {
+            function (resolve) {
 
                 const startedAt =
                     Date.now();
+
 
                 function check() {
 
@@ -812,11 +770,14 @@ window.ShareManager = (function () {
                             target
                         );
 
+
                     if (item) {
 
                         resolve(item);
+
                         return;
                     }
+
 
                     if (
                         Date.now() -
@@ -825,14 +786,17 @@ window.ShareManager = (function () {
                     ) {
 
                         resolve(null);
+
                         return;
                     }
+
 
                     window.setTimeout(
                         check,
                         50
                     );
                 }
+
 
                 check();
             }
@@ -841,7 +805,7 @@ window.ShareManager = (function () {
 
 
     /* =====================================================
-       WAIT FOR SHARE VIEWER
+       WAIT FOR SHAREVIEWER
     ===================================================== */
 
     function waitForShareViewer(
@@ -849,10 +813,11 @@ window.ShareManager = (function () {
     ) {
 
         return new Promise(
-            resolve => {
+            function (resolve) {
 
                 const startedAt =
                     Date.now();
+
 
                 function check() {
 
@@ -863,8 +828,10 @@ window.ShareManager = (function () {
                     ) {
 
                         resolve(true);
+
                         return;
                     }
+
 
                     if (
                         Date.now() -
@@ -873,14 +840,17 @@ window.ShareManager = (function () {
                     ) {
 
                         resolve(false);
+
                         return;
                     }
+
 
                     window.setTimeout(
                         check,
                         50
                     );
                 }
+
 
                 check();
             }
@@ -902,19 +872,24 @@ window.ShareManager = (function () {
                 10000
             );
 
+
         if (!available) {
 
             console.error(
-                "[ShareManager] ShareViewer.start() did not become available."
+                "[ShareManager] ShareViewer.start() " +
+                "did not become available."
             );
 
             return false;
         }
 
+
         try {
 
             await ShareViewer.start(
+
                 item,
+
                 {
                     section:
                         target.section,
@@ -923,6 +898,7 @@ window.ShareManager = (function () {
                         target.id
                 }
             );
+
 
             return true;
 
@@ -940,6 +916,18 @@ window.ShareManager = (function () {
 
     /* =====================================================
        OPEN DEEP LINK
+
+       IMPORTANT:
+
+       There is NO normal-viewer fallback.
+
+       A URL containing:
+
+          contractz
+          section
+          id
+
+       is explicitly a Share Mode request.
     ===================================================== */
 
     async function openDeepLink() {
@@ -947,13 +935,24 @@ window.ShareManager = (function () {
         const target =
             readTarget();
 
+
+        /*
+         * Normal SkyMedia navigation.
+         */
+
         if (
+            !target.contract ||
             !target.section ||
             !target.id
         ) {
 
             return false;
         }
+
+
+        /*
+         * Prevent multiple simultaneous attempts.
+         */
 
         if (
             openDeepLink._promise
@@ -962,8 +961,22 @@ window.ShareManager = (function () {
             return openDeepLink._promise;
         }
 
+
         openDeepLink._promise =
             (async function () {
+
+                /*
+                 * IMPORTANT:
+                 *
+                 * Do NOT decode contractz ourselves.
+                 *
+                 * The existing GlideContract/Manifest
+                 * startup path is already responsible for
+                 * decoding the SR2 payload.
+                 *
+                 * We wait for that existing path to produce
+                 * the isolated item in Manifest.
+                 */
 
                 const item =
                     await waitForManifestItem(
@@ -971,15 +984,23 @@ window.ShareManager = (function () {
                         10000
                     );
 
+
                 if (!item) {
 
                     console.error(
-                        "[ShareManager] Shared item was not found in Manifest:",
+                        "[ShareManager] Shared item was not " +
+                        "found in Manifest:",
                         target
                     );
 
                     return false;
                 }
+
+
+                /*
+                 * Now wait for the existing standalone
+                 * ShareViewer.
+                 */
 
                 return await startShareMode(
                     item,
@@ -988,10 +1009,10 @@ window.ShareManager = (function () {
 
             })();
 
+
         try {
 
-            return await
-                openDeepLink._promise;
+            return await openDeepLink._promise;
 
         } finally {
 
@@ -1000,6 +1021,10 @@ window.ShareManager = (function () {
         }
     }
 
+
+    /* =====================================================
+       PUBLIC API
+    ===================================================== */
 
     return {
 
@@ -1018,6 +1043,7 @@ window.ShareManager = (function () {
         isShareDeepLink,
 
         openDeepLink
+
     };
 
 })();
