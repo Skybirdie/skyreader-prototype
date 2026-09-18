@@ -23,8 +23,6 @@
           ↓
      Worker returns /s/<section>/<id>
           ↓
-     recipient opens /s/<key>
-          ↓
      Worker retrieves payload
           ↓
      window.SkyMediaContract
@@ -1498,19 +1496,21 @@ function injectContractBootstrap(
 
   window.SkyMediaContract = ${JSON.stringify(manifest)};
 
-  window.__SKY_SHARE_TARGET = ${JSON.stringify({
-    section:
-      target?.section ||
-      section,
+window.__SKY_SHARE_MODE = true;
 
-    id:
-      target?.id ||
-      id
-  })};
+window.__SKY_SHARE_TARGET = ${JSON.stringify({
+  section:
+    target?.section ||
+    section,
 
-  window.__SKY_SHARE_KEY = ${JSON.stringify(
-    imageQuery?.key || ""
-  )};
+  id:
+    target?.id ||
+    id
+})};
+
+window.__SKY_SHARE_KEY = ${JSON.stringify(
+  imageQuery?.key || ""
+)};
 
 })();
 </script>
