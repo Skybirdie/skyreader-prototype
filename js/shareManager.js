@@ -635,6 +635,13 @@ window.ShareManager = (function () {
     }
 
 
+function isShareMode() {
+
+    return isShareDeepLink();
+
+}
+
+
     /* =====================================================
        SECTION → MANIFEST TYPE
     ===================================================== */
