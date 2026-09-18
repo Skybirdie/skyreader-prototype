@@ -113,37 +113,10 @@ window.ShareViewer = (function () {
     const GLIDE_MEDIA_URL =
         "https://meditationmornings.glide.page/dl/media";
 
-/* Standalone Share Mode loading sequence. */
-const SHARE_LOADING_INTERVAL = 2500;
-
-const SHARE_LOADING_MESSAGES = [
-    "1. In the beginning was the Word,",
-    "and the Word was with God,",
-    "and the Word was God.",
-    "2. The same was in the beginning with God.",
-    "3. All things were made by him;",
-    "and without him was not any thing made that was made.",
-    "4. In him was life;",
-    "and the life was the light of men.",
-    "5. And the light shineth in darkness;",
-    "and the darkness comprehended it not.",
-    "12. But as many as received him,",
-    "to them gave he power to become the sons of God,",
-    "even to them that believe on his name:",
-    "13. Which were born, not of blood,",
-    "nor of the will of the flesh,",
-    "nor of the will of man, but of God.",
-    "14. And the Word was made flesh,",
-    "and dwelt among us,",
-    "and we beheld his glory,",
-    "the glory as of the only begotten of the Father,",
-    "full of grace and truth."
-];
 
 let shareLoadingOverlay = null;
 let shareLoadingText = null;
-let shareLoadingTimer = null;
-let shareLoadingIndex = 0;
+
 
     /* =====================================================
        BASIC HELPERS
@@ -240,78 +213,227 @@ let shareLoadingIndex = 0;
     }
 
 
+/* =====================================================
+   SHARE MODE LOADING
+
+   ShareViewer owns the visual overlay.
+
+   SkyMediaLoading owns the actual message sequence.
+
+   This prevents ShareViewer from maintaining a second
+   independent Scripture timer.
+===================================================== */
+
+let shareLoadingOverlay = null;
+let shareLoadingText = null;
+let shareLoadingListenerBound = false;
+
+
+/* -----------------------------------------------------
+   Create visual loading overlay
+----------------------------------------------------- */
+
 function createShareLoadingOverlay() {
-    if (shareLoadingOverlay || !shell) return;
 
-    shareLoadingOverlay = createElement("div", "sky-share-loading");
-    shareLoadingOverlay.setAttribute("role", "status");
-    shareLoadingOverlay.setAttribute("aria-live", "polite");
-    shareLoadingOverlay.setAttribute("aria-busy", "true");
-    shareLoadingOverlay.hidden = true;
-
-    const inner = createElement("div", "sky-share-loading-inner");
-
-    const image = document.createElement("img");
-    image.className = "sky-share-loading-image";
-    image.src = "/assets/loading.gif";
-    image.alt = "";
-    image.setAttribute("aria-hidden", "true");
-
-    shareLoadingText = createElement("span", "sky-share-loading-text");
-
-    inner.appendChild(image);
-    inner.appendChild(shareLoadingText);
-    shareLoadingOverlay.appendChild(inner);
-
-    const main = shell.querySelector(".sky-share-main");
-    (main || shell).appendChild(shareLoadingOverlay);
-}
-
-function setShareLoadingMessage() {
-    if (shareLoadingText) {
-        shareLoadingText.textContent =
-            SHARE_LOADING_MESSAGES[shareLoadingIndex] ||
-            SHARE_LOADING_MESSAGES[0];
+    if (
+        shareLoadingOverlay ||
+        !shell
+    ) {
+        return;
     }
+
+    shareLoadingOverlay =
+        createElement(
+            "div",
+            "sky-share-loading"
+        );
+
+    shareLoadingOverlay.setAttribute(
+        "role",
+        "status"
+    );
+
+    shareLoadingOverlay.setAttribute(
+        "aria-live",
+        "polite"
+    );
+
+    shareLoadingOverlay.setAttribute(
+        "aria-busy",
+        "true"
+    );
+
+    shareLoadingOverlay.hidden =
+        true;
+
+    const inner =
+        createElement(
+            "div",
+            "sky-share-loading-inner"
+        );
+
+    const image =
+        document.createElement(
+            "img"
+        );
+
+    image.className =
+        "sky-share-loading-image";
+
+    image.src =
+        "assets/loading.gif";
+
+    image.alt =
+        "";
+
+    image.setAttribute(
+        "aria-hidden",
+        "true"
+    );
+
+    shareLoadingText =
+        createElement(
+            "span",
+            "sky-share-loading-text"
+        );
+
+    inner.appendChild(
+        image
+    );
+
+    inner.appendChild(
+        shareLoadingText
+    );
+
+    shareLoadingOverlay.appendChild(
+        inner
+    );
+
+    const main =
+        shell.querySelector(
+            ".sky-share-main"
+        );
+
+    (
+        main ||
+        shell
+    ).appendChild(
+        shareLoadingOverlay
+    );
 }
+
+
+/* -----------------------------------------------------
+   Connect to SkyMediaLoading
+----------------------------------------------------- */
+
+function bindShareLoadingSequence() {
+
+    if (
+        shareLoadingListenerBound
+    ) {
+        return;
+    }
+
+    shareLoadingListenerBound =
+        true;
+
+    document.addEventListener(
+        "skymedia:loading-message",
+        event => {
+
+            const detail =
+                event.detail || {};
+
+            if (
+                !shareLoadingText
+            ) {
+                return;
+            }
+
+            shareLoadingText.textContent =
+                detail.text || "";
+        }
+    );
+}
+
+
+/* -----------------------------------------------------
+   Start
+----------------------------------------------------- */
 
 function startShareLoading() {
-    createShareLoadingOverlay();
-    if (!shareLoadingOverlay) return;
 
-    if (shareLoadingTimer) {
-        window.clearInterval(shareLoadingTimer);
-        shareLoadingTimer = null;
+    createShareLoadingOverlay();
+
+    bindShareLoadingSequence();
+
+    if (
+        !shareLoadingOverlay
+    ) {
+        return;
     }
 
-    shareLoadingIndex = 0;
-    setShareLoadingMessage();
+    shareLoadingOverlay.hidden =
+        false;
 
-    shareLoadingOverlay.hidden = false;
-    shareLoadingOverlay.setAttribute("aria-busy", "true");
-    shareLoadingOverlay.classList.add("is-active");
+    shareLoadingOverlay.setAttribute(
+        "aria-busy",
+        "true"
+    );
 
-    shareLoadingTimer = window.setInterval(() => {
-        shareLoadingIndex =
-            (shareLoadingIndex + 1) % SHARE_LOADING_MESSAGES.length;
+    shareLoadingOverlay.classList.add(
+        "is-active"
+    );
 
-        setShareLoadingMessage();
-    }, SHARE_LOADING_INTERVAL);
+    /*
+     * The new global service controls
+     * the Scripture sequence.
+     */
+    if (
+        window.SkyMediaLoading &&
+        typeof SkyMediaLoading.start ===
+            "function"
+    ) {
+
+        SkyMediaLoading.start();
+    }
 }
+
+
+/* -----------------------------------------------------
+   Stop
+----------------------------------------------------- */
 
 function stopShareLoading() {
-    if (shareLoadingTimer) {
-        window.clearInterval(shareLoadingTimer);
-        shareLoadingTimer = null;
+
+    if (
+        window.SkyMediaLoading &&
+        typeof SkyMediaLoading.stop ===
+            "function"
+    ) {
+
+        SkyMediaLoading.stop();
     }
 
-    if (!shareLoadingOverlay) return;
+    if (
+        !shareLoadingOverlay
+    ) {
+        return;
+    }
 
-    shareLoadingOverlay.classList.remove("is-active");
-    shareLoadingOverlay.hidden = true;
-    shareLoadingOverlay.setAttribute("aria-busy", "false");
+    shareLoadingOverlay.classList.remove(
+        "is-active"
+    );
+
+    shareLoadingOverlay.hidden =
+        true;
+
+    shareLoadingOverlay.setAttribute(
+        "aria-busy",
+        "false"
+    );
 }
-
 
     /* =====================================================
        SHARE BOOK PAGE INDICATOR
