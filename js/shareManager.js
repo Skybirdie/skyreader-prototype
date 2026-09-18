@@ -6,42 +6,43 @@
  --------------------------------------------------------
  FINAL SHORT-LINK VERSION
 
+ PURPOSE
+
  1. Create an isolated SR2 share contract containing ONLY
     the selected item.
 
- 2. Send that isolated contract to the Cloudflare Worker.
+ 2. Send that contract to the Cloudflare Worker.
 
- 3. Worker stores the contract in KV and returns a short
-    /s/<key> URL.
+ 3. Worker stores the contract in MEDIA_KV and returns:
 
- 4. Clipboard success uses a custom "Link copied."
-    notification instead of browser alert().
+      /s/<16-character-key>
 
- 5. On a shared URL, the existing SkyMedia Manifest
-    machinery locates the isolated item.
+ 4. The public URL contains NO:
+      - contractz
+      - section
+      - id
 
- 6. The EXISTING ShareViewer receives the item.
+ 5. On a shared URL, the Worker supplies the isolated
+    contract to the existing GlideContract/Manifest
+    machinery.
+
+ 6. Existing ShareViewer opens the selected item.
 
  IMPORTANT
 
- - ShareViewer is NOT rebuilt.
- - Glide does NOT need to know which item was shared.
- - Generator does NOT need to know about the Share button.
- - The complete Glide contract is NOT placed in the URL.
- - The selected item remains the only serialized content.
+ - No Cloudflare KV logic is performed here.
+ - No catalog is created.
+ - ShareViewer is not rebuilt.
+ - No normal Front Page fallback is used.
+ - No browser alert is used.
 =========================================================
 */
 
 window.ShareManager = (function () {
 
     const CONTRACT_PARAM = "contractz";
-    const SECTION_PARAM = "section";
-    const ID_PARAM = "id";
 
-    /*
-     * Worker endpoint used to publish a short share URL.
-     */
-    const SHARE_PRIME_PATH =
+    const PRIME_PATH =
         "/__sky_share_prime";
 
 
@@ -122,10 +123,6 @@ window.ShareManager = (function () {
 
     /* =====================================================
        BUILD MINIMAL AUTHORITATIVE ITEM
-
-       ONLY the selected item is serialized.
-
-       Runtime fields are intentionally omitted.
     ===================================================== */
 
     function buildMinimalItem(item) {
@@ -172,12 +169,6 @@ window.ShareManager = (function () {
         };
 
 
-        /*
-         * Preserve dateAdd if present.
-         *
-         * date remains the authoritative visibility date.
-         */
-
         if (
             item.dateAdd !== undefined &&
             item.dateAdd !== null &&
@@ -195,8 +186,6 @@ window.ShareManager = (function () {
 
     /* =====================================================
        ENCODE SELECTED ITEM
-
-       Uses the EXISTING SR2 codec.
     ===================================================== */
 
     function encodeSelectedItem(item) {
@@ -236,261 +225,6 @@ window.ShareManager = (function () {
 
 
     /* =====================================================
-       BASE URL
-    ===================================================== */
-
-    function baseUrl() {
-
-        const url =
-            new URL(
-                window.location.href
-            );
-
-        /*
-         * Sharing is always based on the Worker origin.
-         * This removes the current Glide/application query
-         * contract from the share URL.
-         */
-
-        url.search = "";
-        url.hash = "";
-
-        return url.toString();
-    }
-
-
-    /* =====================================================
-       LEGACY / DEBUG URL BUILDER
-
-       Kept for compatibility and diagnostics.
-
-       The actual share() path now asks the Worker for
-       the short URL.
-    ===================================================== */
-
-    function buildUrl(
-        section,
-        id,
-        item
-    ) {
-
-        const normalizedSection =
-            normalizeSection(section);
-
-        const normalizedId =
-            cleanString(id);
-
-
-        if (!normalizedSection) {
-
-            throw new Error(
-                "Cannot create share link: section is missing."
-            );
-        }
-
-
-        if (!normalizedId) {
-
-            throw new Error(
-                "Cannot create share link: item id is missing."
-            );
-        }
-
-
-        const payload =
-            encodeSelectedItem(item);
-
-
-        const url =
-            new URL(
-                baseUrl()
-            );
-
-
-        url.searchParams.set(
-            CONTRACT_PARAM,
-            payload
-        );
-
-
-        url.searchParams.set(
-            SECTION_PARAM,
-            normalizedSection
-        );
-
-
-        url.searchParams.set(
-            ID_PARAM,
-            normalizedId
-        );
-
-
-        return url.toString();
-    }
-
-
-    /* =====================================================
-       CUSTOM "LINK COPIED" NOTIFICATION
-
-       Deliberately NOT window.alert().
-
-       This keeps the notification inside the page and
-       avoids the browser-generated:
-
-       "An embedded page at ... says ..."
-    ===================================================== */
-
-    function showLinkCopied() {
-
-        const existing =
-            document.getElementById(
-                "skyShareLinkCopiedToast"
-            );
-
-        if (existing) {
-
-            existing.textContent =
-                "Link copied.";
-
-            existing.classList.remove(
-                "is-visible"
-            );
-
-            void existing.offsetWidth;
-
-            existing.classList.add(
-                "is-visible"
-            );
-
-            window.clearTimeout(
-                existing._skyShareToastTimer
-            );
-
-            existing._skyShareToastTimer =
-                window.setTimeout(
-                    function () {
-
-                        existing.classList.remove(
-                            "is-visible"
-                        );
-
-                    },
-                    1800
-                );
-
-            return;
-        }
-
-
-        const toast =
-            document.createElement(
-                "div"
-            );
-
-        toast.id =
-            "skyShareLinkCopiedToast";
-
-        toast.textContent =
-            "Link copied";
-
-
-        Object.assign(
-            toast.style,
-            {
-                position: "fixed",
-                left: "50%",
-                bottom: "28px",
-                transform:
-                    "translate(-50%, 12px)",
-                zIndex: "2147483647",
-
-                padding:
-                    "9px 16px",
-
-                borderRadius:
-                    "999px",
-
-                background:
-                    "#00A550E0",
-
-                color:
-                    "#fff",
-
-                fontFamily:
-                    "system-ui, -apple-system, BlinkMacSystemFont, " +
-                    "\"Segoe UI\", sans-serif",
-
-                fontSize:
-                    "14px",
-
-                fontWeight:
-                    "600",
-
-                lineHeight:
-                    "1.2",
-
-                whiteSpace:
-                    "nowrap",
-
-                boxShadow:
-                    "0 6px 24px rgba(0,0,0,.25)",
-
-                opacity:
-                    "0",
-
-                pointerEvents:
-                    "none",
-
-                transition:
-                    "opacity .18s ease, transform .18s ease"
-            }
-        );
-
-
-        document.body.appendChild(
-            toast
-        );
-
-
-        requestAnimationFrame(
-            function () {
-
-                toast.style.opacity =
-                    "1";
-
-                toast.style.transform =
-                    "translate(-50%, 0)";
-            }
-        );
-
-
-        toast._skyShareToastTimer =
-            window.setTimeout(
-                function () {
-
-                    toast.style.opacity =
-                        "0";
-
-                    toast.style.transform =
-                        "translate(-50%, 12px)";
-
-
-                    window.setTimeout(
-                        function () {
-
-                            toast.remove();
-
-                        },
-                        220
-                    );
-
-                },
-                1800
-            );
-    }
-
-
-    /* =====================================================
        CLIPBOARD
     ===================================================== */
 
@@ -513,7 +247,7 @@ window.ShareManager = (function () {
             } catch (error) {
 
                 console.warn(
-                    "Clipboard API failed:",
+                    "[ShareManager] Clipboard API failed:",
                     error
                 );
             }
@@ -561,7 +295,7 @@ window.ShareManager = (function () {
         } catch (error) {
 
             console.warn(
-                "Clipboard fallback failed:",
+                "[ShareManager] Clipboard fallback failed:",
                 error
             );
 
@@ -571,25 +305,22 @@ window.ShareManager = (function () {
 
 
     /* =====================================================
-       ASK WORKER FOR SHORT SHARE URL
+       PRIME WORKER
+
+       Sends the isolated contract to Cloudflare.
+
+       Worker creates the short key and stores the payload.
     ===================================================== */
 
-    async function createShortShareUrl(
+    async function primeWorker(
         payload,
         section,
         id
     ) {
 
-        const endpoint =
-            new URL(
-                SHARE_PRIME_PATH,
-                window.location.origin
-            );
-
-
         const response =
             await fetch(
-                endpoint.toString(),
+                PRIME_PATH,
                 {
                     method: "POST",
 
@@ -604,10 +335,12 @@ window.ShareManager = (function () {
                                 payload,
 
                             section:
-                                section,
+                                normalizeSection(
+                                    section
+                                ),
 
                             id:
-                                id
+                                cleanString(id)
                         })
                 }
             );
@@ -615,40 +348,101 @@ window.ShareManager = (function () {
 
         if (!response.ok) {
 
-            const text =
-                await response.text()
-                    .catch(() => "");
+            let message =
+                "SkyMedia share server returned " +
+                response.status +
+                ".";
+
+
+            try {
+
+                const data =
+                    await response.json();
+
+                if (
+                    data &&
+                    data.error
+                ) {
+                    message =
+                        String(
+                            data.error
+                        );
+                }
+
+            } catch (_) {
+                /* keep default message */
+            }
+
 
             throw new Error(
-                "Short share URL request failed (" +
-                response.status +
-                ")" +
-                (text
-                    ? ": " + text
-                    : "")
+                message
             );
         }
 
 
-        const result =
+        const data =
             await response.json();
 
 
-        const url =
-            cleanString(
-                result?.url
-            );
-
-
-        if (!url) {
+        if (
+            !data ||
+            !data.url
+        ) {
 
             throw new Error(
-                "Worker did not return a short share URL."
+                "SkyMedia share server did not return a short URL."
             );
         }
 
 
-        return url;
+        return String(
+            data.url
+        );
+    }
+
+
+    /* =====================================================
+       BUILD SHORT SHARE URL
+    ===================================================== */
+
+    async function buildUrl(
+        section,
+        id,
+        item
+    ) {
+
+        const normalizedSection =
+            normalizeSection(section);
+
+        const normalizedId =
+            cleanString(id);
+
+
+        if (!normalizedSection) {
+
+            throw new Error(
+                "Cannot create share link: section is missing."
+            );
+        }
+
+
+        if (!normalizedId) {
+
+            throw new Error(
+                "Cannot create share link: item id is missing."
+            );
+        }
+
+
+        const payload =
+            encodeSelectedItem(item);
+
+
+        return await primeWorker(
+            payload,
+            normalizedSection,
+            normalizedId
+        );
     }
 
 
@@ -684,11 +478,13 @@ window.ShareManager = (function () {
         }
 
 
-        const normalizedId =
-            cleanString(item.id);
+        const itemId =
+            cleanString(
+                item.id
+            );
 
 
-        if (!normalizedId) {
+        if (!itemId) {
 
             throw new Error(
                 "Cannot share: selected item has no id."
@@ -697,27 +493,14 @@ window.ShareManager = (function () {
 
 
         /*
-         * Build exactly the same isolated-item SR2 payload
-         * that the working version uses.
-         */
-
-        const payload =
-            encodeSelectedItem(item);
-
-
-        /*
-         * Worker stores the payload in KV and returns:
-
-            /s/<short-key>
-
-         * No long contract appears in the final URL.
+         * First create the actual short Worker URL.
          */
 
         const url =
-            await createShortShareUrl(
-                payload,
+            await buildUrl(
                 normalizedSection,
-                normalizedId
+                itemId,
+                item
             );
 
 
@@ -752,12 +535,12 @@ window.ShareManager = (function () {
             } catch (error) {
 
                 /*
-                 * Continue to clipboard if the native
-                 * share sheet was cancelled or unavailable.
+                 * User cancellation is not a fatal error.
+                 * Fall through to clipboard.
                  */
 
                 console.warn(
-                    "Native share was not completed:",
+                    "[ShareManager] Native share was not completed:",
                     error
                 );
             }
@@ -766,6 +549,15 @@ window.ShareManager = (function () {
 
         /*
          * Clipboard.
+         *
+         * IMPORTANT:
+         *
+         * There is deliberately NO alert() here.
+         *
+         * This avoids:
+         *
+         * "An embedded page at ... says
+         * Share link copied to clipboard."
          */
 
         const copied =
@@ -776,7 +568,9 @@ window.ShareManager = (function () {
 
         if (copied) {
 
-            showLinkCopied();
+            console.log(
+                "[ShareManager] Link copied."
+            );
 
             return url;
         }
@@ -796,7 +590,7 @@ window.ShareManager = (function () {
         } catch (error) {
 
             console.log(
-                "Share URL:",
+                "[ShareManager] Share URL:",
                 url
             );
         }
@@ -819,54 +613,97 @@ window.ShareManager = (function () {
 
 
         /*
-         * Short URLs use:
-
-             /s/<key>
-
-         * The Worker has already recovered the original
-         * section/id and injected the contract. The browser
-         * may therefore arrive without query parameters.
-
-         * Keep support for the current ?contractz=... format
-         * as well.
+         * FINAL SHORT URL:
+         *
+         * /s/<key>
+         *
+         * The Worker bootstrap supplies the actual target
+         * internally through window.__SKY_SHARE_TARGET.
          */
 
-        const pathParts =
-            url.pathname
-                .split("/")
-                .filter(Boolean);
+        if (
+            window.__SKY_SHARE_TARGET &&
+            typeof window.__SKY_SHARE_TARGET ===
+                "object"
+        ) {
+
+            const internal =
+                window.__SKY_SHARE_TARGET;
 
 
-        const shortKey =
-            pathParts.length >= 2 &&
-            pathParts[0].toLowerCase() === "s"
-                ? cleanString(pathParts[1])
-                : "";
+            const internalSection =
+                normalizeSection(
+                    internal.section
+                );
+
+
+            const internalId =
+                cleanString(
+                    internal.id
+                );
+
+
+            const internalContract =
+                cleanString(
+                    window.__SKY_SHARE_PAYLOAD
+                );
+
+
+            if (
+                internalSection &&
+                internalId &&
+                internalContract
+            ) {
+
+                return {
+
+                    section:
+                        internalSection,
+
+                    id:
+                        internalId,
+
+                    contract:
+                        internalContract
+                };
+            }
+        }
+
+
+        /*
+         * Legacy/direct contract support.
+         *
+         * This keeps the previously working direct
+         * contractz mechanism compatible.
+         */
+
+        const section =
+            normalizeSection(
+                url.searchParams.get(
+                    "section"
+                )
+            );
+
+        const id =
+            cleanString(
+                url.searchParams.get(
+                    "id"
+                )
+            );
+
+        const contract =
+            url.searchParams.get(
+                CONTRACT_PARAM
+            );
 
 
         return {
 
-            section:
-                normalizeSection(
-                    url.searchParams.get(
-                        SECTION_PARAM
-                    )
-                ),
+            section,
 
-            id:
-                cleanString(
-                    url.searchParams.get(
-                        ID_PARAM
-                    )
-                ),
+            id,
 
-            contract:
-                url.searchParams.get(
-                    CONTRACT_PARAM
-                ),
-
-            key:
-                shortKey
+            contract
         };
     }
 
@@ -880,19 +717,6 @@ window.ShareManager = (function () {
         const target =
             readTarget();
 
-
-        /*
-         * Short-link form.
-         */
-
-        if (target.key) {
-            return true;
-        }
-
-
-        /*
-         * Legacy direct-contract form.
-         */
 
         return !!(
             target.contract &&
@@ -948,15 +772,10 @@ window.ShareManager = (function () {
             );
 
 
-        /*
-         * For a short-link request, the Worker bootstrap
-         * supplies section/id in the URL before the app
-         * starts.
-         *
-         * If the Worker does not expose them in the URL,
-         * Manifest still contains exactly one item. In that
-         * case use the isolated Manifest item.
-         */
+        if (!wantedId) {
+            return null;
+        }
+
 
         const type =
             sectionType(
@@ -965,7 +784,6 @@ window.ShareManager = (function () {
 
 
         if (
-            wantedId &&
             typeof Manifest.content ===
                 "function"
         ) {
@@ -1023,48 +841,24 @@ window.ShareManager = (function () {
 
                 if (Array.isArray(items)) {
 
-                    /*
-                     * First try exact id.
-                     */
+                    const match =
+                        items.find(
+                            function (item) {
 
-                    if (wantedId) {
-
-                        const match =
-                            items.find(
-                                function (item) {
-
-                                    return (
-                                        item &&
-                                        cleanString(
-                                            item.id
-                                        ) ===
-                                        wantedId
-                                    );
-                                }
-                            );
+                                return (
+                                    item &&
+                                    cleanString(
+                                        item.id
+                                    ) ===
+                                    wantedId
+                                );
+                            }
+                        );
 
 
-                        if (match) {
-                            return match;
-                        }
+                    if (match) {
+                        return match;
                     }
-
-
-                    /*
-                     * A short share contract contains
-                     * exactly one item. If section/id are
-                     * not yet available, that one item is
-                     * still authoritative.
-                     */
-
-                    if (
-                        target.key &&
-                        items.length === 1
-                    ) {
-
-                        return items[0];
-                    }
-
                 }
 
             } catch (error) {
@@ -1258,20 +1052,10 @@ window.ShareManager = (function () {
             readTarget();
 
 
-        /*
-         * Short-link requests are identified by /s/<key>.
-         *
-         * Legacy direct contract requests continue to work
-         * when section/id/contract are present.
-         */
-
         if (
-            !target.key &&
-            (
-                !target.contract ||
-                !target.section ||
-                !target.id
-            )
+            !target.contract ||
+            !target.section ||
+            !target.id
         ) {
 
             return false;
@@ -1288,13 +1072,6 @@ window.ShareManager = (function () {
 
         openDeepLink._promise =
             (async function () {
-
-                /*
-                 * The Worker has already injected the recovered
-                 * isolated contract into the application startup.
-                 *
-                 * Do NOT decode contractz ourselves.
-                 */
 
                 const item =
                     await waitForManifestItem(
@@ -1315,32 +1092,9 @@ window.ShareManager = (function () {
                 }
 
 
-                /*
-                 * For short links, section/id should normally
-                 * have been supplied by the Worker bootstrap.
-                 *
-                 * If not, derive them from the item.
-                 */
-
-                const effectiveTarget = {
-
-                    section:
-                        target.section ||
-                        normalizeSection(
-                            item.type
-                        ),
-
-                    id:
-                        target.id ||
-                        cleanString(
-                            item.id
-                        )
-                };
-
-
                 return await startShareMode(
                     item,
-                    effectiveTarget
+                    target
                 );
 
             })();
@@ -1383,4 +1137,3 @@ window.ShareManager = (function () {
     };
 
 })();
-
