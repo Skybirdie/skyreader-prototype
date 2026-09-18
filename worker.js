@@ -1,15 +1,25 @@
 "use strict";
 
 const CONTRACT_PREFIX = "sr2.";
+const COMPACT_CONTRACT_PREFIX = "sr2c.";
+
 const KEY_LENGTH = 16;
+
 const SKYMEDIA_BASE_URL =
   "https://skyreader-prototype.sliburd81.workers.dev";
 
 /* =========================================================
-   Open Graph / Social Preview configuration
+   FINAL SHORT SHARE ROUTE
    ========================================================= */
 
-const OG_SITE_NAME = "Meditation Mornings";
+const SHORT_SHARE_PREFIX = "/s/";
+
+/* =========================================================
+   Open Graph / Social Preview
+   ========================================================= */
+
+const OG_SITE_NAME =
+  "Meditation Mornings";
 
 const OG_DEFAULT_THUMBNAIL =
   "https://storage.googleapis.com/glide-prod.appspot.com/uploads-v2/mKxnsa8ky8uPGbBKpTyv/pub/lu8ys9mg3bqa2jgeWIFB.webp";
@@ -17,14 +27,19 @@ const OG_DEFAULT_THUMBNAIL =
 const OG_LOGO =
   "https://storage.googleapis.com/glide-prod.appspot.com/uploads-v2/mKxnsa8ky8uPGbBKpTyv/pub/Qysgcds56u8OmAi76mCC.webp";
 
-const OG_IMAGE_PATH = "/__sky_og_image";
+const OG_IMAGE_PATH =
+  "/__sky_og_image";
+
 
 /* =========================================================
    Deterministic KV key generation
-   Must match the key generator used by ShareManager / Glide.
    ========================================================= */
 
-function fnv1a32(value, seed) {
+function fnv1a32(
+  value,
+  seed
+) {
+
   let hash =
     (0x811c9dc5 ^ seed) >>> 0;
 
@@ -33,7 +48,9 @@ function fnv1a32(value, seed) {
     i < value.length;
     i++
   ) {
-    hash ^= value.charCodeAt(i);
+
+    hash ^=
+      value.charCodeAt(i);
 
     hash =
       Math.imul(
@@ -45,14 +62,18 @@ function fnv1a32(value, seed) {
   return hash >>> 0;
 }
 
+
 function hex8(value) {
+
   return value
     .toString(16)
     .padStart(8, "0")
     .toUpperCase();
 }
 
+
 function makeKey(payload) {
+
   const hash1 =
     fnv1a32(
       payload,
@@ -71,11 +92,13 @@ function makeKey(payload) {
   );
 }
 
+
 /* =========================================================
    Validation
    ========================================================= */
 
 function isValidKey(key) {
+
   return (
     typeof key === "string" &&
     key.length === KEY_LENGTH &&
@@ -83,22 +106,35 @@ function isValidKey(key) {
   );
 }
 
+
 function isValidPayload(payload) {
+
   if (!payload) {
     return false;
   }
 
-  if (
-    !payload.startsWith(
+  const isStandard =
+    payload.startsWith(
       CONTRACT_PREFIX
-    )
-  ) {
+    );
+
+  const isCompact =
+    payload.startsWith(
+      COMPACT_CONTRACT_PREFIX
+    );
+
+  if (!isStandard && !isCompact) {
     return false;
   }
 
+  const prefix =
+    isCompact
+      ? COMPACT_CONTRACT_PREFIX
+      : CONTRACT_PREFIX;
+
   const encoded =
     payload.slice(
-      CONTRACT_PREFIX.length
+      prefix.length
     );
 
   if (!encoded) {
@@ -110,12 +146,15 @@ function isValidPayload(payload) {
   );
 }
 
+
 /* =========================================================
    Response helpers
    ========================================================= */
 
 function htmlHeaders() {
+
   return {
+
     "content-type":
       "text/html; charset=UTF-8",
 
@@ -127,8 +166,11 @@ function htmlHeaders() {
   };
 }
 
+
 function textHeaders() {
+
   return {
+
     "content-type":
       "text/plain; charset=UTF-8",
 
@@ -140,12 +182,28 @@ function textHeaders() {
   };
 }
 
+
+function jsonHeaders() {
+
+  return {
+
+    "content-type":
+      "application/json; charset=UTF-8",
+
+    "cache-control":
+      "no-store, no-cache, must-revalidate"
+  };
+}
+
+
 /* =========================================================
    Asset request
-   Always serve the application's root index.html.
    ========================================================= */
 
-function makeCleanAssetRequest(request) {
+function makeCleanAssetRequest(
+  request
+) {
+
   const assetUrl =
     new URL(
       "/index.html",
@@ -161,20 +219,32 @@ function makeCleanAssetRequest(request) {
   );
 }
 
+
 /* =========================================================
    C2.2 Base64URL decoder
    ========================================================= */
 
-function base64UrlDecode(value) {
+function base64UrlDecode(
+  value
+) {
+
   try {
+
     let base64 =
       value
-        .replace(/-/g, "+")
-        .replace(/_/g, "/");
+        .replace(
+          /-/g,
+          "+"
+        )
+        .replace(
+          /_/g,
+          "/"
+        );
 
     while (
       base64.length % 4
     ) {
+
       base64 += "=";
     }
 
@@ -191,54 +261,68 @@ function base64UrlDecode(value) {
       i < binary.length;
       i++
     ) {
+
       bytes[i] =
         binary.charCodeAt(i);
     }
 
     return bytes;
 
-  } catch (error) {
+  } catch (_) {
+
     return null;
   }
 }
 
+
 /* =========================================================
    C2.2 byte decompressor
-   Must remain compatible with the Glide C2.2 compressor.
    ========================================================= */
 
-function decompressBytes(bytes) {
+function decompressBytes(
+  bytes
+) {
+
   if (
     !bytes ||
     bytes.length < 2
   ) {
+
     throw new Error(
       "C2.2 payload is too short."
     );
   }
 
+
   const version =
     bytes[0];
 
+
   if (version !== 2) {
+
     throw new Error(
       "Unsupported C2.2 codec version: " +
       version
     );
   }
 
+
   const windowSize = 4095;
   const maxLen = 18;
   const minLen = 3;
+
   const output = [];
 
   let pos = 1;
 
+
   while (
     pos < bytes.length
   ) {
+
     const flags =
       bytes[pos++];
+
 
     for (
       let bit = 0;
@@ -246,16 +330,16 @@ function decompressBytes(bytes) {
       pos < bytes.length;
       bit++
     ) {
-      const isMatch =
-        (flags &
-          (1 << bit)) !==
-        0;
 
-      /* -----------------------------------------------------
-         Literal byte
-         ----------------------------------------------------- */
+      const isMatch =
+        (
+          flags &
+          (1 << bit)
+        ) !== 0;
+
 
       if (!isMatch) {
+
         output.push(
           bytes[pos++]
         );
@@ -263,18 +347,17 @@ function decompressBytes(bytes) {
         continue;
       }
 
-      /* -----------------------------------------------------
-         Match token requires two bytes.
-         ----------------------------------------------------- */
 
       if (
         pos + 1 >=
         bytes.length
       ) {
+
         throw new Error(
           "Incomplete C2.2 match token."
         );
       }
+
 
       const high =
         bytes[pos++];
@@ -286,22 +369,6 @@ function decompressBytes(bytes) {
         (high << 8) |
         low;
 
-      /* -----------------------------------------------------
-         Reverse the compressor's packing:
-
-         packed =
-           ((offset - 1) << 4) |
-           (length - maxLen + 15)
-
-         Since maxLen = 18:
-
-         low nibble = length - 3
-
-         therefore:
-
-         length = lowNibble + 3
-         offset = (packed >>> 4) + 1
-         ----------------------------------------------------- */
 
       const length =
         (packed & 0x0F) +
@@ -311,38 +378,36 @@ function decompressBytes(bytes) {
         (packed >>> 4) +
         1;
 
+
       if (
         length < minLen ||
         length > maxLen
       ) {
+
         throw new Error(
           "Invalid C2.2 match length."
         );
       }
+
 
       if (
         offset < 1 ||
         offset > windowSize ||
         offset > output.length
       ) {
+
         throw new Error(
           "Invalid C2.2 match offset."
         );
       }
 
-      /* -----------------------------------------------------
-         Copy from already decoded output.
-
-         IMPORTANT:
-         This intentionally allows overlapping copies.
-         That is required for LZ-style back-references.
-         ----------------------------------------------------- */
 
       for (
         let i = 0;
         i < length;
         i++
       ) {
+
         const sourceIndex =
           output.length -
           offset;
@@ -354,27 +419,20 @@ function decompressBytes(bytes) {
     }
   }
 
+
   return new Uint8Array(
     output
   );
 }
 
+
 /* =========================================================
-   Decode sr2 payload into the original JSON contract.
+   Decode standard sr2 payload
    ========================================================= */
 
-function decodeContractPayload(
+function decodeStandardPayload(
   payload
 ) {
-  if (
-    !isValidPayload(
-      payload
-    )
-  ) {
-    throw new Error(
-      "Invalid sr2 payload."
-    );
-  }
 
   const encoded =
     payload.slice(
@@ -386,64 +444,231 @@ function decodeContractPayload(
       encoded
     );
 
+
   if (!compressed) {
+
     throw new Error(
       "Unable to Base64URL-decode sr2 payload."
     );
   }
+
 
   const utf8 =
     decompressBytes(
       compressed
     );
 
+
   const json =
     new TextDecoder()
-      .decode(utf8);
+      .decode(
+        utf8
+      );
 
-  return JSON.parse(json);
+
+  return JSON.parse(
+    json
+  );
 }
 
+
 /* =========================================================
-   Normalize a contract into an array.
+   Expand compact sr2c item
+   ========================================================= */
+
+function expandCompactItem(
+  compact
+) {
+
+  if (
+    !compact ||
+    typeof compact !== "object" ||
+    Array.isArray(compact)
+  ) {
+
+    throw new Error(
+      "Invalid compact SkyMedia item."
+    );
+  }
+
+
+  const item = {};
+
+
+  if ("i" in compact)
+    item.id = compact.i;
+
+  if ("t" in compact)
+    item.type = compact.t;
+
+  if ("T" in compact)
+    item.title = compact.T;
+
+  if ("s" in compact)
+    item.subtitle = compact.s;
+
+  if ("n" in compact)
+    item.thumbnail = compact.n;
+
+  if ("m" in compact)
+    item.media = compact.m;
+
+  if ("a" in compact)
+    item.audio = compact.a;
+
+  if ("u" in compact)
+    item.author = compact.u;
+
+  if ("c" in compact)
+    item.category = compact.c;
+
+  if ("d" in compact)
+    item.date = compact.d;
+
+
+  return item;
+}
+
+
+/* =========================================================
+   Decode compact sr2c payload
+   ========================================================= */
+
+function decodeCompactPayload(
+  payload
+) {
+
+  const encoded =
+    payload.slice(
+      COMPACT_CONTRACT_PREFIX.length
+    );
+
+
+  const compressed =
+    base64UrlDecode(
+      encoded
+    );
+
+
+  if (!compressed) {
+
+    throw new Error(
+      "Unable to Base64URL-decode sr2c payload."
+    );
+  }
+
+
+  const utf8 =
+    decompressBytes(
+      compressed
+    );
+
+
+  const json =
+    new TextDecoder()
+      .decode(
+        utf8
+      );
+
+
+  const compact =
+    JSON.parse(
+      json
+    );
+
+
+  return [
+    expandCompactItem(
+      compact
+    )
+  ];
+}
+
+
+/* =========================================================
+   Decode either sr2 or sr2c
+   ========================================================= */
+
+function decodeContractPayload(
+  payload
+) {
+
+  if (
+    !isValidPayload(
+      payload
+    )
+  ) {
+
+    throw new Error(
+      "Invalid SkyMedia payload."
+    );
+  }
+
+
+  if (
+    payload.startsWith(
+      COMPACT_CONTRACT_PREFIX
+    )
+  ) {
+
+    return decodeCompactPayload(
+      payload
+    );
+  }
+
+
+  return decodeStandardPayload(
+    payload
+  );
+}
+
+
+/* =========================================================
+   Normalize contract to array
    ========================================================= */
 
 function normalizeContractArray(
   contract
 ) {
+
   if (
     Array.isArray(contract)
   ) {
     return contract;
   }
 
+
   if (
     contract &&
-    typeof contract ===
-      "object"
+    typeof contract === "object"
   ) {
     return [contract];
   }
 
+
   return [];
 }
 
+
 /* =========================================================
-   Select the item represented by the share URL.
+   Select shared item
    ========================================================= */
 
 function getSharedItem(
   contract,
   url
 ) {
+
   const items =
     normalizeContractArray(
       contract
     );
 
+
   if (!items.length) {
     return null;
   }
+
 
   const requestedId =
     String(
@@ -452,7 +677,9 @@ function getSharedItem(
       ) || ""
     ).trim();
 
+
   if (requestedId) {
+
     const matchingItem =
       items.find(
         item =>
@@ -462,27 +689,123 @@ function getSharedItem(
           requestedId
       );
 
+
     if (matchingItem) {
       return matchingItem;
     }
   }
 
+
   /*
-   * Normal Glide share contracts are expected to contain
-   * the item being shared. If the contract contains multiple
-   * items and no id was supplied, use the first item.
+   * FINAL SHARE CONTRACTS contain exactly one item.
    */
 
   return items[0];
 }
 
+
 /* =========================================================
-   Clean a possible Glide / Markdown URL wrapper.
+   Determine section from item type
+   ========================================================= */
+
+function sectionFromItem(
+  item
+) {
+
+  const type =
+    String(
+      item?.type || ""
+    )
+      .trim()
+      .toLowerCase();
+
+
+  if (type === "book") {
+    return "reader";
+  }
+
+
+  if (type === "video") {
+    return "video";
+  }
+
+
+  if (type === "slideshow") {
+    return "slideshow";
+  }
+
+
+  return type;
+}
+
+
+/* =========================================================
+   Parse final /s/<key> route
+   ========================================================= */
+
+function getShortShareKey(
+  url
+) {
+
+  const pathname =
+    url.pathname;
+
+
+  if (
+    !pathname.startsWith(
+      SHORT_SHARE_PREFIX
+    )
+  ) {
+    return "";
+  }
+
+
+  const remainder =
+    pathname.slice(
+      SHORT_SHARE_PREFIX.length
+    );
+
+
+  if (
+    !remainder ||
+    remainder.includes("/")
+  ) {
+    return "";
+  }
+
+
+  let key = "";
+
+
+  try {
+
+    key =
+      decodeURIComponent(
+        remainder
+      )
+        .trim()
+        .toUpperCase();
+
+  } catch (_) {
+
+    return "";
+  }
+
+
+  return isValidKey(key)
+    ? key
+    : "";
+}
+
+
+/* =========================================================
+   Clean media URL
    ========================================================= */
 
 function cleanMediaUrl(
   value
 ) {
+
   if (
     value === null ||
     value === undefined
@@ -490,35 +813,41 @@ function cleanMediaUrl(
     return "";
   }
 
+
   let text =
     String(value).trim();
+
 
   if (!text) {
     return "";
   }
 
-  /* ---------------------------------------------------------
-     Remove surrounding JSON-style quotes.
-     --------------------------------------------------------- */
 
   if (
     text.length >= 2 &&
     text.startsWith('"') &&
     text.endsWith('"')
   ) {
+
     try {
+
       const decoded =
-        JSON.parse(text);
+        JSON.parse(
+          text
+        );
+
 
       if (
         typeof decoded ===
         "string"
       ) {
+
         text =
           decoded.trim();
       }
 
     } catch (_) {
+
       text =
         text
           .slice(1, -1)
@@ -526,35 +855,32 @@ function cleanMediaUrl(
     }
   }
 
-  /* ---------------------------------------------------------
-     Markdown link:
-     [https://example.com/image.jpg](https://example.com/image.jpg)
-     --------------------------------------------------------- */
 
   const markdownMatch =
     text.match(
       /^\s*\[[^\]]+\]\((https?:\/\/[^)]+)\)\s*$/i
     );
 
+
   if (markdownMatch) {
     return markdownMatch[1];
   }
 
-  /* ---------------------------------------------------------
-     If the field contains a URL directly.
-     --------------------------------------------------------- */
 
   const urlMatch =
     text.match(
       /https?:\/\/[^\s<>"')]+/i
     );
 
+
   if (urlMatch) {
     return urlMatch[0];
   }
 
+
   return "";
 }
+
 
 /* =========================================================
    HTML escaping
@@ -563,6 +889,7 @@ function cleanMediaUrl(
 function escapeHtml(
   value
 ) {
+
   return String(
     value ?? ""
   )
@@ -588,8 +915,9 @@ function escapeHtml(
     );
 }
 
+
 /* =========================================================
-   Build Open Graph metadata.
+   Build Open Graph metadata
    ========================================================= */
 
 function buildOgTags(
@@ -597,15 +925,19 @@ function buildOgTags(
   key,
   payload
 ) {
+
   let contract = null;
 
+
   try {
+
     contract =
       decodeContractPayload(
         payload
       );
 
   } catch (error) {
+
     console.error(
       "SkyMedia OG contract decode failed:",
       error
@@ -614,8 +946,12 @@ function buildOgTags(
     return "";
   }
 
+
   const url =
-    new URL(request.url);
+    new URL(
+      request.url
+    );
+
 
   const item =
     getSharedItem(
@@ -623,11 +959,13 @@ function buildOgTags(
       url
     );
 
+
   const title =
     String(
       item?.title ||
       OG_SITE_NAME
     ).trim();
+
 
   const imageUrl =
     new URL(
@@ -635,97 +973,70 @@ function buildOgTags(
       url.origin
     );
 
+
   imageUrl.searchParams.set(
     "k",
     key
   );
 
-  /*
-   * Preserve id when supplied so that the OG image
-   * endpoint can select the correct item.
-   */
-
-  const requestedId =
-    String(
-      url.searchParams.get(
-        "id"
-      ) || ""
-    ).trim();
-
-  if (requestedId) {
-    imageUrl.searchParams.set(
-      "id",
-      requestedId
-    );
-  }
 
   const escapedTitle =
-    escapeHtml(title);
+    escapeHtml(
+      title
+    );
+
 
   const escapedSiteName =
     escapeHtml(
       OG_SITE_NAME
     );
 
+
   const escapedImageUrl =
     escapeHtml(
       imageUrl.toString()
     );
+
 
   const escapedPageUrl =
     escapeHtml(
       url.toString()
     );
 
+
   let tags = "";
 
-  /*
-   * Open Graph title.
-   */
 
   tags +=
     `<meta property="og:title" content="${escapedTitle}">`;
 
-  /*
-   * Temporary site name.
-   */
 
   tags +=
     `<meta property="og:site_name" content="${escapedSiteName}">`;
 
-  /*
-   * The actual short share URL.
-   */
 
   tags +=
     `<meta property="og:url" content="${escapedPageUrl}">`;
 
-  /*
-   * Generated OG image.
-   *
-   * The __sky_og_image endpoint handles the
-   * item's thumbnail and falls back to the
-   * default thumbnail when necessary.
-   */
 
   tags +=
     `<meta property="og:image" content="${escapedImageUrl}">`;
 
-  /*
-   * Explicit image dimensions for social crawlers.
-   */
 
   tags +=
     `<meta property="og:image:width" content="1200">`;
 
+
   tags +=
     `<meta property="og:image:height" content="630">`;
+
 
   return tags;
 }
 
+
 /* =========================================================
-   Inject recovered contract AND OG metadata into index.html.
+   Inject short-share bootstrap
    ========================================================= */
 
 function injectContractBootstrap(
@@ -734,10 +1045,67 @@ function injectContractBootstrap(
   request,
   key
 ) {
+
+  let contract = null;
+
+
+  try {
+
+    contract =
+      decodeContractPayload(
+        payload
+      );
+
+  } catch (error) {
+
+    console.error(
+      "SkyMedia share bootstrap decode failed:",
+      error
+    );
+
+    return html;
+  }
+
+
+  const items =
+    normalizeContractArray(
+      contract
+    );
+
+
+  const item =
+    items[0] || null;
+
+
+  const section =
+    sectionFromItem(
+      item
+    );
+
+
+  const id =
+    String(
+      item?.id || ""
+    ).trim();
+
+
   const encodedPayload =
     JSON.stringify(
       payload
     );
+
+
+  const encodedSection =
+    JSON.stringify(
+      section
+    );
+
+
+  const encodedId =
+    JSON.stringify(
+      id
+    );
+
 
   const ogTags =
     key
@@ -748,60 +1116,74 @@ function injectContractBootstrap(
         )
       : "";
 
+
+  /*
+   * IMPORTANT:
+   *
+   * We deliberately do NOT put contractz into the visible
+   * address bar.
+   *
+   * GlideContract already accepts SkyMediaContract.
+   *
+   * ShareManager reads __SKY_SHARE_TARGET.
+   */
+
   const script = `
 <script>
 (function () {
   "use strict";
 
-  var payload = ${encodedPayload};
+  var payload =
+    ${encodedPayload};
+
+  var section =
+    ${encodedSection};
+
+  var id =
+    ${encodedId};
 
   if (!payload) return;
 
   try {
-    var url =
-      new URL(
-        window.location.href
-      );
 
-    url.searchParams.delete(
-      "k"
-    );
+    window.SkyMediaContract =
+      payload;
 
-    url.searchParams.set(
-      "contractz",
-      payload
-    );
+    window.__SKY_SHARE_PAYLOAD =
+      payload;
 
-    window.history.replaceState(
-      null,
-      "",
-      url.pathname +
-        "?" +
-        url.searchParams.toString() +
-        url.hash
-    );
+    window.__SKY_SHARE_TARGET = {
+      section: section,
+      id: id
+    };
 
   } catch (error) {
+
     console.error(
-      "SkyMedia KV bootstrap failed:",
+      "SkyMedia short-share bootstrap failed:",
       error
     );
   }
+
 })();
 </script>
 `;
 
+
   const marker =
     "</head>";
+
 
   const index =
     html.indexOf(
       marker
     );
 
+
   if (index < 0) {
     return html;
   }
+
 
   return (
     html.slice(
@@ -810,12 +1192,15 @@ function injectContractBootstrap(
     ) +
     ogTags +
     script +
-    html.slice(index)
+    html.slice(
+      index
+    )
   );
 }
 
+
 /* =========================================================
-   Serve index.html with a recovered contract.
+   Serve index.html with recovered contract
    ========================================================= */
 
 async function serveWithContract(
@@ -824,6 +1209,7 @@ async function serveWithContract(
   payload,
   key = ""
 ) {
+
   const assetResponse =
     await env.ASSETS.fetch(
       makeCleanAssetRequest(
@@ -831,14 +1217,17 @@ async function serveWithContract(
       )
     );
 
+
   if (!assetResponse.ok) {
     return assetResponse;
   }
+
 
   const contentType =
     assetResponse.headers.get(
       "content-type"
     ) || "";
+
 
   if (
     !contentType
@@ -848,8 +1237,10 @@ async function serveWithContract(
     return assetResponse;
   }
 
+
   const html =
     await assetResponse.text();
+
 
   const modified =
     injectContractBootstrap(
@@ -859,35 +1250,45 @@ async function serveWithContract(
       key
     );
 
+
   return new Response(
     modified,
     {
       status: 200,
-      headers: htmlHeaders()
+      headers:
+        htmlHeaders()
     }
   );
 }
 
+
 /* =========================================================
-   Generate the social-preview image.
+   Generate social-preview image
    ========================================================= */
 
 async function serveOgImage(
   request,
   env
 ) {
+
   if (!env.IMAGES) {
+
     return new Response(
       "SkyMedia Images binding is not configured.",
       {
         status: 500,
-        headers: textHeaders()
+        headers:
+          textHeaders()
       }
     );
   }
 
+
   const url =
-    new URL(request.url);
+    new URL(
+      request.url
+    );
+
 
   const key =
     String(
@@ -898,25 +1299,32 @@ async function serveOgImage(
       .trim()
       .toUpperCase();
 
+
   if (!isValidKey(key)) {
+
     return new Response(
       "Invalid SkyMedia publication key.",
       {
         status: 400,
-        headers: textHeaders()
+        headers:
+          textHeaders()
       }
     );
   }
 
+
   let payload = null;
 
+
   try {
+
     payload =
       await env.MEDIA_KV.get(
         key
       );
 
   } catch (error) {
+
     console.error(
       "SkyMedia OG KV read failed:",
       error
@@ -926,40 +1334,51 @@ async function serveOgImage(
       "SkyMedia KV read failed.",
       {
         status: 500,
-        headers: textHeaders()
+        headers:
+          textHeaders()
       }
     );
   }
 
+
   if (!payload) {
+
     return new Response(
       "SkyMedia publication not found.",
       {
         status: 404,
-        headers: textHeaders()
+        headers:
+          textHeaders()
       }
     );
   }
 
+
   if (!isValidPayload(payload)) {
+
     return new Response(
       "SkyMedia publication data is invalid.",
       {
         status: 500,
-        headers: textHeaders()
+        headers:
+          textHeaders()
       }
     );
   }
 
+
   let contract;
 
+
   try {
+
     contract =
       decodeContractPayload(
         payload
       );
 
   } catch (error) {
+
     console.error(
       "SkyMedia OG C2.2 decode failed:",
       error
@@ -969,10 +1388,12 @@ async function serveOgImage(
       "SkyMedia publication data could not be decoded.",
       {
         status: 500,
-        headers: textHeaders()
+        headers:
+          textHeaders()
       }
     );
   }
+
 
   const item =
     getSharedItem(
@@ -980,39 +1401,36 @@ async function serveOgImage(
       url
     );
 
+
   let thumbnailUrl =
     cleanMediaUrl(
       item?.thumbnail
     );
 
-  /*
-   * If there is no thumbnail, use the temporary
-   * default thumbnail.
-   */
 
   if (!thumbnailUrl) {
+
     thumbnailUrl =
       OG_DEFAULT_THUMBNAIL;
   }
+
 
   let baseResponse =
     await fetch(
       thumbnailUrl
     );
 
-  /*
-   * If the supplied thumbnail is unavailable,
-   * fall back to the default thumbnail.
-   */
 
   if (
     !baseResponse.ok ||
     !baseResponse.body
   ) {
+
     if (
       thumbnailUrl !==
       OG_DEFAULT_THUMBNAIL
     ) {
+
       baseResponse =
         await fetch(
           OG_DEFAULT_THUMBNAIL
@@ -1020,75 +1438,70 @@ async function serveOgImage(
     }
   }
 
+
   if (
     !baseResponse.ok ||
     !baseResponse.body
   ) {
+
     return new Response(
       "SkyMedia OG thumbnail could not be loaded.",
       {
         status: 502,
-        headers: textHeaders()
+        headers:
+          textHeaders()
       }
     );
   }
 
-  /*
-   * Fetch the logo separately.
-   */
 
   const logoResponse =
     await fetch(
       OG_LOGO
     );
 
+
   if (
     !logoResponse.ok ||
     !logoResponse.body
   ) {
+
     return new Response(
       "SkyMedia OG logo could not be loaded.",
       {
         status: 502,
-        headers: textHeaders()
+        headers:
+          textHeaders()
       }
     );
   }
 
-  /*
-   * Determine the base image dimensions so that
-   * the logo can be sized relative to the thumbnail.
-   *
-   * tee() allows us to inspect the image and still
-   * pass another stream into the transformation.
-   */
 
   const baseStreams =
     baseResponse.body.tee();
 
+
   let imageInfo = null;
 
+
   try {
+
     imageInfo =
       await env.IMAGES.info(
         baseStreams[0]
       );
 
   } catch (error) {
+
     console.error(
       "SkyMedia OG image info failed:",
       error
     );
   }
 
-  /*
-   * Default logo width is 16% of the base image width.
-   *
-   * Keep reasonable bounds so very small or very
-   * large source images don't produce an absurd logo.
-   */
 
   let logoWidth = 160;
+
 
   if (
     imageInfo &&
@@ -1098,12 +1511,14 @@ async function serveOgImage(
       )
     )
   ) {
+
     logoWidth =
       Math.round(
         Number(
           imageInfo.width
         ) * 0.16
       );
+
 
     logoWidth =
       Math.max(
@@ -1115,20 +1530,12 @@ async function serveOgImage(
       );
   }
 
-  /*
-   * Use the second tee'd stream for the actual
-   * transformation.
-   */
 
   let imagePipeline =
     env.IMAGES.input(
       baseStreams[1]
     );
 
-  /*
-   * Overlay the temporary Meditation Mornings logo
-   * in the bottom-right corner.
-   */
 
   imagePipeline =
     imagePipeline.draw(
@@ -1137,28 +1544,41 @@ async function serveOgImage(
           logoResponse.body
         )
         .transform({
-          width: logoWidth,
-          fit: "contain"
+          width:
+            logoWidth,
+
+          fit:
+            "contain"
         }),
       {
-        bottom: 18,
-        right: 18,
-        opacity: 0.88
+        bottom:
+          18,
+
+        right:
+          18,
+
+        opacity:
+          0.88
       }
     );
+
 
   const result =
     await imagePipeline.output(
       {
         format:
           "image/webp",
-        quality: 85
+
+        quality:
+          85
       }
     );
+
 
   return result.response(
     {
       headers: {
+
         "Cache-Control":
           "public, max-age=86400, stale-while-revalidate=604800"
       }
@@ -1166,59 +1586,200 @@ async function serveOgImage(
   );
 }
 
+
+/* =========================================================
+   Store share payload
+   ========================================================= */
+
+async function storeSharePayload(
+  env,
+  key,
+  payload
+) {
+
+  if (
+    !isValidKey(key) ||
+    !isValidPayload(payload)
+  ) {
+
+    throw new Error(
+      "Invalid share payload."
+    );
+  }
+
+
+  if (
+    makeKey(payload) !==
+    key
+  ) {
+
+    throw new Error(
+      "Share payload key mismatch."
+    );
+  }
+
+
+  await env.MEDIA_KV.put(
+    key,
+    payload
+  );
+
+
+  const stored =
+    await env.MEDIA_KV.get(
+      key
+    );
+
+
+  if (
+    stored !==
+    payload
+  ) {
+
+    throw new Error(
+      "KV verification failed."
+    );
+  }
+}
+
+
 /* =========================================================
    Worker
    ========================================================= */
 
 export default {
+
   async fetch(
     request,
-    env,
-    ctx
+    env
   ) {
+
     const url =
-      new URL(request.url);
-
-    const keyParam =
-      url.searchParams.get(
-        "k"
+      new URL(
+        request.url
       );
 
-    const contractz =
-      url.searchParams.get(
-        "contractz"
-      );
 
     /* =====================================================
        SOCIAL PREVIEW IMAGE
-       /__sky_og_image?k=<key>
-
-       This is intentionally handled before the normal
-       application routes.
        ===================================================== */
 
     if (
       url.pathname ===
       OG_IMAGE_PATH
     ) {
+
       return serveOgImage(
         request,
         env
       );
     }
 
-    /* =====================================================
-       SHARE PRIMING ENDPOINT
 
-       This MUST be handled before the normal
-       ?k / ?contractz routes.
+    /* =====================================================
+       FINAL SHORT SHARE ROUTE
+       
+       /s/<16-character-key>
+       ===================================================== */
+
+    const shortKey =
+      getShortShareKey(
+        url
+      );
+
+
+    if (shortKey) {
+
+      /*
+       * POST/prime is handled separately below.
+       * A GET here retrieves the stored isolated contract.
+       */
+
+      let payload = null;
+
+
+      try {
+
+        payload =
+          await env.MEDIA_KV.get(
+            shortKey
+          );
+
+      } catch (error) {
+
+        console.error(
+          "SkyMedia short-share KV read failed:",
+          error
+        );
+
+        return new Response(
+          "SkyMedia KV read failed.",
+          {
+            status: 500,
+            headers:
+              textHeaders()
+          }
+        );
+      }
+
+
+      if (!payload) {
+
+        return new Response(
+          "SkyMedia share link was not found.",
+          {
+            status: 404,
+            headers:
+              textHeaders()
+          }
+        );
+      }
+
+
+      if (!isValidPayload(payload)) {
+
+        return new Response(
+          "SkyMedia share payload is invalid.",
+          {
+            status: 500,
+            headers:
+              textHeaders()
+          }
+        );
+      }
+
+
+      return serveWithContract(
+        request,
+        env,
+        payload,
+        shortKey
+      );
+    }
+
+
+    /* =====================================================
+       SHARE PRIME ENDPOINT
+       
+       POST /__sky_share_prime
+       
+       Body:
+       {
+         contractz,
+         section,
+         id
+       }
+       
+       The Worker creates the key.
        ===================================================== */
 
     if (
       url.pathname ===
       "/__sky_share_prime"
     ) {
+
       const corsHeaders = {
+
         "access-control-allow-origin":
           "*",
 
@@ -1235,10 +1796,12 @@ export default {
           "no-store, no-cache, must-revalidate"
       };
 
+
       if (
         request.method ===
         "OPTIONS"
       ) {
+
         return new Response(
           null,
           {
@@ -1249,10 +1812,12 @@ export default {
         );
       }
 
+
       if (
         request.method !==
         "POST"
       ) {
+
         return new Response(
           JSON.stringify({
             error:
@@ -1266,13 +1831,17 @@ export default {
         );
       }
 
+
       let body;
 
+
       try {
+
         body =
           await request.json();
 
       } catch (_) {
+
         return new Response(
           JSON.stringify({
             error:
@@ -1286,12 +1855,6 @@ export default {
         );
       }
 
-      const primeKey =
-        String(
-          body?.k || ""
-        )
-          .trim()
-          .toUpperCase();
 
       const primeContract =
         String(
@@ -1299,11 +1862,13 @@ export default {
           ""
         );
 
+
       const primeSection =
         String(
           body?.section ||
           ""
         ).trim();
+
 
       const primeId =
         String(
@@ -1311,18 +1876,17 @@ export default {
           ""
         ).trim();
 
+
       if (
-        !isValidKey(
-          primeKey
-        ) ||
         !isValidPayload(
           primeContract
         )
       ) {
+
         return new Response(
           JSON.stringify({
             error:
-              "Invalid share-prime data."
+              "Invalid share-prime contract."
           }),
           {
             status: 400,
@@ -1332,45 +1896,27 @@ export default {
         );
       }
 
-      if (
+
+      /*
+       * The key is now generated entirely by the Worker.
+       */
+
+      const primeKey =
         makeKey(
           primeContract
-        ) !== primeKey
-      ) {
-        return new Response(
-          JSON.stringify({
-            error:
-              "Share-prime key mismatch."
-          }),
-          {
-            status: 400,
-            headers:
-              corsHeaders
-          }
         );
-      }
+
 
       try {
-        await env.MEDIA_KV.put(
+
+        await storeSharePayload(
+          env,
           primeKey,
           primeContract
         );
 
-        const storedPrimeContract =
-          await env.MEDIA_KV.get(
-            primeKey
-          );
-
-        if (
-          storedPrimeContract !==
-          primeContract
-        ) {
-          throw new Error(
-            "KV verification failed."
-          );
-        }
-
       } catch (error) {
+
         console.error(
           "SkyMedia share-prime KV failure:",
           error
@@ -1389,41 +1935,41 @@ export default {
         );
       }
 
+
+      /*
+       * Public URL intentionally contains ONLY the key.
+       *
+       * section and id are retained in the request data
+       * only for compatibility/debugging and are NOT placed
+       * in the public URL.
+       */
+
       const cleanUrl =
         new URL(
           SKYMEDIA_BASE_URL
         );
 
-      cleanUrl.searchParams.set(
-        "k",
-        primeKey
-      );
 
-      if (primeSection) {
-        cleanUrl.searchParams.set(
-          "section",
-          primeSection
-        );
-      }
+      cleanUrl.pathname =
+        SHORT_SHARE_PREFIX +
+        primeKey;
 
-      if (primeId) {
-        cleanUrl.searchParams.set(
-          "id",
-          primeId
-        );
-      }
-
-      /*
-       * IMPORTANT:
-       * Explicitly append a trailing "&" to the
-       * clean short URL returned by the Worker.
-       */
 
       return new Response(
         JSON.stringify({
+
           url:
-            cleanUrl.toString() +
-            "&"
+            cleanUrl.toString(),
+
+          key:
+            primeKey,
+
+          section:
+            primeSection,
+
+          id:
+            primeId
+
         }),
         {
           status: 200,
@@ -1433,25 +1979,36 @@ export default {
       );
     }
 
+
     /* =====================================================
-       FIRST USE
-       ?k=<key>&contractz=<payload>&section=...&id=...
-
-       Store the full contract in KV, then redirect to
-       the clean URL WITHOUT the contract.
-
-       The clean URL intentionally ends in "&" as a
-       diagnostic workaround for the social-preview issue.
+       LEGACY ?k=<key>&contractz=<payload>
+       
+       Retained so existing transitional links continue
+       working.
        ===================================================== */
+
+    const keyParam =
+      url.searchParams.get(
+        "k"
+      );
+
+
+    const contractz =
+      url.searchParams.get(
+        "contractz"
+      );
+
 
     if (
       keyParam &&
       contractz
     ) {
+
       const normalizedKey =
         keyParam
           .trim()
           .toUpperCase();
+
 
       if (
         !isValidKey(
@@ -1461,6 +2018,7 @@ export default {
           contractz
         )
       ) {
+
         return new Response(
           "SkyMedia publication link is invalid.",
           {
@@ -1471,15 +2029,14 @@ export default {
         );
       }
 
-      const calculatedKey =
-        makeKey(
-          contractz
-        );
 
       if (
-        calculatedKey !==
+        makeKey(
+          contractz
+        ) !==
         normalizedKey
       ) {
+
         return new Response(
           "SkyMedia publication link is invalid.",
           {
@@ -1490,13 +2047,17 @@ export default {
         );
       }
 
+
       try {
-        await env.MEDIA_KV.put(
+
+        await storeSharePayload(
+          env,
           normalizedKey,
           contractz
         );
 
       } catch (error) {
+
         return new Response(
           "SkyMedia KV write failed.",
           {
@@ -1507,88 +2068,43 @@ export default {
         );
       }
 
-      let storedPayload =
-        null;
-
-      try {
-        storedPayload =
-          await env.MEDIA_KV.get(
-            normalizedKey
-          );
-
-      } catch (error) {
-        return new Response(
-          "SkyMedia KV verification read failed.",
-          {
-            status: 500,
-            headers:
-              textHeaders()
-          }
-        );
-      }
-
-      if (
-        storedPayload !==
-        contractz
-      ) {
-        return new Response(
-          "SkyMedia KV verification failed.",
-          {
-            status: 500,
-            headers:
-              textHeaders()
-          }
-        );
-      }
-
-      /*
-       * Remove only the long contract from the URL.
-       */
 
       const cleanUrl =
         new URL(
           request.url
         );
 
+
       cleanUrl.searchParams.delete(
         "contractz"
       );
 
-      /*
-       * IMPORTANT:
-       * The URL API may serialize the query without
-       * preserving an empty trailing parameter.
-       *
-       * Therefore the "&" is appended AFTER
-       * cleanUrl.toString().
-       */
 
       return Response.redirect(
-        cleanUrl.toString() +
-          "&",
+        cleanUrl.toString(),
         302
       );
     }
 
-    /* =====================================================
-       CLEAN SHORT LINK
-       ?k=<key>&section=...&id=...
 
-       Retrieve the contract from KV and inject it into
-       index.html, including Open Graph metadata.
+    /* =====================================================
+       LEGACY CLEAN ?k=<key>
        ===================================================== */
 
     if (keyParam) {
+
       const normalizedKey =
         keyParam
           .trim()
           .toUpperCase();
+
 
       if (
         !isValidKey(
           normalizedKey
         )
       ) {
+
         return new Response(
           "SkyMedia publication key is invalid.",
           {
@@ -1599,16 +2115,19 @@ export default {
         );
       }
 
-      let payload =
-        null;
+
+      let payload = null;
+
 
       try {
+
         payload =
           await env.MEDIA_KV.get(
             normalizedKey
           );
 
       } catch (error) {
+
         return new Response(
           "SkyMedia KV read failed.",
           {
@@ -1619,7 +2138,9 @@ export default {
         );
       }
 
+
       if (!payload) {
+
         return new Response(
           "SkyMedia publication not found.",
           {
@@ -1630,11 +2151,13 @@ export default {
         );
       }
 
+
       if (
         !isValidPayload(
           payload
         )
       ) {
+
         return new Response(
           "SkyMedia publication data is invalid.",
           {
@@ -1645,14 +2168,6 @@ export default {
         );
       }
 
-      /*
-       * IMPORTANT:
-       * Pass the recovered payload and normalized key.
-       *
-       * The key is required here so that
-       * injectContractBootstrap() generates the
-       * Open Graph metadata.
-       */
 
       return serveWithContract(
         request,
@@ -1662,21 +2177,21 @@ export default {
       );
     }
 
+
     /* =====================================================
        LEGACY DIRECT CONTRACT
-
-       Existing URLs such as:
-       ?contractz=sr2....
-
-       continue to work.
+       
+       Retained for compatibility/testing.
        ===================================================== */
 
     if (contractz) {
+
       if (
         !isValidPayload(
           contractz
         )
       ) {
+
         return new Response(
           "SkyMedia contract is invalid.",
           {
@@ -1687,10 +2202,12 @@ export default {
         );
       }
 
+
       const contractKey =
         makeKey(
           contractz
         );
+
 
       return serveWithContract(
         request,
@@ -1700,11 +2217,9 @@ export default {
       );
     }
 
-    /* =====================================================
-       NORMAL REQUEST
 
-       No KV key and no direct contract.
-       Let Static Assets handle the normal application.
+    /* =====================================================
+       NORMAL APPLICATION REQUEST
        ===================================================== */
 
     return env.ASSETS.fetch(
