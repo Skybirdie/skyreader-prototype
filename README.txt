@@ -1,70 +1,35 @@
-SkyMedia Direct-ID Share Fix
-============================
+SkyMedia Short Link — Phase 3 test
 
-This package changes NEW share links from the old random-key form:
-    /s/16-CHARACTER-KEY
+PURPOSE
+This phase connects the new permanent catalog to the canonical short route:
 
-to the direct-ID form:
-    /s/<section>/<item-id>
+  /s/<section>/<id>
 
-Example:
-    /s/slideshow/abovealllove202609131952
+We are NOT changing Share Mode in this phase.
+We are NOT changing the Glide generator yet.
+Legacy share links remain supported.
 
-Files to replace
-----------------
-1. worker.js              -> replace the repository root worker.js
-2. js/shareManager.js    -> replace the repository js/shareManager.js
+FILES
+- worker.js — complete replacement Worker.
+- skyShareGenerator-phase2.js — reference copy of the currently working Phase 2 generator; DO NOT replace your generator with this file for this test.
 
-Do NOT replace app.js for this change.
-Do NOT change wrangler.jsonc for this change.
+DEPLOY
+Replace your current worker.js in the GitHub repository with the supplied worker.js and deploy normally with your existing Workers Builds process (or npx wrangler deploy if deploying locally).
 
-What the new flow does
-----------------------
-When a user creates a NEW share link, ShareManager sends the selected
-ONE item to /__sky_share_prime. The Worker stores that item in MEDIA_KV
-under a deterministic internal record key, then returns the direct
-section/ID URL.
+TEST ITEM
+The requested main-dataset test item is:
 
-When somebody opens that URL, the Worker retrieves the one stored item,
-builds a one-item SkyMediaContract in memory, injects it into index.html,
-and the existing Manifest -> ShareManager -> ShareViewer flow opens the
-shared item.
+  section: slideshow
+  id: yellowfeverprophecy202609060634
 
-Existing /s/<16-character-key> links remain supported.
-Existing ?k=... and ?contractz=... legacy links remain supported.
+After deployment, open:
 
-Cloudflare setup
-----------------
-No new binding is required. The existing MEDIA_KV and IMAGES bindings
-are used. No wrangler.jsonc change is required.
+  https://skyreader-prototype.sliburd81.workers.dev/s/slideshow/yellowfeverprophecy202609060634
 
-Deployment
-----------
-Commit these two replacement files to the connected GitHub repository.
-Cloudflare Workers Builds should then build/deploy the Worker normally.
+EXPECTED RESULT
+The Worker should find the already-published catalog:v1 record for this item, construct a one-item SkyMedia contract, and open that item using the normal SkyMedia application/viewer.
 
-Important testing
------------------
-After deployment, create a NEW share link from SkyMedia. Do not use an
-old copied random-key link for the first test.
+IMPORTANT
+If the result is still "SkyMedia shared item was not found", the catalog lookup key is not matching the Phase 2 stored record and we will inspect the key construction next. Do not change other project files yet.
 
-The expected new URL is similar to:
-    https://skyreader-prototype.sliburd81.workers.dev/s/slideshow/ITEM-ID
-
-Then open that URL in a fresh browser tab/window.
-
-Usage/cost note
----------------
-Creating a new direct-ID share performs one inbound Worker request and,
-inside that invocation, one KV write plus one KV verification read.
-Opening the shared URL performs one inbound Worker request plus one KV
-read. That is intentionally comparable to the old random-key system,
-which also performed one KV write + verification read at share creation
-and one KV read when the shared URL was opened.
-
-The new system removes the need to calculate/store the compressed SR2
-payload as the public-link identity. It does NOT eliminate the need for
-KV storage: the Worker still needs the selected item's data in order to
-resolve a direct ID later.
-
-A normal static asset request is not changed by this package.
+The Phase 2 catalog endpoint and existing contractz sharing remain untouched.

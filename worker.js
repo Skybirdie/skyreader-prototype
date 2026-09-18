@@ -242,7 +242,7 @@ function getDirectShareTarget(url) {
 
 async function getDirectShareRecord(env, target) {
 
-  const key = makeShareRecordKey(target.section, target.id);
+  const key = makeCatalogRecordKey(target.section, target.id);
 
   let raw;
 
@@ -1552,7 +1552,8 @@ async function handleLegacyPrime(
 }
 
 /* =========================================================
-   /s/<key>
+   /s/<section>/<id>
+   Reads the permanent catalog record.
 ========================================================= */
 
 async function handleDirectShare(
