@@ -68,6 +68,21 @@ const SHARE_RECORD_PREFIX =
   "share:v1:";
 
 /* =========================================================
+   TEMPORARY CATALOG PUBLISH TEST
+
+   This is intentionally a temporary shared test token.
+   It proves the Glide -> Worker POST path before we move
+   publishing authentication to a proper secret-backed
+   Glide workflow/API arrangement.
+========================================================= */
+
+const CATALOG_TEST_TOKEN =
+  "SMCAT-TEST-9f7b2d4c-20260918";
+
+const CATALOG_TEST_STATUS_KEY =
+  "catalog:test:last";
+
+/* =========================================================
    FNV-1A
 ========================================================= */
 
@@ -1657,6 +1672,171 @@ async function handleShortShare(
 }
 
 /* =========================================================
+   TEMPORARY /__sky_catalog_publish TEST ENDPOINT
+
+   POST body is deliberately tiny for this first test.
+   It proves that the Glide JavaScript column can reach
+   the Worker and that the Worker can write/read MEDIA_KV.
+
+   This endpoint will later be changed to accept the full
+   catalog and use proper secret-backed authentication.
+========================================================= */
+
+function catalogTestCorsHeaders() {
+
+  return {
+    "access-control-allow-origin": "*",
+    "access-control-allow-methods": "POST, GET, OPTIONS",
+    "access-control-allow-headers":
+      "Content-Type, X-Sky-Catalog-Test-Token",
+    "content-type":
+      "application/json; charset=UTF-8",
+    "cache-control":
+      "no-store, no-cache, must-revalidate"
+  };
+}
+
+function catalogTestAuthorized(request, url) {
+
+  const headerToken =
+    String(
+      request.headers.get(
+        "X-Sky-Catalog-Test-Token"
+      ) || ""
+    ).trim();
+
+  const queryToken =
+    String(
+      url.searchParams.get("token") || ""
+    ).trim();
+
+  return (
+    headerToken === CATALOG_TEST_TOKEN ||
+    queryToken === CATALOG_TEST_TOKEN
+  );
+}
+
+async function handleCatalogPublishTest(request, env) {
+
+  const url = new URL(request.url);
+  const headers = catalogTestCorsHeaders();
+
+  if (request.method === "OPTIONS") {
+    return new Response(null, {
+      status: 204,
+      headers
+    });
+  }
+
+  if (!catalogTestAuthorized(request, url)) {
+    return new Response(
+      JSON.stringify({ error: "Catalog test authorization failed." }),
+      { status: 401, headers }
+    );
+  }
+
+  if (request.method === "GET") {
+
+    let stored = null;
+
+    try {
+      stored = await env.MEDIA_KV.get(
+        CATALOG_TEST_STATUS_KEY
+      );
+    } catch (error) {
+      console.error(
+        "SkyMedia catalog test KV read failure:",
+        error
+      );
+
+      return new Response(
+        JSON.stringify({ error: "KV read failed." }),
+        { status: 500, headers }
+      );
+    }
+
+    if (!stored) {
+      return new Response(
+        JSON.stringify({
+          received: false,
+          message: "No catalog test POST has been received yet."
+        }),
+        { status: 200, headers }
+      );
+    }
+
+    return new Response(
+      stored,
+      { status: 200, headers }
+    );
+  }
+
+  if (request.method !== "POST") {
+    return new Response(
+      JSON.stringify({ error: "Catalog publish test requires POST." }),
+      { status: 405, headers }
+    );
+  }
+
+  let body;
+
+  try {
+    body = await request.json();
+  } catch (_) {
+    return new Response(
+      JSON.stringify({ error: "Invalid catalog test JSON." }),
+      { status: 400, headers }
+    );
+  }
+
+  const record = {
+    received: true,
+    receivedAt: new Date().toISOString(),
+    method: request.method,
+    test: body?.test === true,
+    source: String(body?.source || ""),
+    itemCount: Number(body?.itemCount || 0),
+    firstItemId: String(body?.firstItemId || ""),
+    firstItemType: String(body?.firstItemType || "")
+  };
+
+  try {
+
+    await env.MEDIA_KV.put(
+      CATALOG_TEST_STATUS_KEY,
+      JSON.stringify(record)
+    );
+
+    const stored =
+      await env.MEDIA_KV.get(
+        CATALOG_TEST_STATUS_KEY
+      );
+
+    if (stored !== JSON.stringify(record)) {
+      throw new Error("Catalog test KV verification failed.");
+    }
+
+  } catch (error) {
+
+    console.error(
+      "SkyMedia catalog test KV write failure:",
+      error
+    );
+
+    return new Response(
+      JSON.stringify({ error: "KV write/verification failed." }),
+      { status: 500, headers }
+    );
+  }
+
+  return new Response(
+    JSON.stringify(record),
+    { status: 200, headers }
+  );
+}
+
+
+/* =========================================================
    Worker
 ========================================================= */
 
@@ -1683,6 +1863,21 @@ export default {
     ) {
 
       return serveOgImage(
+        request,
+        env
+      );
+    }
+
+    /* -----------------------------------------------------
+       Temporary catalog publish test
+    ----------------------------------------------------- */
+
+    if (
+      url.pathname ===
+      "/__sky_catalog_publish"
+    ) {
+
+      return handleCatalogPublishTest(
         request,
         env
       );
