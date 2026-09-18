@@ -1,1316 +1,1176 @@
 "use strict";
 
-/* =========================================================
-   SkyMedia Share Manager
+/*
+=========================================================
+ SkyMedia Share Manager
+ --------------------------------------------------------
+ RESTORED ARCHITECTURE:
 
-   KV-BACKED SHARE LINK ARCHITECTURE
-   ---------------------------------
-
-   The Share button creates a FIRST-USE request containing:
-
-       ?k=<16-character-key>
-       &contractz=sr2.<FULL-COLLECTION>
-       &section=<reader|video|slideshow>
+ 1. SkyMedia already knows the exact selected item.
+ 2. ShareManager creates a contract containing ONLY that item.
+ 3. Existing GlideContract C2.2/SR2 codec encodes that item.
+ 4. URL contains:
+       ?contractz=sr2.<single-item-payload>
+       &section=<section>
        &id=<item-id>
+ 5. Recipient decodes that one-item contract.
+ 6. ShareManager.openDeepLink() hands the item to the
+    EXISTING standalone ShareViewer when available.
 
-   That request is sent to the Cloudflare Worker at:
+ KV / /api/shorten / /__sky_share_prime are NOT used.
 
-       /__sky_share_prime
+ This restores the previously proven isolated-item behavior.
+=========================================================
+*/
 
-   The Worker:
-
-       1. validates the key against the complete contract
-       2. stores the COMPLETE contract in MEDIA_KV
-       3. returns the clean Share Mode URL:
-
-          /share/<key>/<section>/<id>
-
-   The final shared URL therefore contains no contract:
-
-       https://skyreader-prototype.sliburd81.workers.dev/
-       share/<key>/<section>/<id>
-
-   IMPORTANT:
-
-   - The COMPLETE collection is preserved in KV.
-   - We do NOT create a one-item contract.
-   - The Generator remains responsible for supplying the
-     complete contract to SkyMedia.
-   - The Share button does NOT depend on Glide seeing the
-     share request.
-   - No /api/shorten endpoint is required.
-   - Existing deep-link reading logic remains available.
-   ========================================================= */
 
 window.ShareManager = (function () {
 
+    /* =====================================================
+       SECTION NORMALIZATION
+    ===================================================== */
 
-  /* =========================================================
-     CONFIGURATION
-     ========================================================= */
+    function normalizeSection(value) {
 
-  /*
-    The Cloudflare Worker / SkyMedia base URL.
+        const section =
+            String(value || "")
+                .trim()
+                .toLowerCase();
 
-    This is deliberately explicit so the Share button always
-    creates a link pointing at the deployed SkyMedia application
-    rather than depending on the Glide page containing the app.
-  */
-  const SKYMEDIA_BASE_URL =
-    "https://skyreader-prototype.sliburd81.workers.dev";
-
-
-  /*
-    Worker endpoint responsible for storing the complete
-    contract in MEDIA_KV and returning the clean Share Mode URL.
-  */
-  const SHARE_PRIME_PATH =
-    "/__sky_share_prime";
-
-
-  /* =========================================================
-     SECTION NORMALIZATION
-     ========================================================= */
-
-  function normalizeSection(section) {
-
-    const value =
-      String(section || "")
-        .trim()
-        .toLowerCase();
-
-
-    if (
-      value === "book" ||
-      value === "books" ||
-      value === "reader" ||
-      value === "pdf" ||
-      value === "pdfs"
-    ) {
-      return "reader";
-    }
-
-
-    if (
-      value === "video" ||
-      value === "videos"
-    ) {
-      return "video";
-    }
-
-
-    if (
-      value === "slideshow" ||
-      value === "slideshows" ||
-      value === "slide" ||
-      value === "slides"
-    ) {
-      return "slideshow";
-    }
-
-
-    return value;
-  }
-
-
-  /* =========================================================
-     LOCATE CURRENT CONTRACT
-     ========================================================= */
-
-  function getCurrentContractz() {
-
-    const current =
-      new URL(
-        window.location.href
-      );
-
-
-    /*
-      Preferred current format.
-    */
-    const contractz =
-      current.searchParams.get(
-        "contractz"
-      );
-
-    if (contractz) {
-      return contractz;
-    }
-
-
-    /*
-      Legacy fallback.
-    */
-    const contract =
-      current.searchParams.get(
-        "contract"
-      );
-
-    if (contract) {
-      return contract;
-    }
-
-
-    /*
-      Older legacy fallback.
-    */
-    const books =
-      current.searchParams.get(
-        "books"
-      );
-
-    if (books) {
-      return books;
-    }
-
-
-    /*
-      Some SkyMedia startup configurations may already have
-      decoded the contract into a global variable.
-
-      Try a safe Manifest getter without changing the existing
-      contract system.
-    */
-    try {
-
-      if (
-        window.Manifest &&
-        typeof window.Manifest.getContractz ===
-          "function"
-      ) {
-
-        const value =
-          window.Manifest.getContractz();
-
-        if (value) {
-          return String(value);
+        if (
+            section === "book" ||
+            section === "books" ||
+            section === "reader" ||
+            section === "pdf" ||
+            section === "pdfs"
+        ) {
+            return "reader";
         }
-      }
 
-    } catch (_) {
-      // Continue.
+        if (
+            section === "video" ||
+            section === "videos"
+        ) {
+            return "video";
+        }
+
+        if (
+            section === "slideshow" ||
+            section === "slideshows" ||
+            section === "slide" ||
+            section === "slides"
+        ) {
+            return "slideshow";
+        }
+
+        return section;
     }
 
 
-    return "";
-  }
+    /* =====================================================
+       STRING CLEANUP
+    ===================================================== */
 
+    function cleanString(value) {
 
-  /* =========================================================
-     FNV-1A 32-BIT HASH
+        if (
+            value === null ||
+            value === undefined
+        ) {
+            return "";
+        }
 
-     MUST MATCH THE GLIDE GENERATOR AND CLOUDFLARE WORKER.
-     ========================================================= */
-
-  function fnv1a32(
-    value,
-    seed
-  ) {
-
-    let hash =
-      (0x811c9dc5 ^ seed) >>> 0;
-
-
-    for (
-      let i = 0;
-      i < value.length;
-      i++
-    ) {
-
-      hash ^=
-        value.charCodeAt(i);
-
-      hash =
-        Math.imul(
-          hash,
-          0x01000193
-        ) >>> 0;
+        return String(value).trim();
     }
 
 
-    return hash >>> 0;
-  }
+    /* =====================================================
+       MEDIA NORMALIZATION
+       -----------------------------------------------------
+       Preserve the authoritative Glide contract shape.
+
+       A slideshow may legitimately contain an array.
+       Other media normally arrive as strings.
+    ===================================================== */
+
+    function normalizeMedia(value) {
+
+        if (Array.isArray(value)) {
+
+            return value.map(
+                item => cleanString(item)
+            ).filter(Boolean);
+        }
+
+        if (
+            value === null ||
+            value === undefined
+        ) {
+            return "";
+        }
+
+        return value;
+    }
 
 
-  function hex8(value) {
+    /* =====================================================
+       MINIMAL AUTHORITATIVE ITEM
+       -----------------------------------------------------
+       IMPORTANT:
 
-    return value
-      .toString(16)
-      .padStart(8, "0")
-      .toUpperCase();
-  }
+       Runtime projections such as:
 
+           pdf
+           book
+           video
+           videoUrl
+           slides
+           slideshow
 
-  /*
-    Generate the same 16-character key used by the Generator
-    and Cloudflare Worker.
-  */
-  function makeKVKey(payload) {
+       are intentionally NOT serialized.
 
-    const hash1 =
-      fnv1a32(
-        payload,
-        0
-      );
+       The existing GlideContract adapter reconstructs
+       those runtime projections when it decodes the SR2
+       contract.
 
+       date remains the visibility/release date.
+       dateAdd is preserved when present.
+    ===================================================== */
 
-    const hash2 =
-      fnv1a32(
-        payload,
-        0x9E3779B9
-      );
-
-
-    return (
-      hex8(hash1) +
-      hex8(hash2)
-    );
-  }
-
-
-  /* =========================================================
-     BUILD FIRST-USE KV URL
-     ========================================================= */
-
-  function buildLongUrl(
-    section,
-    id
-  ) {
-
-    const normalizedSection =
-      normalizeSection(
+    function buildMinimalItem(
+        item,
         section
-      );
-
-
-    const itemId =
-      String(id || "")
-        .trim();
-
-
-    if (!normalizedSection) {
-
-      throw new Error(
-        "ShareManager: missing section."
-      );
-    }
-
-
-    if (!itemId) {
-
-      throw new Error(
-        "ShareManager: missing item id."
-      );
-    }
-
-
-    /*
-      Get the COMPLETE current contract.
-    */
-    const contractz =
-      getCurrentContractz();
-
-
-    if (!contractz) {
-
-      throw new Error(
-        "ShareManager: no complete SkyMedia contract was found."
-      );
-    }
-
-
-    /*
-      Validate that it looks like the expected C2.2 contract.
-    */
-    if (
-      !contractz.startsWith("sr2.")
     ) {
 
-      throw new Error(
-        "ShareManager: current contract is not a valid sr2 contract."
-      );
-    }
+        if (!item) {
 
-
-    /*
-      Generate the deterministic KV key from the EXACT
-      contract payload.
-
-      This MUST match both the Generator and Worker.
-    */
-    const kvKey =
-      makeKVKey(
-        contractz
-      );
-
-
-    /*
-      Build the first-use URL.
-
-      IMPORTANT:
-
-      The complete contract remains in this temporary URL
-      because the Worker needs it to prime MEDIA_KV.
-    */
-    const url =
-      new URL(
-        SKYMEDIA_BASE_URL
-      );
-
-
-    url.searchParams.set(
-      "k",
-      kvKey
-    );
-
-
-    url.searchParams.set(
-      "contractz",
-      contractz
-    );
-
-
-    /*
-      Preserve the requested application destination.
-    */
-    url.searchParams.set(
-      "section",
-      normalizedSection
-    );
-
-
-    url.searchParams.set(
-      "id",
-      itemId
-    );
-
-
-    return url.toString();
-  }
-
-
-  /* =========================================================
-     PRIME KV AND CREATE SHORT SHARE URL
-     ========================================================= */
-
-  async function shorten(longUrl) {
-
-    if (!longUrl) {
-      throw new Error(
-        "ShareManager: missing share URL."
-      );
-    }
-
-
-    const url =
-      new URL(
-        longUrl
-      );
-
-
-    const key =
-      url.searchParams.get(
-        "k"
-      );
-
-
-    const contractz =
-      url.searchParams.get(
-        "contractz"
-      );
-
-
-    const section =
-      normalizeSection(
-        url.searchParams.get(
-          "section"
-        )
-      );
-
-
-    const id =
-      String(
-        url.searchParams.get(
-          "id"
-        ) || ""
-      ).trim();
-
-
-    if (
-      !key ||
-      !contractz
-    ) {
-
-      throw new Error(
-        "ShareManager: incomplete first-use URL."
-      );
-    }
-
-
-    if (!section) {
-
-      throw new Error(
-        "ShareManager: missing section."
-      );
-    }
-
-
-    if (!id) {
-
-      throw new Error(
-        "ShareManager: missing item id."
-      );
-    }
-
-
-    /*
-      Send the COMPLETE contract to the Worker.
-
-      The Worker validates:
-
-          makeKey(contractz) === key
-
-      and then stores the contract in MEDIA_KV.
-    */
-    const response =
-      await fetch(
-        SKYMEDIA_BASE_URL +
-          SHARE_PRIME_PATH,
-        {
-          method: "POST",
-          mode: "cors",
-          cache: "no-store",
-          headers: {
-            "Content-Type":
-              "application/json"
-          },
-          body: JSON.stringify({
-            k: key,
-            contractz,
-            section,
-            id
-          })
+            throw new Error(
+                "ShareManager: no item supplied."
+            );
         }
-      );
+
+        const normalizedSection =
+            normalizeSection(section);
+
+        let type =
+            cleanString(item.type)
+                .toLowerCase();
+
+        if (!type) {
+
+            if (normalizedSection === "reader") {
+                type = "book";
+            }
+            else if (normalizedSection === "video") {
+                type = "video";
+            }
+            else if (normalizedSection === "slideshow") {
+                type = "slideshow";
+            }
+        }
+
+        if (
+            type === "reader" ||
+            type === "pdf" ||
+            type === "book"
+        ) {
+            type = "book";
+        }
+        else if (
+            type === "videos" ||
+            type === "video"
+        ) {
+            type = "video";
+        }
+        else if (
+            type === "slide" ||
+            type === "slides" ||
+            type === "slideshows" ||
+            type === "slideshow"
+        ) {
+            type = "slideshow";
+        }
+
+        const id =
+            cleanString(item.id);
+
+        if (!id) {
+
+            throw new Error(
+                "ShareManager: selected item has no id."
+            );
+        }
+
+        const minimal = {
+
+            id: id,
+
+            type: type,
+
+            title:
+                item.title == null
+                    ? ""
+                    : String(item.title),
+
+            subtitle:
+                item.subtitle == null
+                    ? ""
+                    : String(item.subtitle),
+
+            thumbnail:
+                item.thumbnail == null
+                    ? ""
+                    : String(item.thumbnail),
+
+            media:
+                normalizeMedia(item.media),
+
+            audio:
+                item.audio == null
+                    ? ""
+                    : String(item.audio),
+
+            author:
+                item.author == null
+                    ? ""
+                    : String(item.author),
+
+            category:
+                item.category == null
+                    ? ""
+                    : String(item.category),
+
+            date:
+                item.date == null
+                    ? ""
+                    : String(item.date)
+        };
 
 
-    if (!response.ok) {
+        /*
+         * dateAdd is not part of the current authoritative
+         * seven-field contract, but older content can contain
+         * it. Preserve it when it actually exists.
+         */
+        if (
+            Object.prototype.hasOwnProperty.call(
+                item,
+                "dateAdd"
+            )
+        ) {
 
-      let detail = "";
-
-      try {
-
-        const body =
-          await response.json();
-
-        detail =
-          body &&
-          body.error
-            ? String(body.error)
-            : "";
-
-      } catch (_) {
-        // Ignore non-JSON error responses.
-      }
+            minimal.dateAdd =
+                item.dateAdd == null
+                    ? ""
+                    : String(item.dateAdd);
+        }
 
 
-      throw new Error(
-        "ShareManager: unable to create the short share link" +
-        (
-          detail
-            ? " — " + detail
-            : " (" + response.status + ")"
-        )
-      );
+        return minimal;
     }
 
 
-    const data =
-      await response.json();
+    /* =====================================================
+       ENCODE SELECTED ITEM
+       -----------------------------------------------------
+       This is the central restoration.
 
+       The old working implementation encoded:
 
-    if (
-      !data ||
-      typeof data.url !== "string" ||
-      !data.url
+           [minimalItem]
+
+       NOT the complete Glide collection.
+    ===================================================== */
+
+    function encodeSelectedItem(
+        item,
+        section
     ) {
 
-      throw new Error(
-        "ShareManager: Worker returned an invalid short share link."
-      );
-    }
+        if (
+            !window.GlideContract ||
+            !GlideContract.codec ||
+            typeof GlideContract.codec.encode !==
+                "function"
+        ) {
 
+            throw new Error(
+                "ShareManager: GlideContract SR2 codec is unavailable."
+            );
+        }
 
-    /*
-      The Worker is now authoritative.
+        const minimalItem =
+            buildMinimalItem(
+                item,
+                section
+            );
 
-      Return exactly the URL it generated rather than
-      reconstructing the Share Mode route locally.
-    */
-    return data.url;
-  }
-
-
-  /* =========================================================
-     SHARE FEEDBACK TOAST
-     ========================================================= */
-
-  function showShareToast(
-    message,
-    kind = "info"
-  ) {
-
-    let toast =
-      document.getElementById(
-        "skymediaShareToast"
-      );
-
-
-    /*
-      A fullscreen element lives in the browser's top layer.
-      Anything outside that element can be hidden behind it.
-
-      When the document itself is fullscreen, append the toast
-      there so it remains visible.
-
-      For video fullscreen, the native browser controls remain
-      authoritative and the toast falls back to the document
-      overlay.
-    */
-    const fs =
-      document.fullscreenElement;
-
-
-    const host =
-      fs &&
-      fs !== document.documentElement &&
-      fs instanceof HTMLElement
-        ? fs
-        : document.body;
-
-
-    if (!toast) {
-
-      toast =
-        document.createElement(
-          "div"
+        return GlideContract.codec.encode(
+            [minimalItem]
         );
-
-      toast.id =
-        "skymediaShareToast";
-
-      toast.className =
-        "skymedia-share-toast";
     }
 
 
-    if (
-      toast.parentElement !==
-      host
+    /* =====================================================
+       DECODE CONTRACT
+       -----------------------------------------------------
+       Uses the existing GlideContract decoder.
+
+       The decoder may return:
+         - an array
+         - an object
+         - { content: [...] }
+    ===================================================== */
+
+    function decodeContract(
+        payload
     ) {
 
-      host.appendChild(
-        toast
-      );
-    }
+        if (
+            !window.GlideContract ||
+            !GlideContract.codec ||
+            typeof GlideContract.codec.decode !==
+                "function"
+        ) {
 
+            throw new Error(
+                "ShareManager: GlideContract SR2 decoder is unavailable."
+            );
+        }
 
-    toast.textContent =
-      message;
+        let value =
+            GlideContract.codec.decode(
+                payload
+            );
 
+        if (
+            value &&
+            typeof value === "object" &&
+            Array.isArray(value.content)
+        ) {
 
-    toast.dataset.kind =
-      kind;
+            value =
+                value.content;
+        }
 
+        if (Array.isArray(value)) {
+            return value;
+        }
 
-    toast.classList.remove(
-      "visible"
-    );
-
-
-    void toast.offsetWidth;
-
-
-    toast.classList.add(
-      "visible"
-    );
-
-
-    clearTimeout(
-      toast._hideTimer
-    );
-
-
-    toast._hideTimer =
-      setTimeout(
-        () => {
-          toast.classList.remove(
-            "visible"
-          );
-        },
-        2800
-      );
-  }
-
-
-  /* =========================================================
-     COPY HELPER
-     ========================================================= */
-
-  async function copyToClipboard(
-    text
-  ) {
-
-    if (
-      navigator.clipboard &&
-      typeof navigator.clipboard.writeText ===
-        "function"
-    ) {
-
-      await navigator.clipboard.writeText(
-        text
-      );
-
-      return true;
-    }
-
-
-    /*
-      Older-browser fallback.
-    */
-    const textarea =
-      document.createElement(
-        "textarea"
-      );
-
-
-    textarea.value =
-      text;
-
-
-    textarea.setAttribute(
-      "readonly",
-      ""
-    );
-
-
-    textarea.style.position =
-      "fixed";
-
-
-    textarea.style.opacity =
-      "0";
-
-
-    document.body.appendChild(
-      textarea
-    );
-
-
-    textarea.select();
-
-
-    let copied =
-      false;
-
-
-    try {
-
-      copied =
-        document.execCommand(
-          "copy"
-        );
-
-    } catch (_) {
-
-      copied =
-        false;
-    }
-
-
-    textarea.remove();
-
-
-    return copied;
-  }
-
-
-  /* =========================================================
-     SHARE
-     ========================================================= */
-
-  async function share(
-    section,
-    item
-  ) {
-
-    try {
-
-      /*
-        -------------------------------------------------------
-        1. VALIDATE THE ITEM
-        -------------------------------------------------------
-      */
-      if (
-        !item ||
-        !item.id
-      ) {
+        if (
+            value &&
+            typeof value === "object"
+        ) {
+            return [value];
+        }
 
         throw new Error(
-          "ShareManager: cannot share an item without an id."
+            "ShareManager: decoded SR2 contract contains no items."
         );
-      }
+    }
 
 
-      const normalizedSection =
-        normalizeSection(
-          section
+    /* =====================================================
+       BASE URL
+       -----------------------------------------------------
+       Remove the current query string and hash.
+
+       This is intentional.
+
+       The share URL must NOT inherit the Glide contract,
+       current navigation state, or another shared item's
+       parameters.
+    ===================================================== */
+
+    function baseUrl() {
+
+        const url =
+            new URL(
+                window.location.href
+            );
+
+        url.search = "";
+        url.hash = "";
+
+        return url.toString();
+    }
+
+
+    /* =====================================================
+       BUILD SHARE URL
+       -----------------------------------------------------
+
+       Result:
+
+       https://worker.example/
+         ?contractz=sr2.<ONE ITEM>
+         &section=slideshow
+         &id=abovealllove202609131952
+    ===================================================== */
+
+    function buildUrl(
+        section,
+        id,
+        item
+    ) {
+
+        const normalizedSection =
+            normalizeSection(section);
+
+        const safeId =
+            cleanString(id);
+
+        if (!normalizedSection) {
+
+            throw new Error(
+                "ShareManager: missing share section."
+            );
+        }
+
+        if (!safeId) {
+
+            throw new Error(
+                "ShareManager: missing share item id."
+            );
+        }
+
+        const payload =
+            encodeSelectedItem(
+                item,
+                normalizedSection
+            );
+
+        const url =
+            new URL(
+                baseUrl()
+            );
+
+        url.searchParams.set(
+            "contractz",
+            payload
         );
 
-
-      if (!normalizedSection) {
-
-        throw new Error(
-          "ShareManager: missing section."
-        );
-      }
-
-
-      /*
-        -------------------------------------------------------
-        2. BUILD THE FIRST-USE REQUEST
-        -------------------------------------------------------
-
-        This contains the COMPLETE contract.
-
-        It is NOT the URL we give to the user.
-      */
-      const firstUseUrl =
-        buildLongUrl(
-          normalizedSection,
-          item.id
+        url.searchParams.set(
+            "section",
+            normalizedSection
         );
 
-
-      /*
-        -------------------------------------------------------
-        3. PRIME KV
-        -------------------------------------------------------
-
-        IMPORTANT CHANGE:
-
-        We now wait for the Worker to finish storing the
-        complete contract before exposing the share URL.
-
-        This eliminates the race condition in which a recipient
-        could receive the URL before MEDIA_KV was ready.
-      */
-      let preparedUrl;
-
-      try {
-
-        preparedUrl =
-          await shorten(
-            firstUseUrl
-          );
-
-      } catch (error) {
-
-        showShareToast(
-          "Unable to create share link.",
-          "error"
+        url.searchParams.set(
+            "id",
+            safeId
         );
 
-
-        console.error(
-          "ShareManager: KV share preparation failed.",
-          error
-        );
+        return url.toString();
+    }
 
 
-        return null;
-      }
+    /* =====================================================
+       COPY FALLBACK
+    ===================================================== */
 
+    async function copyToClipboard(
+        value
+    ) {
 
-      /*
-        -------------------------------------------------------
-        4. NATIVE WEB SHARE
-        -------------------------------------------------------
+        if (
+            navigator.clipboard &&
+            typeof navigator.clipboard.writeText ===
+                "function"
+        ) {
 
-        At this point the URL is already backed by KV.
+            try {
 
-        The browser therefore receives the final clean
-        Share Mode URL.
-      */
-      if (
-        navigator.share &&
-        typeof navigator.share ===
-          "function"
-      ) {
+                await navigator.clipboard.writeText(
+                    value
+                );
+
+                return true;
+
+            } catch (_) {
+                /* Continue to fallback. */
+            }
+        }
 
         try {
 
-          await navigator.share({
-            title:
-              item.title ||
-              "SkyMedia",
+            const textarea =
+                document.createElement(
+                    "textarea"
+                );
 
-            text:
-              item.title
-                ? `View ${item.title} in SkyMedia`
-                : "View this item in SkyMedia",
+            textarea.value = value;
 
-            url:
-              preparedUrl
-          });
+            textarea.setAttribute(
+                "readonly",
+                ""
+            );
+
+            textarea.style.position =
+                "fixed";
+
+            textarea.style.left =
+                "-9999px";
+
+            textarea.style.top =
+                "0";
+
+            document.body.appendChild(
+                textarea
+            );
+
+            textarea.select();
+
+            const copied =
+                document.execCommand(
+                    "copy"
+                );
+
+            textarea.remove();
+
+            return copied;
+
+        } catch (_) {
+
+            return false;
+        }
+    }
 
 
-          showShareToast(
-            "Share link sent.",
-            "success"
-          );
+    /* =====================================================
+       SHARE
+       -----------------------------------------------------
+       This method intentionally does NOT:
+
+         - call /api/shorten
+         - call /__sky_share_prime
+         - generate a KV key
+         - serialize the complete Glide collection
+         - contact Cloudflare KV
+
+       It shares exactly the item already selected by
+       SkyMedia.
+    ===================================================== */
+
+    async function share(
+        section,
+        item
+    ) {
+
+        if (!item) {
+
+            throw new Error(
+                "ShareManager: no selected item."
+            );
+        }
+
+        const normalizedSection =
+            normalizeSection(section);
+
+        const id =
+            cleanString(item.id);
+
+        if (!id) {
+
+            throw new Error(
+                "ShareManager: selected item has no id."
+            );
+        }
+
+        const shareUrl =
+            buildUrl(
+                normalizedSection,
+                id,
+                item
+            );
+
+        const title =
+            cleanString(
+                item.title
+            ) ||
+            "Meditation Mornings";
+
+        /*
+         * Native share remains the preferred mechanism.
+         */
+        if (
+            navigator.share &&
+            typeof navigator.share ===
+                "function"
+        ) {
+
+            try {
+
+                await navigator.share({
+
+                    title: title,
+
+                    text:
+                        title,
+
+                    url:
+                        shareUrl
+                });
+
+                return shareUrl;
+
+            } catch (error) {
+
+                /*
+                 * Abort/cancel is not an application failure.
+                 * The user simply closed the native share sheet.
+                 */
+                if (
+                    error &&
+                    error.name ===
+                        "AbortError"
+                ) {
+
+                    return shareUrl;
+                }
+
+                /*
+                 * Fall through to clipboard for browsers
+                 * where native sharing fails.
+                 */
+            }
+        }
 
 
-          return preparedUrl;
+        /*
+         * Clipboard fallback.
+         */
+        const copied =
+            await copyToClipboard(
+                shareUrl
+            );
+
+        if (copied) {
+
+            try {
+
+                window.alert(
+                    "Share link copied to clipboard."
+                );
+
+            } catch (_) {
+                /* Ignore alert failure. */
+            }
+
+            return shareUrl;
+        }
+
+
+        /*
+         * Final legacy fallback.
+         */
+        try {
+
+            window.prompt(
+                "Copy this share link:",
+                shareUrl
+            );
+
+        } catch (_) {
+            /* Ignore prompt failure. */
+        }
+
+        return shareUrl;
+    }
+
+
+    /* =====================================================
+       READ DEEP-LINK TARGET
+       ===================================================== */
+
+    function readTarget() {
+
+        const url =
+            new URL(
+                window.location.href
+            );
+
+        const section =
+            normalizeSection(
+                url.searchParams.get(
+                    "section"
+                )
+            );
+
+        const id =
+            cleanString(
+                url.searchParams.get(
+                    "id"
+                )
+            );
+
+        if (
+            !section &&
+            !id
+        ) {
+            return null;
+        }
+
+        return {
+            section,
+            id
+        };
+    }
+
+
+    /* =====================================================
+       FIND ITEM IN DECODED MANIFEST
+       -----------------------------------------------------
+       The shared contract normally contains exactly one
+       item. The section/type checks are retained so that
+       malformed links do not accidentally open another type.
+    ===================================================== */
+
+    function findManifestItem(
+        items,
+        target
+    ) {
+
+        if (
+            !Array.isArray(items) ||
+            !items.length
+        ) {
+            return null;
+        }
+
+        const targetId =
+            cleanString(
+                target?.id
+            );
+
+        const targetSection =
+            normalizeSection(
+                target?.section
+            );
+
+        let targetType =
+            "";
+
+        if (
+            targetSection === "reader"
+        ) {
+            targetType = "book";
+        }
+        else if (
+            targetSection === "video"
+        ) {
+            targetType = "video";
+        }
+        else if (
+            targetSection === "slideshow"
+        ) {
+            targetType = "slideshow";
+        }
+
+
+        /*
+         * Exact id + type match first.
+         */
+        let match =
+            items.find(
+                item => {
+
+                    const sameId =
+                        cleanString(
+                            item?.id
+                        ) === targetId;
+
+                    if (!sameId) {
+                        return false;
+                    }
+
+                    if (!targetType) {
+                        return true;
+                    }
+
+                    return (
+                        cleanString(
+                            item?.type
+                        ).toLowerCase() ===
+                        targetType
+                    );
+                }
+            );
+
+        if (match) {
+            return match;
+        }
+
+
+        /*
+         * ID-only fallback.
+
+         * This is useful with older contracts where the
+         * item type was absent or represented differently.
+         */
+        match =
+            items.find(
+                item =>
+                    cleanString(
+                        item?.id
+                    ) === targetId
+            );
+
+        if (match) {
+            return match;
+        }
+
+
+        /*
+         * A one-item SR2 contract can safely fall back to
+         * its sole item when the target id is absent.
+         */
+        if (
+            items.length === 1 &&
+            !targetId
+        ) {
+            return items[0];
+        }
+
+        return null;
+    }
+
+
+    /* =====================================================
+       MANIFEST DISCOVERY
+       -----------------------------------------------------
+       The decoded shared contract is normally enough by
+       itself. We deliberately do NOT replace the normal
+       application manifest with it.
+
+       Share Mode receives the decoded item directly.
+    ===================================================== */
+
+    function getDecodedSharedItem(
+        target
+    ) {
+
+        const url =
+            new URL(
+                window.location.href
+            );
+
+        const payload =
+            url.searchParams.get(
+                "contractz"
+            );
+
+        if (!payload) {
+
+            throw new Error(
+                "ShareManager: no contractz payload in share URL."
+            );
+        }
+
+        const items =
+            decodeContract(
+                payload
+            );
+
+        const item =
+            findManifestItem(
+                items,
+                target
+            );
+
+        if (!item) {
+
+            throw new Error(
+                "ShareManager: shared item was not found in the SR2 contract."
+            );
+        }
+
+        return item;
+    }
+
+
+    /* =====================================================
+       NORMAL VIEWER FALLBACKS
+       -----------------------------------------------------
+       These are retained only as a fallback.
+
+       The preferred path is ShareViewer.start().
+    ===================================================== */
+
+    async function openNormalViewer(
+        item,
+        target
+    ) {
+
+        const section =
+            normalizeSection(
+                target?.section ||
+                item?.type
+            );
+
+
+        if (
+            section === "reader"
+        ) {
+
+            if (
+                window.AppSwitcher &&
+                typeof AppSwitcher.show ===
+                    "function"
+            ) {
+
+                AppSwitcher.show(
+                    "reader"
+                );
+            }
+
+            if (
+                window.SRNavigation &&
+                typeof SRNavigation.openMagazine ===
+                    "function"
+            ) {
+
+                await SRNavigation.openMagazine(
+                    item
+                );
+
+                return true;
+            }
+
+            if (
+                window.Reader &&
+                typeof Reader.open ===
+                    "function"
+            ) {
+
+                await Reader.open(
+                    item
+                );
+
+                return true;
+            }
+
+            throw new Error(
+                "ShareManager: no Reader opener is available."
+            );
+        }
+
+
+        if (
+            section === "video"
+        ) {
+
+            if (
+                window.AppSwitcher &&
+                typeof AppSwitcher.show ===
+                    "function"
+            ) {
+
+                AppSwitcher.show(
+                    "video"
+                );
+            }
+
+            if (
+                window.VideoViewer &&
+                typeof VideoViewer.openVideo ===
+                    "function"
+            ) {
+
+                await VideoViewer.openVideo(
+                    item
+                );
+
+                return true;
+            }
+
+            throw new Error(
+                "ShareManager: no Video Viewer opener is available."
+            );
+        }
+
+
+        if (
+            section === "slideshow"
+        ) {
+
+            if (
+                window.AppSwitcher &&
+                typeof AppSwitcher.show ===
+                    "function"
+            ) {
+
+                AppSwitcher.show(
+                    "slideshow"
+                );
+            }
+
+            if (
+                window.SlideshowViewer &&
+                typeof SlideshowViewer.open ===
+                    "function"
+            ) {
+
+                await SlideshowViewer.open(
+                    item
+                );
+
+                return true;
+            }
+
+            throw new Error(
+                "ShareManager: no Slideshow Viewer opener is available."
+            );
+        }
+
+
+        throw new Error(
+            "ShareManager: unsupported share section: " +
+            section
+        );
+    }
+
+
+    /* =====================================================
+       OPEN DEEP LINK
+       -----------------------------------------------------
+       IMPORTANT CURRENT SHARE MODE HANDOFF:
+
+       ShareViewer.start(item,target) is preferred.
+
+       This means a recipient does NOT merely enter the
+       normal Reader / Video / Slideshow application.
+
+       The exact decoded item is handed directly to the
+       standalone Share Mode that already exists.
+    ===================================================== */
+
+    async function openDeepLink() {
+
+        const target =
+            readTarget();
+
+        if (!target) {
+            return false;
+        }
+
+
+        /*
+         * A contractz payload is required for the isolated
+         * item architecture.
+         */
+        const url =
+            new URL(
+                window.location.href
+            );
+
+        const payload =
+            url.searchParams.get(
+                "contractz"
+            );
+
+        if (!payload) {
+
+            /*
+             * Do not consume unrelated application URLs.
+             *
+             * A future Worker/KV URL can still be handled
+             * elsewhere if desired, but this ShareManager
+             * only handles direct SR2 item links.
+             */
+            return false;
+        }
+
+
+        try {
+
+            const item =
+                getDecodedSharedItem(
+                    target
+                );
+
+
+            /*
+             * ------------------------------------------------
+             * PREFERRED CURRENT HANDOFF
+             * ------------------------------------------------
+             *
+             * Existing ShareViewer owns the standalone UI.
+             */
+            if (
+                window.ShareViewer &&
+                typeof ShareViewer.start ===
+                    "function"
+            ) {
+
+                await ShareViewer.start(
+                    item,
+                    {
+                        section:
+                            normalizeSection(
+                                target.section ||
+                                item.type
+                            ),
+
+                        id:
+                            cleanString(
+                                target.id ||
+                                item.id
+                            )
+                    }
+                );
+
+                return true;
+            }
+
+
+            /*
+             * ------------------------------------------------
+             * FALLBACK
+             * ------------------------------------------------
+             *
+             * Retain the proven normal-viewer behavior if
+             * ShareViewer is not loaded for some reason.
+             */
+            return await openNormalViewer(
+                item,
+                target
+            );
 
         } catch (error) {
 
-          /*
-            User cancelled the native share sheet.
-
-            Do not report success, but keep the prepared URL
-            available to the caller.
-          */
-          if (
-            error &&
-            error.name ===
-              "AbortError"
-          ) {
-
-            showShareToast(
-              "Share cancelled.",
-              "info"
+            console.error(
+                "[SkyMedia Share] Deep-link failed:",
+                error
             );
 
-
-            return preparedUrl;
-          }
-
-
-          /*
-            Any other native-share failure falls through to
-            clipboard.
-          */
+            return false;
         }
-      }
-
-
-      /*
-        -------------------------------------------------------
-        5. CLIPBOARD FALLBACK
-        -------------------------------------------------------
-      */
-
-      const copied =
-        await copyToClipboard(
-          preparedUrl
-        );
-
-
-      if (copied) {
-
-        showShareToast(
-          "Link copied.",
-          "success"
-        );
-
-
-        return preparedUrl;
-      }
-
-
-      /*
-        The Worker has successfully created the link even if
-        the browser could not copy it.
-      */
-      showShareToast(
-        "Share link created, but could not copy it.",
-        "error"
-      );
-
-
-      return preparedUrl;
-
-    } catch (error) {
-
-      showShareToast(
-        "Unable to create share link.",
-        "error"
-      );
-
-
-      console.error(
-        "ShareManager: share failed.",
-        error
-      );
-
-
-      return null;
-    }
-  }
-
-
-  /* =========================================================
-     READ DEEP-LINK TARGET
-     ========================================================= */
-
-  function readTarget() {
-
-    const url =
-      new URL(
-        window.location.href
-      );
-
-
-    const section =
-      normalizeSection(
-        url.searchParams.get(
-          "section"
-        )
-      );
-
-
-    const id =
-      String(
-        url.searchParams.get(
-          "id"
-        ) || ""
-      ).trim();
-
-
-    if (
-      !section ||
-      !id
-    ) {
-
-      return null;
     }
 
+
+    /* =====================================================
+       PUBLIC API
+    ===================================================== */
 
     return {
-      section,
-      id
+
+        normalizeSection,
+
+        buildMinimalItem,
+
+        encodeSelectedItem,
+
+        buildUrl,
+
+        share,
+
+        readTarget,
+
+        findManifestItem,
+
+        openDeepLink
+
     };
-  }
-
-
-  /* =========================================================
-     FIND ITEM IN MANIFEST
-     ========================================================= */
-
-  function findManifestItem(
-    target
-  ) {
-
-    if (!target) {
-      return null;
-    }
-
-
-    const manifest =
-      window.Manifest;
-
-
-    if (!manifest) {
-      return null;
-    }
-
-
-    /*
-      First try the section-specific collection.
-    */
-    try {
-
-      if (
-        typeof manifest.content ===
-          "function"
-      ) {
-
-        const sectionItems =
-          manifest.content(
-            target.section
-          );
-
-
-        if (
-          Array.isArray(
-            sectionItems
-          )
-        ) {
-
-          const found =
-            sectionItems.find(
-              item =>
-                item &&
-                String(item.id) ===
-                  String(target.id)
-            );
-
-
-          if (found) {
-            return found;
-          }
-        }
-      }
-
-    } catch (_) {
-      // Continue to global search.
-    }
-
-
-    /*
-      Then search the complete collection.
-    */
-    try {
-
-      if (
-        typeof manifest.all ===
-          "function"
-      ) {
-
-        const allItems =
-          manifest.all();
-
-
-        if (
-          Array.isArray(
-            allItems
-          )
-        ) {
-
-          return (
-            allItems.find(
-              item =>
-                item &&
-                String(item.id) ===
-                  String(target.id)
-            ) ||
-            null
-          );
-        }
-
-      }
-
-    } catch (_) {
-      // Continue.
-    }
-
-
-    return null;
-  }
-
-
-  /* =========================================================
-     OPEN DEEP-LINKED ITEM
-     ========================================================= */
-
-  async function openDeepLink() {
-
-    const target =
-      readTarget();
-
-
-    if (!target) {
-      return false;
-    }
-
-
-    const item =
-      findManifestItem(
-        target
-      );
-
-
-    /*
-      Manifest may not have finished loading yet.
-
-      Return false rather than declaring failure.
-    */
-    if (!item) {
-      return false;
-    }
-
-
-    try {
-
-      /* -----------------------------------------------------
-         READER
-         ----------------------------------------------------- */
-
-      if (
-        target.section ===
-        "reader"
-      ) {
-
-        if (
-          window.AppSwitcher &&
-          typeof window.AppSwitcher.show ===
-            "function"
-        ) {
-
-          window.AppSwitcher.show(
-            "reader"
-          );
-        }
-
-
-        if (
-          window.SRNavigation &&
-          typeof window.SRNavigation.openMagazine ===
-            "function"
-        ) {
-
-          await window.SRNavigation.openMagazine(
-            item
-          );
-
-
-          return true;
-        }
-      }
-
-
-      /* -----------------------------------------------------
-         VIDEO
-         ----------------------------------------------------- */
-
-      if (
-        target.section ===
-        "video"
-      ) {
-
-        if (
-          window.AppSwitcher &&
-          typeof window.AppSwitcher.show ===
-            "function"
-        ) {
-
-          window.AppSwitcher.show(
-            "video"
-          );
-        }
-
-
-        if (
-          window.VideoViewer &&
-          typeof window.VideoViewer.openVideo ===
-            "function"
-        ) {
-
-          await window.VideoViewer.openVideo(
-            item
-          );
-
-
-          return true;
-        }
-      }
-
-
-      /* -----------------------------------------------------
-         SLIDESHOW
-         ----------------------------------------------------- */
-
-      if (
-        target.section ===
-        "slideshow"
-      ) {
-
-        if (
-          window.AppSwitcher &&
-          typeof window.AppSwitcher.show ===
-            "function"
-        ) {
-
-          window.AppSwitcher.show(
-            "slideshow"
-          );
-        }
-
-
-        if (
-          window.SlideshowViewer &&
-          typeof window.SlideshowViewer.open ===
-            "function"
-        ) {
-
-          await window.SlideshowViewer.open(
-            item
-          );
-
-
-          return true;
-        }
-      }
-
-    } catch (error) {
-
-      console.error(
-        "ShareManager: unable to open deep link.",
-        error
-      );
-
-
-      return false;
-    }
-
-
-    return false;
-  }
-
-
-  /* =========================================================
-     SHARE MODE DETECTION
-     ========================================================= */
-
-  function isShareMode() {
-
-    const target =
-      readTarget();
-
-
-    return !!(
-      target &&
-      target.section &&
-      target.id
-    );
-  }
-
-
-  function getShareTarget() {
-
-    return readTarget();
-
-  }
-
-
-  /* =========================================================
-     PUBLIC API
-     ========================================================= */
-
-  return {
-
-    buildLongUrl,
-    shorten,
-    share,
-
-    readTarget,
-    findManifestItem,
-    openDeepLink,
-
-    isShareMode,
-    getShareTarget
-
-  };
 
 })();
+
