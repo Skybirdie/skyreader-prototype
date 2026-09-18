@@ -1008,6 +1008,8 @@ window.ShareManager = (function () {
 
         isShareDeepLink,
 
+        isShareMode,
+
         openDeepLink
     };
 
