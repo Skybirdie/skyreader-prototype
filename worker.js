@@ -67,6 +67,9 @@ const SHARE_PATH_PREFIX =
 const SHARE_RECORD_PREFIX =
   "share:v1:";
 
+const CATALOG_RECORD_PREFIX =
+  "catalog:v1:";
+
 /* =========================================================
    TEMPORARY CATALOG PUBLISH TEST
 
@@ -155,6 +158,12 @@ function makeShareRecordKey(section, id) {
       normalizedSection + "\0" + normalizedId
     )
   );
+}
+
+function makeCatalogRecordKey(section, id) {
+  const normalizedSection = normalizeSection(section);
+  const normalizedId = String(id || "").trim();
+  return CATALOG_RECORD_PREFIX + makeKey(normalizedSection + "\\0" + normalizedId);
 }
 
 function normalizeShareItem(item) {
@@ -1722,58 +1731,77 @@ async function handleCatalogPublishTest(request, env) {
   const headers = catalogTestCorsHeaders();
 
   if (request.method === "OPTIONS") {
-    return new Response(null, {
-      status: 204,
-      headers
-    });
+    return new Response(null, { status: 204, headers });
   }
 
   if (!catalogTestAuthorized(request, url)) {
     return new Response(
-      JSON.stringify({ error: "Catalog test authorization failed." }),
+      JSON.stringify({ error: "Catalog publish authorization failed." }),
       { status: 401, headers }
     );
   }
 
+  /* GET with section + id returns the actual stored item. */
   if (request.method === "GET") {
 
-    let stored = null;
+    const section = normalizeSection(
+      url.searchParams.get("section") || ""
+    );
+    const id = String(
+      url.searchParams.get("id") || ""
+    ).trim();
+
+    if (section && id) {
+
+      const key = makeCatalogRecordKey(section, id);
+      let stored;
+
+      try {
+        stored = await env.MEDIA_KV.get(key);
+      } catch (error) {
+        console.error("SkyMedia catalog item KV read failure:", error);
+        return new Response(
+          JSON.stringify({ error: "Catalog item KV read failed." }),
+          { status: 500, headers }
+        );
+      }
+
+      if (!stored) {
+        return new Response(
+          JSON.stringify({ found: false, section, id }),
+          { status: 404, headers }
+        );
+      }
+
+      return new Response(stored, { status: 200, headers });
+    }
+
+    let statusRecord;
 
     try {
-      stored = await env.MEDIA_KV.get(
+      statusRecord = await env.MEDIA_KV.get(
         CATALOG_TEST_STATUS_KEY
       );
     } catch (error) {
-      console.error(
-        "SkyMedia catalog test KV read failure:",
-        error
-      );
-
+      console.error("SkyMedia catalog status KV read failure:", error);
       return new Response(
-        JSON.stringify({ error: "KV read failed." }),
+        JSON.stringify({ error: "Catalog status KV read failed." }),
         { status: 500, headers }
       );
     }
 
-    if (!stored) {
-      return new Response(
-        JSON.stringify({
-          received: false,
-          message: "No catalog test POST has been received yet."
-        }),
-        { status: 200, headers }
-      );
-    }
-
     return new Response(
-      stored,
+      statusRecord || JSON.stringify({
+        received: false,
+        message: "No catalog publish has been received yet."
+      }),
       { status: 200, headers }
     );
   }
 
   if (request.method !== "POST") {
     return new Response(
-      JSON.stringify({ error: "Catalog publish test requires POST." }),
+      JSON.stringify({ error: "Catalog publish requires POST." }),
       { status: 405, headers }
     );
   }
@@ -1784,55 +1812,124 @@ async function handleCatalogPublishTest(request, env) {
     body = await request.json();
   } catch (_) {
     return new Response(
-      JSON.stringify({ error: "Invalid catalog test JSON." }),
+      JSON.stringify({ error: "Invalid catalog publish JSON." }),
       { status: 400, headers }
     );
   }
 
-  const record = {
-    received: true,
-    receivedAt: new Date().toISOString(),
-    method: request.method,
-    test: body?.test === true,
-    source: String(body?.source || ""),
-    itemCount: Number(body?.itemCount || 0),
-    firstItemId: String(body?.firstItemId || ""),
-    firstItemType: String(body?.firstItemType || "")
-  };
+  const contract =
+    Array.isArray(body?.contract)
+      ? body.contract
+      : null;
 
-  try {
-
-    await env.MEDIA_KV.put(
-      CATALOG_TEST_STATUS_KEY,
-      JSON.stringify(record)
-    );
-
-    const stored =
-      await env.MEDIA_KV.get(
-        CATALOG_TEST_STATUS_KEY
-      );
-
-    if (stored !== JSON.stringify(record)) {
-      throw new Error("Catalog test KV verification failed.");
-    }
-
-  } catch (error) {
-
-    console.error(
-      "SkyMedia catalog test KV write failure:",
-      error
-    );
-
+  if (!contract || contract.length === 0) {
     return new Response(
-      JSON.stringify({ error: "KV write/verification failed." }),
-      { status: 500, headers }
+      JSON.stringify({
+        error: "Catalog publish contains no contract items."
+      }),
+      { status: 400, headers }
     );
   }
 
-  return new Response(
-    JSON.stringify(record),
-    { status: 200, headers }
-  );
+  const publishedAt = new Date().toISOString();
+  let storedCount = 0;
+  let skippedCount = 0;
+  const sample = [];
+
+  try {
+
+    for (const rawItem of contract) {
+
+      const item = normalizeShareItem(rawItem);
+
+      if (!item) {
+        skippedCount++;
+        continue;
+      }
+
+      const section = sectionFromItem(item);
+
+      if (!section) {
+        skippedCount++;
+        continue;
+      }
+
+      const key = makeCatalogRecordKey(section, item.id);
+
+      const record = {
+        version: "1.0",
+        section,
+        id: item.id,
+        item,
+        publishedAt
+      };
+
+      await env.MEDIA_KV.put(
+        key,
+        JSON.stringify(record)
+      );
+
+      storedCount++;
+
+      if (sample.length < 10) {
+        sample.push({
+          section,
+          id: item.id,
+          key
+        });
+      }
+    }
+
+    const statusRecord = {
+      received: true,
+      phase: 2,
+      receivedAt: publishedAt,
+      method: request.method,
+      test: body?.test === true,
+      source: String(body?.source || ""),
+      contractItemCount: contract.length,
+      storedCount,
+      skippedCount,
+      sample
+    };
+
+    await env.MEDIA_KV.put(
+      CATALOG_TEST_STATUS_KEY,
+      JSON.stringify(statusRecord)
+    );
+
+    const statusReadBack = await env.MEDIA_KV.get(
+      CATALOG_TEST_STATUS_KEY
+    );
+
+    if (statusReadBack !== JSON.stringify(statusRecord)) {
+      throw new Error("Catalog status KV verification failed.");
+    }
+
+    if (sample.length > 0) {
+      const firstStored = await env.MEDIA_KV.get(sample[0].key);
+
+      if (!firstStored) {
+        throw new Error("First catalog item KV verification failed.");
+      }
+    }
+
+    return new Response(
+      JSON.stringify(statusRecord),
+      { status: 200, headers }
+    );
+
+  } catch (error) {
+
+    console.error("SkyMedia catalog publish KV failure:", error);
+
+    return new Response(
+      JSON.stringify({
+        error: "Catalog publish KV write/verification failed."
+      }),
+      { status: 500, headers }
+    );
+  }
 }
 
 
