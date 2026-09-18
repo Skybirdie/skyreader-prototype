@@ -1164,9 +1164,9 @@ try {
 }
 
 const markdownMatch =
-text.match(
-/^\s*\([^\)]+]\((https?:\/\/[^)]+)\)\s*$/i
-);
+  text.match(
+    /^\s*\[[^\]]+\]\((https?:\/\/[^)]+)\)\s*$/i
+  );
 
 if (markdownMatch) {
 
@@ -1216,8 +1216,8 @@ value ?? ""
 ">"
 )
 .replace(
-/"/g,
-"""
+  /"/g,
+  "&quot;"
 )
 .replace(
 /'/g,
