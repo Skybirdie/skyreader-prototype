@@ -192,7 +192,7 @@ window.ShareManager = (function () {
     ===================================================== */
 
     async function primeShare(
-        payload,
+        item,
         section,
         id
     ) {
@@ -202,6 +202,16 @@ window.ShareManager = (function () {
                 SHARE_PRIME_PATH,
                 window.location.origin
             );
+
+        const minimalItem =
+            buildMinimalItem(item);
+
+        if (!minimalItem || !minimalItem.id) {
+
+            throw new Error(
+                "Cannot create share link: selected item has no id."
+            );
+        }
 
         const response =
             await fetch(
@@ -216,16 +226,14 @@ window.ShareManager = (function () {
 
                     body:
                         JSON.stringify({
-                            contractz:
-                                payload,
-
                             section:
-                                normalizeSection(
-                                    section
-                                ),
+                                normalizeSection(section),
 
                             id:
-                                cleanString(id)
+                                cleanString(id),
+
+                            item:
+                                minimalItem
                         })
                 }
             );
@@ -240,39 +248,27 @@ window.ShareManager = (function () {
                 const data =
                     await response.json();
 
-                if (
-                    data &&
-                    data.error
-                ) {
-                    message =
-                        data.error;
+                if (data && data.error) {
+                    message = data.error;
                 }
 
             } catch (_) {}
 
-            throw new Error(
-                message
-            );
+            throw new Error(message);
         }
 
         const data =
             await response.json();
 
-        if (
-            !data ||
-            !data.url
-        ) {
+        if (!data || !data.url) {
 
             throw new Error(
                 "Share server did not return a share URL."
             );
         }
 
-        return String(
-            data.url
-        );
+        return String(data.url);
     }
-
 
     /* =====================================================
        BUILD SHARE URL
@@ -309,13 +305,8 @@ window.ShareManager = (function () {
             );
         }
 
-        const payload =
-            encodeSelectedItem(
-                item
-            );
-
         return primeShare(
-            payload,
+            item,
             normalizedSection,
             normalizedId
         );
@@ -542,7 +533,7 @@ window.ShareManager = (function () {
        READ SHARE TARGET
 
        New short links:
-           /s/<key>
+           /s/<section>/<id>
 
        Worker bootstrap supplies:
            window.__SKY_SHARE_TARGET
@@ -641,22 +632,6 @@ window.ShareManager = (function () {
                 target.short
             )
         );
-    }
-
-
-    /* =====================================================
-       SHARE MODE DETECTION
-
-       App.start() and index.html use this public method to
-       decide whether the current request is a standalone
-       share URL. Direct-ID Worker links are identified by
-       window.__SKY_SHARE_TARGET, while legacy links are
-       identified by section/id/contract query parameters.
-    ===================================================== */
-
-    function isShareMode() {
-
-        return isShareDeepLink();
     }
 
 
@@ -1032,8 +1007,6 @@ window.ShareManager = (function () {
         readTarget,
 
         isShareDeepLink,
-
-        isShareMode,
 
         openDeepLink
     };
