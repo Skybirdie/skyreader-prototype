@@ -637,8 +637,11 @@ window.ShareManager = (function () {
 
 function isShareMode() {
 
-    return isShareDeepLink();
+    if (window.__SKY_SHARE_MODE === true) {
+        return true;
+    }
 
+    return isShareDeepLink();
 }
 
 
