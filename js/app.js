@@ -478,50 +478,40 @@ async function startShareMode(){
 
     shareMode=true;
 
+    /*
+     * The short-link Worker bootstrap has already placed the
+     * one-item SR2 contract into window.SkyMediaContract.
+     * Manifest.load() therefore uses that contract through
+     * GlideContract and does NOT fall back to content.json.
+     */
     await Manifest.load();
 
     manifestLoaded=true;
 
-    const target =
-        typeof ShareManager !== "undefined" &&
-        typeof ShareManager.getShareTarget === "function"
-            ? ShareManager.getShareTarget()
-            : null;
-
-    if(!target){
-        throw new Error(
-            "Share Mode: no valid section/id target was found."
-        );
-    }
-
-    const item =
-        typeof ShareManager !== "undefined" &&
-        typeof ShareManager.findManifestItem === "function"
-            ? ShareManager.findManifestItem(target)
-            : null;
-
-    if(!item){
-        throw new Error(
-            "Share Mode: the requested item could not be found."
-        );
-    }
-
-    window.SkyMediaShareItem=item;
-    window.SkyMediaShareTarget=target;
-
+    /*
+     * ShareManager owns the target lookup and ShareViewer handoff.
+     * Do not duplicate those APIs here. The previous version called
+     * getShareTarget()/findManifestItem(), which are not public methods
+     * of the current ShareManager and caused Share Mode to stop on the
+     * initial Loading MMicj screen.
+     */
     if(
-        typeof window.ShareViewer === "undefined" ||
-        typeof window.ShareViewer.start !== "function"
+        typeof window.ShareManager === "undefined" ||
+        typeof ShareManager.openDeepLink !== "function"
     ){
         throw new Error(
-            "Share Mode: ShareViewer is not available."
+            "Share Mode: ShareManager deep-link handler is not available."
         );
     }
 
-    await window.ShareViewer.start(
-        item,
-        target
-    );
+    const opened =
+        await ShareManager.openDeepLink();
+
+    if(!opened){
+        throw new Error(
+            "Share Mode: the requested shared item could not be opened."
+        );
+    }
 
     shareStarted=true;
 
@@ -540,9 +530,7 @@ async function startShareMode(){
     }
 
     log(
-        "Share Mode started:",
-        target.section,
-        target.id
+        "Share Mode started."
     );
 }
 
