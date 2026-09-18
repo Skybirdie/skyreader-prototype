@@ -280,6 +280,96 @@ async function getDirectShareRecord(env, target) {
   }
 }
 
+
+
+/* =========================================================
+   CATALOG SHARE RECORD
+========================================================= */
+
+async function getCatalogShareRecord(env, target) {
+
+  const key =
+    makeCatalogRecordKey(
+      target.section,
+      target.id
+    );
+
+  let raw;
+
+  try {
+
+    raw =
+      await env.MEDIA_KV.get(key);
+
+  } catch (error) {
+
+    console.error(
+      "SkyMedia catalog KV read failed:",
+      error
+    );
+
+    throw new Error(
+      "SkyMedia catalog KV read failed."
+    );
+  }
+
+  if (!raw) {
+    return null;
+  }
+
+  try {
+
+    const record =
+      JSON.parse(raw);
+
+    if (
+      !record ||
+      !record.item
+    ) {
+
+      return null;
+    }
+
+    const item =
+      normalizeShareItem(
+        record.item
+      );
+
+    if (!item) {
+      return null;
+    }
+
+    /*
+     * Verify that the catalog record actually belongs
+     * to the URL being requested.
+     */
+    if (
+      item.id !== target.id ||
+      sectionFromItem(item) !== target.section
+    ) {
+
+      return null;
+    }
+
+    return {
+      key,
+      item,
+      manifest:
+        buildShareManifest(item)
+    };
+
+  } catch (error) {
+
+    console.error(
+      "SkyMedia catalog record decode failed:",
+      error
+    );
+
+    return null;
+  }
+}
+
+
 /* =========================================================
    Validation
 ========================================================= */
@@ -1062,6 +1152,71 @@ async function serveDirectShare(
 }
 
 /* =========================================================
+   Serve catalog share
+
+   Canonical Phase 4 route:
+
+       /s/<section>/<id>
+
+   Example:
+
+       /s/slideshow/abovealllove202609131952
+
+   The item is retrieved from the catalog published by
+   Glide. No contractz, compression, Base64, random key,
+   or share-prime operation is involved.
+========================================================= */
+
+async function serveCatalogShare(
+  request,
+  env,
+  target
+) {
+
+  const record =
+    await getCatalogShareRecord(
+      env,
+      target
+    );
+
+  if (!record) {
+    return null;
+  }
+
+  const html =
+    await getIndexHtml(
+      env,
+      request
+    );
+
+  if (
+    typeof html !== "string"
+  ) {
+
+    return html;
+  }
+
+  const modified =
+    injectContractBootstrap(
+      html,
+      record.manifest,
+      request,
+      target,
+      {
+        target
+      }
+    );
+
+  return new Response(
+    modified,
+    {
+      status: 200,
+      headers: htmlHeaders()
+    }
+  );
+}
+
+/* =========================================================
    OG IMAGE
 ========================================================= */
 
@@ -1125,7 +1280,7 @@ async function serveOgImage(
       );
     }
 
-  } else {
+    } else {
 
     const target = {
       section: normalizeSection(
@@ -1136,23 +1291,58 @@ async function serveOgImage(
       ).trim()
     };
 
-    if (!target.section || !target.id) {
+    if (
+      !target.section ||
+      !target.id
+    ) {
+
       return new Response(
         "Invalid SkyMedia OG target.",
-        { status: 400, headers: textHeaders() }
+        {
+          status: 400,
+          headers: textHeaders()
+        }
       );
     }
 
-    const record = await getDirectShareRecord(env, target);
+    /*
+     * Phase 4:
+     * OG preview now reads from the published catalog.
+     */
+
+    let record =
+      await getCatalogShareRecord(
+        env,
+        target
+      );
+
+    /*
+     * Temporary backward compatibility for any
+     * older share:v1 records.
+     */
 
     if (!record) {
+
+      record =
+        await getDirectShareRecord(
+          env,
+          target
+        );
+    }
+
+    if (!record) {
+
       return new Response(
         "SkyMedia shared item was not found.",
-        { status: 404, headers: textHeaders() }
+        {
+          status: 404,
+          headers: textHeaders()
+        }
       );
     }
 
-    item = record.item;
+    item =
+      record.item;
   }
 
   if (!item) {
@@ -1552,7 +1742,19 @@ async function handleLegacyPrime(
 }
 
 /* =========================================================
-   /s/<key>
+   /s/<section>/<id>
+
+   PHASE 4 CANONICAL CATALOG ROUTE
+
+   First attempt:
+
+       catalog:v1:<section/id>
+
+   This is the new architecture.
+
+   If no catalog record exists, fall back to the older
+   share:v1 record so existing share links continue to
+   work during the transition.
 ========================================================= */
 
 async function handleDirectShare(
@@ -1560,11 +1762,39 @@ async function handleDirectShare(
   env
 ) {
 
-  const target = getDirectShareTarget(
-    new URL(request.url)
-  );
+  const target =
+    getDirectShareTarget(
+      new URL(request.url)
+    );
 
-  if (!target) return null;
+  if (!target) {
+    return null;
+  }
+
+  /*
+   * -------------------------------------------------------
+   * Phase 4:
+   * Look in the published catalog first.
+   * -------------------------------------------------------
+   */
+
+  const catalogResponse =
+    await serveCatalogShare(
+      request,
+      env,
+      target
+    );
+
+  if (catalogResponse) {
+    return catalogResponse;
+  }
+
+  /*
+   * -------------------------------------------------------
+   * Temporary backward compatibility:
+   * Look in the older share:v1 store.
+   * -------------------------------------------------------
+   */
 
   return serveDirectShare(
     request,
