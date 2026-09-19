@@ -910,24 +910,23 @@ function stopShareLoading() {
         "important"
     );
 
-    /* Sized to 75% of the original footprint (30% / 220px /
-       70px), i.e. a 25% reduction, while staying proportional
+    /* Sized proportional
        to the go-button width. */
     goLink.style.setProperty(
         "width",
-        "22.5%",
+        "30%",
         "important"
     );
 
     goLink.style.setProperty(
         "max-width",
-        "165px",
+        "220px",
         "important"
     );
 
     goLink.style.setProperty(
         "min-width",
-        "53px",
+        "70px",
         "important"
     );
 
@@ -1065,7 +1064,7 @@ function stopShareLoading() {
 
     gif.style.setProperty(
         "box-shadow",
-        "0 40px 40px -40px rgba(84, 231, 196, 0.6)",
+        "0 40px 0 -40px rgba(84, 231, 196, 0.6)",
         "important"
     );
 
