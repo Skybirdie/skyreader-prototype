@@ -3237,6 +3237,128 @@ async function waitForSharedSlideshowReady() {
     }
 
 
+    /*
+     * WINDOW-LEVEL FINAL-PAGE GUARDS
+     *
+     * PageFlip/Reader can install its own handlers below the
+     * document level.  A document-capture listener can therefore
+     * still be too late for some builds.  These window-capture
+     * guards run before the event reaches document/page elements.
+     */
+
+    function blockFinalPageWindowWheel(event) {
+
+        if (!isBookShare() || event.ctrlKey) {
+            return;
+        }
+
+        const forward =
+            Number(event.deltaY) > 0 ||
+            Number(event.deltaX) > 0;
+
+        if (!forward) {
+            return;
+        }
+
+        if (
+            !window.Reader ||
+            typeof Reader.currentPage !== "function" ||
+            typeof Reader.pages !== "function"
+        ) {
+            return;
+        }
+
+        const current = Number(Reader.currentPage()) || 1;
+        const total = Number(Reader.pages()) || 0;
+
+        if (!total || current < total) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        updatePageButtons();
+    }
+
+
+    function blockFinalPageWindowMouse(event) {
+
+        if (!isBookShare()) {
+            return;
+        }
+
+        if (
+            !window.Reader ||
+            typeof Reader.currentPage !== "function" ||
+            typeof Reader.pages !== "function"
+        ) {
+            return;
+        }
+
+        const current = Number(Reader.currentPage()) || 1;
+        const total = Number(Reader.pages()) || 0;
+
+        if (!total || current < total) {
+            return;
+        }
+
+        const target = event.target;
+
+        if (!target || !target.closest) {
+            return;
+        }
+
+        /*
+         * NEXT is an explicit control, but on the final page it
+         * must be completely inert rather than allowed to reach
+         * any Reader/PageFlip handler.
+         */
+        const nextButton = target.closest("#nextButton");
+
+        if (nextButton) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            updatePageButtons();
+            return;
+        }
+
+        /* X and the other toolbar/status controls remain usable. */
+        if (isAllowedLastPageControl(target)) {
+            return;
+        }
+
+        const viewer = document.getElementById("viewerArea");
+
+        if (!viewer || !viewer.contains(target)) {
+            return;
+        }
+
+        /*
+         * This is a direct mouse interaction with the final page.
+         * Block it before PageFlip can turn it into its final-page
+         * close action.
+         */
+        if (
+            event.type === "pointerdown" &&
+            event.pointerType &&
+            event.pointerType !== "mouse"
+        ) {
+            return;
+        }
+
+        if (
+            event.type === "pointerup" &&
+            event.pointerType &&
+            event.pointerType !== "mouse"
+        ) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopImmediatePropagation();
+    }
+
+
     function bindLastPageProtection() {
 
         if (lastPageProtectionBound) {
@@ -3246,6 +3368,48 @@ async function waitForSharedSlideshowReady() {
 
         lastPageProtectionBound =
             true;
+
+
+        /* Window capture is intentionally in addition to the
+         * existing document-capture guards. */
+        window.addEventListener(
+            "wheel",
+            blockFinalPageWindowWheel,
+            {
+                capture: true,
+                passive: false
+            }
+        );
+
+        window.addEventListener(
+            "pointerdown",
+            blockFinalPageWindowMouse,
+            true
+        );
+
+        window.addEventListener(
+            "pointerup",
+            blockFinalPageWindowMouse,
+            true
+        );
+
+        window.addEventListener(
+            "mousedown",
+            blockFinalPageWindowMouse,
+            true
+        );
+
+        window.addEventListener(
+            "mouseup",
+            blockFinalPageWindowMouse,
+            true
+        );
+
+        window.addEventListener(
+            "click",
+            blockFinalPageWindowMouse,
+            true
+        );
 
 
         /*
@@ -3373,6 +3537,45 @@ async function waitForSharedSlideshowReady() {
             true
         );
 
+
+
+        window.removeEventListener(
+            "wheel",
+            blockFinalPageWindowWheel,
+            {
+                capture: true
+            }
+        );
+
+        window.removeEventListener(
+            "pointerdown",
+            blockFinalPageWindowMouse,
+            true
+        );
+
+        window.removeEventListener(
+            "pointerup",
+            blockFinalPageWindowMouse,
+            true
+        );
+
+        window.removeEventListener(
+            "mousedown",
+            blockFinalPageWindowMouse,
+            true
+        );
+
+        window.removeEventListener(
+            "mouseup",
+            blockFinalPageWindowMouse,
+            true
+        );
+
+        window.removeEventListener(
+            "click",
+            blockFinalPageWindowMouse,
+            true
+        );
 
         lastPageProtectionBound =
             false;
