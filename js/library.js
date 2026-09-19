@@ -121,7 +121,7 @@ shelf.innerHTML="";
 
 this.organizedBooks("viewer").forEach(book=>{
 
-const card=this.createShelfCard(book);
+const card=this.createShelfCard(book,{includeDate:true});
 card.classList.add("viewerBookCard");
 
 shelf.appendChild(card);
@@ -317,7 +317,7 @@ setSelectedCard(bookId){
 
 },
 
-createShelfCard(book){
+createShelfCard(book,options={}){
 
 const card=document.createElement("div");
 
@@ -392,6 +392,33 @@ title,
 subtitle
 
 );
+
+/* Viewer Landing shelf cards show a release date beneath the title,
+   matching the format and (muted, smaller-than-title) styling used by
+   the video and slideshow landing cards - see DateDisplay.format()
+   (js/dateDisplay.js). Only requested for #viewerShelfView, so this
+   stays behind an opt-in flag rather than changing every bookCard. */
+if(options.includeDate){
+
+    const dateText=
+        window.DateDisplay &&
+        typeof DateDisplay.format==="function"
+            ? DateDisplay.format(book.date)
+            : "";
+
+    if(dateText){
+
+        const date=document.createElement("div");
+
+        date.className="bookDate";
+
+        date.textContent=dateText;
+
+        card.appendChild(date);
+
+    }
+
+}
 
 card.onclick=()=>{
 

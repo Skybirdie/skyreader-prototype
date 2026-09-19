@@ -21,8 +21,13 @@ window.SlideshowUI=(function(){
         bind("slideshowNarrowLibraryToggle",toggleDrawer);
         bind("slideshowLibraryDrawerClose",closeDrawer);
         document.querySelectorAll("[data-slideshow-view]").forEach(b=>b.addEventListener("click",()=>{SlideshowLibrary.setView(b.dataset.slideshowView);document.querySelectorAll("[data-slideshow-view]").forEach(x=>x.classList.toggle("active",x===b));}));
-        const sort=document.getElementById("slideshowSort"),filter=document.getElementById("slideshowFilter"),cat=document.getElementById("slideshowCategory");
-        sort?.addEventListener("change",()=>SlideshowLibrary.setSort(sort.value)); filter?.addEventListener("change",()=>SlideshowLibrary.setFilter(filter.value)); cat?.addEventListener("change",()=>SlideshowLibrary.setCategory(cat.value));
+        /* Filtering, like the Reader section, is category-only - "favorites"
+           is exposed as a Sort mode instead, so there is no separate
+           all/favorites filter grouping here. */
+        const sort=document.getElementById("slideshowSort"),cat=document.getElementById("slideshowCategory");
+        const closeSlideshowOrgMenus=()=>{document.getElementById("slideshowSortMenu")?.classList.add("hidden");document.getElementById("slideshowFilterMenu")?.classList.add("hidden");};
+        sort?.addEventListener("change",()=>{SlideshowLibrary.setSort(sort.value);closeSlideshowOrgMenus();});
+        cat?.addEventListener("change",()=>{SlideshowLibrary.setCategory(cat.value);closeSlideshowOrgMenus();});
         document.getElementById("slideshowSortButton")?.addEventListener("click",()=>toggleMenu("slideshowSortMenu","slideshowFilterMenu"));
         document.getElementById("slideshowFilterButton")?.addEventListener("click",()=>toggleMenu("slideshowFilterMenu","slideshowSortMenu"));
         document.getElementById("slideshowAudioMode")?.addEventListener("change",e=>{
@@ -38,7 +43,7 @@ window.SlideshowUI=(function(){
         searchButton?.addEventListener("click",()=>{const open=searchGroup?.classList.toggle("searchOpen");if(open)searchBox?.focus();else{if(searchBox)searchBox.value="";SlideshowLibrary.setSearch("");}});
         searchBox?.addEventListener("input",()=>SlideshowLibrary.setSearch(searchBox.value));
         document.getElementById("slideshowSettingsButton")?.addEventListener("click",()=>{if(typeof SettingsPanel!=="undefined")SettingsPanel.toggle();});
-        populateCategories(); return true;
+        return true;
     }
 
 function showToolbar() {
