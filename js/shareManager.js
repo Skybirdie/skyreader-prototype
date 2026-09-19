@@ -9,6 +9,17 @@ window.ShareManager = (function () {
     const SHARE_PRIME_PATH =
         "/__sky_share_prime";
 
+    /*
+     * SkyMedia is normally embedded inside the Glide page.
+     * In that situation window.location.origin is the Glide
+     * origin, not the Cloudflare Worker origin.  The share-prime
+     * request must therefore always target the Worker.  A runtime
+     * override is supported for future deployments, while the
+     * current production Worker remains the safe default.
+     */
+    const SHARE_PRIME_BASE_URL =
+        "https://skyreader-prototype.sliburd81.workers.dev";
+
 
     /* =====================================================
        SECTION NORMALIZATION
@@ -197,10 +208,16 @@ window.ShareManager = (function () {
         id
     ) {
 
+        const workerBase =
+            cleanString(
+                window.__SKY_WORKER_BASE_URL
+            ) ||
+            SHARE_PRIME_BASE_URL;
+
         const endpoint =
             new URL(
                 SHARE_PRIME_PATH,
-                window.location.origin
+                workerBase.replace(/\/+$/, "") + "/"
             );
 
         const minimalItem =
