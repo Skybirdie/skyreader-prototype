@@ -2787,6 +2787,20 @@ max-width:35vw;
    logo was actually being painted behind those two sections
    entirely. 4000 clears all of them.
 
+   The z-index fix above wasn't sufficient by itself: the img
+   element used to live inside <main id="workspace"> - a
+   descendant of #app - and AppSwitcher.show() (js/appSwitcher.js)
+   toggles app-section-hidden on #app whenever Video or Slideshow
+   becomes active. #app.app-section-hidden{display:none!important}
+   (css/video.css) then removed the logo from rendering entirely
+   for any descendant, no matter its own position/z-index -
+   display:none on an ancestor can't be overridden from below.
+   The element now lives at the body level in index.html (a
+   sibling of #frontPage, #app, #videoSection and
+   #slideshowSection) so it's never inside a subtree that gets
+   hidden this way. Being position:fixed, its DOM location doesn't
+   change where it renders, only whether an ancestor can hide it.
+
    Excluded everywhere via body.sky-share-mode: ShareViewer
    re-parents this element into its own shell in Share Mode,
    and share.css positions it there instead - loaded after
@@ -2829,8 +2843,13 @@ body:not(.sky-share-mode) #workspacePrimaryLogo:not(.sky-share-primary-logo) {
 }
 
 /* Reader focus mode: #libraryPanel is hidden, so there is no
-   panel left to sit beside. */
-body:not(.sky-share-mode) #app.viewerFocus #workspacePrimaryLogo:not(.sky-share-primary-logo) {
+   panel left to sit beside.
+   Uses :has() rather than a descendant selector because
+   #workspacePrimaryLogo now lives at the body level (a sibling
+   of #app, #videoSection and #slideshowSection, not nested
+   inside #app) so that no section's app-section-hidden rule can
+   hide it when a different section is active. */
+body:not(.sky-share-mode):has(#app.viewerFocus) #workspacePrimaryLogo:not(.sky-share-primary-logo) {
     left: var(--workspace-logo-gap) !important;
 }
 
