@@ -247,13 +247,6 @@ body.sky-share-mode #workspacePrimaryLogo {
 
 <main id="workspace">
 
-<img
-    id="workspacePrimaryLogo"
-    src="assets/primary-logo.png"
-    alt=""
-    aria-hidden="true"
-    width="120">
-
 <aside id="libraryPanel">
 
 
@@ -428,6 +421,18 @@ body.sky-share-mode #workspacePrimaryLogo {
 </main>
 
 </div>
+
+<!-- Lives at the body level, outside #frontPage / #app / #videoSection /
+     #slideshowSection, so no section's app-section-hidden{display:none}
+     can hide it when a different section is active. It's position:fixed
+     and z-index-stacked (see #workspacePrimaryLogo in style.css) purely
+     via CSS, so its DOM position here doesn't affect where it renders. -->
+<img
+    id="workspacePrimaryLogo"
+    src="assets/primary-logo.png"
+    alt=""
+    aria-hidden="true"
+    width="120">
 
 <!-- SVG ICONS -->
 
