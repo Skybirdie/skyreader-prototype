@@ -507,24 +507,18 @@ html:fullscreen #topBar{
   object-fit:cover;
 }
 
-/* Title and date share the same treatment used by the video section's
-   .video-landing-circle-title/.video-landing-circle-date and the
-   slideshow section's .slideshow-landing-card-title/-date: centered,
-   single-line with ellipsis truncation, muted smaller date beneath a
-   bolder title, same line-height. */
 #viewerShelfView .bookTitle{
   margin:5px 1px 0;
 
-  color:var(--text);
+  font-size:clamp(10px,1.2vw,14px);
+  line-height:1.15;
 
-  font-size:clamp(11px,1.2vw,14px);
-  font-weight:600;
-  line-height:1.25;
+  display:-webkit-box;
+  -webkit-line-clamp:2;
+  -webkit-box-orient:vertical;
 
   overflow:hidden;
-  text-overflow:ellipsis;
-  white-space:nowrap;
-  text-align:center;
+  overflow-wrap:anywhere;
 }
 
 #viewerShelfView .bookSubtitle{
@@ -538,18 +532,26 @@ html:fullscreen #topBar{
    (js/dateDisplay.js) for the "Sep 5th, 2026" / "5 days ago" text
    this holds. */
 #viewerShelfView .bookDate{
-  margin:-4px 1px 0;
+  margin:-3px 1px 0;
 
-  color:var(--muted);
+  /*
+   * The shared .bookCard uses a full-card ::before overlay.
+   * Keep the Viewer Landing date above that overlay and give it
+   * an explicit theme-aware foreground so it cannot disappear
+   * into the card background.  This selector is intentionally
+   * limited to #viewerShelfView.
+   */
+  position:relative;
+  z-index:2;
+  color:var(--text,#222831)!important;
 
   font-size:clamp(9px,1vw,11px);
-  font-weight:400;
+  font-weight:500;
   line-height:1.2;
 
   overflow:hidden;
   text-overflow:ellipsis;
   white-space:nowrap;
-  text-align:center;
 }
 
 
