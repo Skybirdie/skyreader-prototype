@@ -881,12 +881,32 @@ async function renderMediaAnnotations(surface,page,viewport){
                     mute.setAttribute("aria-label",mute.title);
                 };
 
+                /*
+                 * Only stopPropagation for touch/pointer start-end events —
+                 * calling preventDefault() on touchstart/touchend (or
+                 * pointerdown/pointerup for a touch-type pointer) tells the
+                 * browser to skip synthesizing the follow-up "click" event
+                 * for that tap. That's harmless on desktop (native mouse
+                 * clicks fire regardless of what happens on mousedown/up),
+                 * but on mobile it silently killed every button's click
+                 * handler below — which is why these controls worked on
+                 * desktop but not on touch devices. stopPropagation() alone
+                 * is enough to keep the tap from reaching the media
+                 * container's click-to-toggle handler or bubbling out to
+                 * the page-turn layer.
+                 */
                 const stopTurn=event=>{
                     event.preventDefault();
                     event.stopPropagation();
                 };
-                ["pointerdown","pointerup","mousedown","mouseup","touchstart","touchend","click"].forEach(type=>
+                const stopTurnPassive=event=>{
+                    event.stopPropagation();
+                };
+                ["mousedown","mouseup","click"].forEach(type=>
                     controls.addEventListener(type,stopTurn)
+                );
+                ["pointerdown","pointerup","touchstart","touchend"].forEach(type=>
+                    controls.addEventListener(type,stopTurnPassive)
                 );
 
                 playPause.addEventListener("click",()=>{
