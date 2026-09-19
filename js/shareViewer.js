@@ -1065,7 +1065,7 @@ function stopShareLoading() {
 
     gif.style.setProperty(
         "box-shadow",
-        "inset 0 22px 22px -22px rgba(84, 231, 196, 0.6)",
+        "0 40px 40px -40px rgba(84, 231, 196, 0.6)",
         "important"
     );
 
