@@ -2817,23 +2817,28 @@ max-width:35vw;
         top .18s ease;
 }
 
-/* Default: below the top bar, right of the left panel */
+/* Default: below the top bar, right of the left panel.
+   !important because the img still carries a first-paint sizing
+   rule (see the scoped body.sky-share-mode shim in <head>) and
+   this codebase's convention for this element elsewhere is
+   !important throughout - matching that keeps this rule from
+   being silently outranked the same way the old ones were. */
 body:not(.sky-share-mode) #workspacePrimaryLogo:not(.sky-share-primary-logo) {
-    top: calc(var(--header-height) + var(--workspace-logo-gap));
-    left: calc(var(--workspace-logo-panel) + var(--workspace-logo-gap));
+    top: calc(var(--header-height) + var(--workspace-logo-gap)) !important;
+    left: calc(var(--workspace-logo-panel) + var(--workspace-logo-gap)) !important;
 }
 
 /* Reader focus mode: #libraryPanel is hidden, so there is no
    panel left to sit beside. */
 body:not(.sky-share-mode) #app.viewerFocus #workspacePrimaryLogo:not(.sky-share-primary-logo) {
-    left: var(--workspace-logo-gap);
+    left: var(--workspace-logo-gap) !important;
 }
 
 /* Video focus mode: .video-top-bar and .video-library are both
    hidden for immersive playback - same reasoning as above. */
 body:not(.sky-share-mode):has(#videoSection.videoFocus) #workspacePrimaryLogo:not(.sky-share-primary-logo) {
-    top: var(--workspace-logo-gap);
-    left: var(--workspace-logo-gap);
+    top: var(--workspace-logo-gap) !important;
+    left: var(--workspace-logo-gap) !important;
 }
 
 /* Narrow screens (<1000px): every section's left panel becomes
