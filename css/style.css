@@ -507,18 +507,24 @@ html:fullscreen #topBar{
   object-fit:cover;
 }
 
+/* Title and date share the same treatment used by the video section's
+   .video-landing-circle-title/.video-landing-circle-date and the
+   slideshow section's .slideshow-landing-card-title/-date: centered,
+   single-line with ellipsis truncation, muted smaller date beneath a
+   bolder title, same line-height. */
 #viewerShelfView .bookTitle{
   margin:5px 1px 0;
 
-  font-size:clamp(10px,1.2vw,14px);
-  line-height:1.15;
+  color:var(--text);
 
-  display:-webkit-box;
-  -webkit-line-clamp:2;
-  -webkit-box-orient:vertical;
+  font-size:clamp(11px,1.2vw,14px);
+  font-weight:600;
+  line-height:1.25;
 
   overflow:hidden;
-  overflow-wrap:anywhere;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  text-align:center;
 }
 
 #viewerShelfView .bookSubtitle{
@@ -532,7 +538,7 @@ html:fullscreen #topBar{
    (js/dateDisplay.js) for the "Sep 5th, 2026" / "5 days ago" text
    this holds. */
 #viewerShelfView .bookDate{
-  margin:-3px 1px 0;
+  margin:-4px 1px 0;
 
   color:var(--muted);
 
@@ -543,6 +549,7 @@ html:fullscreen #topBar{
   overflow:hidden;
   text-overflow:ellipsis;
   white-space:nowrap;
+  text-align:center;
 }
 
 
