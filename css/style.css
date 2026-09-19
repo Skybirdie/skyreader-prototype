@@ -525,6 +525,26 @@ html:fullscreen #topBar{
   display:none;
 }
 
+/* Release date beneath the title, in the Viewer Landing shelf only -
+   matches the muted, smaller-than-title treatment used by the video
+   section's .video-landing-circle-date and the slideshow section's
+   .slideshow-landing-card-date. See DateDisplay.format()
+   (js/dateDisplay.js) for the "Sep 5th, 2026" / "5 days ago" text
+   this holds. */
+#viewerShelfView .bookDate{
+  margin:-3px 1px 0;
+
+  color:var(--muted);
+
+  font-size:clamp(9px,1vw,11px);
+  font-weight:400;
+  line-height:1.2;
+
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
 
 /* ---------- Read Again ---------- */
 
