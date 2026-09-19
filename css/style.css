@@ -2736,6 +2736,46 @@ max-width:35vw;
 }
 
 /* =========================================================
+   LINK COPIED FEEDBACK — link-copied.gif
+
+   Plays over whatever screen is active (front page, reader,
+   slideshow, or video viewer) whenever ShareManager copies a
+   share link to the clipboard.
+
+   Centered, fixed, and above every other overlay in the app
+   (same z-index ceiling as .skymedia-share-toast) so it is
+   never hidden behind a viewer's own chrome.
+   ========================================================= */
+
+#skyLinkCopiedFeedback {
+    position: fixed !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) scale(.85) !important;
+
+    width: 60px !important;
+    height: 60px !important;
+
+    z-index: 2147483647 !important;
+
+    pointer-events: none !important;
+
+    opacity: 0;
+    visibility: hidden;
+
+    transition:
+        opacity .18s ease,
+        transform .18s ease,
+        visibility .18s ease;
+}
+
+#skyLinkCopiedFeedback.visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translate(-50%, -50%) scale(1) !important;
+}
+
+/* =========================================================
    Primary logo — visible over Video and Slideshow
 ========================================================= */
 
