@@ -910,21 +910,24 @@ function stopShareLoading() {
         "important"
     );
 
+    /* Sized to 75% of the original footprint (30% / 220px /
+       70px), i.e. a 25% reduction, while staying proportional
+       to the go-button width. */
     goLink.style.setProperty(
         "width",
-        "30%",
+        "22.5%",
         "important"
     );
 
     goLink.style.setProperty(
         "max-width",
-        "220px",
+        "165px",
         "important"
     );
 
     goLink.style.setProperty(
         "min-width",
-        "70px",
+        "53px",
         "important"
     );
 
@@ -1046,17 +1049,27 @@ function stopShareLoading() {
         "important"
     );
 
-    /* Box-shadow + rounded corners so the gif itself reads
-       as a distinct button sitting on top of the artwork. */
+    /* Fully rounded (pill/circle, depending on the gif's own
+       aspect ratio) with a layered, colored shadow stack so
+       it reads as a raised 3D button sitting on the artwork:
+         - inset highlight/shade  -> glossy, rounded-surface feel
+         - solid "step" shadow    -> extruded edge / depth
+         - soft ambient shadow    -> grounds it against the page
+         - outer glow             -> accent-colored button glow
+    ===================================================== */
     gif.style.setProperty(
         "border-radius",
-        "14px",
+        "50%",
         "important"
     );
 
     gif.style.setProperty(
         "box-shadow",
-        "0 8px 20px rgba(0, 0, 0, 0.4), 0 2px 6px rgba(0, 0, 0, 0.3)",
+        "inset 0 2px 3px rgba(255, 255, 255, 0.35), " +
+        "inset 0 -4px 6px rgba(0, 0, 0, 0.25), " +
+        "0 3px 0 #2fa588, " +
+        "0 6px 14px rgba(0, 0, 0, 0.35), " +
+        "0 0 22px rgba(84, 231, 196, 0.6)",
         "important"
     );
 
