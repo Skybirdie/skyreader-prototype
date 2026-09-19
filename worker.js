@@ -69,6 +69,39 @@ const CATALOG_RECORD_PREFIX =
   "catalog:v1:";
 
 /* =========================================================
+   KV read caching
+
+   Every KV value this Worker reads is immutable for the
+   lifetime of a publish: a catalog item, a primed share
+   record, or an encoded contract. None of them change
+   between two requests for the same link.
+
+   cacheTtl lets the colo serve repeat reads from its local
+   cache instead of going back to KV storage, which removes
+   a KV read (and ~50-100ms) from every repeat view of the
+   same shared item.
+
+   Lower this while actively republishing the catalog if you
+   need edits to appear immediately.
+========================================================= */
+
+const KV_CACHE_TTL = 300;
+
+function kvGet(
+  env,
+  key
+) {
+
+  return env.MEDIA_KV.get(
+    key,
+    {
+      cacheTtl:
+        KV_CACHE_TTL
+    }
+  );
+}
+
+/* =========================================================
    TEMPORARY CATALOG PUBLISH TEST
 
    This is intentionally a temporary shared test token.
@@ -521,7 +554,8 @@ async function getDirectShareRecord(
   try {
 
     raw =
-      await env.MEDIA_KV.get(
+      await kvGet(
+        env,
         key
       );
 
@@ -615,19 +649,13 @@ async function getCatalogShareRecord(
       target.id
     );
 
-  console.log(
-    "SkyMedia catalog lookup:",
-    target.section,
-    target.id,
-    key
-  );
-
   let raw;
 
   try {
 
     raw =
-      await env.MEDIA_KV.get(
+      await kvGet(
+        env,
         key
       );
 
@@ -1457,9 +1485,14 @@ function buildOgTags(
 
    Do NOT rewrite the browser URL.
 
-   The address bar must remain:
+   The address bar must remain the canonical share URL:
 
-       /s/<key>
+       /s/<section>/<id>
+
+   e.g. /s/slideshow/abovealllove202609131952
+
+   The old /s/<16-character-key> form is compatibility
+   code only.
 
    The contract is supplied directly to the existing
    GlideContract adapter through its accepted global:
@@ -1933,7 +1966,8 @@ async function serveOgImage(
     try {
 
       payload =
-        await env.MEDIA_KV.get(
+        await kvGet(
+          env,
           key
         );
 
@@ -2113,9 +2147,28 @@ async function serveOgImage(
       OG_DEFAULT_THUMBNAIL;
   }
 
+  /*
+   * The thumbnail and the logo are static remote files.
+   * Caching them keeps a social crawler storm from pulling
+   * the same two images from Glide storage on every preview.
+   */
+
+  const OG_SOURCE_FETCH = {
+
+    cf: {
+
+      cacheTtl:
+        86400,
+
+      cacheEverything:
+        true
+    }
+  };
+
   let baseResponse =
     await fetch(
-      thumbnailUrl
+      thumbnailUrl,
+      OG_SOURCE_FETCH
     );
 
   if (
@@ -2130,7 +2183,8 @@ async function serveOgImage(
 
       baseResponse =
         await fetch(
-          OG_DEFAULT_THUMBNAIL
+          OG_DEFAULT_THUMBNAIL,
+          OG_SOURCE_FETCH
         );
     }
   }
@@ -2154,7 +2208,8 @@ async function serveOgImage(
 
   const logoResponse =
     await fetch(
-      OG_LOGO
+      OG_LOGO,
+      OG_SOURCE_FETCH
     );
 
   if (
@@ -2445,7 +2500,8 @@ async function handleSharePrime(
       );
 
       const stored =
-        await env.MEDIA_KV.get(
+        await kvGet(
+          env,
           key
         );
 
@@ -2551,7 +2607,8 @@ async function handleSharePrime(
     );
 
     const stored =
-      await env.MEDIA_KV.get(
+      await kvGet(
+        env,
         key
       );
 
@@ -2864,7 +2921,10 @@ async function handleDirectShare(
 }
 
 /* =========================================================
-   /s/<key> legacy handler
+   /s/<16-character-key> legacy handler
+
+   Compatibility only. The canonical route is
+   /s/<section>/<id>, handled by handleDirectShare().
 ========================================================= */
 
 async function handleShortShare(
@@ -2922,7 +2982,8 @@ async function handleShortShare(
   try {
 
     payload =
-      await env.MEDIA_KV.get(
+      await kvGet(
+        env,
         key
       );
 
@@ -3130,6 +3191,13 @@ async function handleCatalogPublishTest(
       let stored;
 
       try {
+
+        /*
+         * The diagnostic endpoint deliberately bypasses
+         * kvGet()'s cacheTtl. A verification read must show
+         * what is actually in KV right now, not a colo copy
+         * from up to KV_CACHE_TTL seconds ago.
+         */
 
         stored =
           await env.MEDIA_KV.get(
@@ -3431,7 +3499,8 @@ async function handleCatalogPublishTest(
     );
 
     const statusReadBack =
-      await env.MEDIA_KV.get(
+      await kvGet(
+        env,
         CATALOG_TEST_STATUS_KEY
       );
 
@@ -3662,7 +3731,8 @@ export default {
       try {
 
         payload =
-          await env.MEDIA_KV.get(
+          await kvGet(
+            env,
             key
           );
 
