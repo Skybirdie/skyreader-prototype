@@ -2065,6 +2065,33 @@ padding: 10px;
 }
 
 
+/* Smaller, muted release date beneath the title - see
+   DateDisplay.format() (js/dateDisplay.js) for the actual
+   "Sep 5th, 2026" / "5 days ago" text this holds. */
+.video-landing-circle-date{
+    flex:0 0 auto;
+
+    max-width:100%;
+
+    margin-top:-4px;
+
+    color:var(--muted);
+
+    font-size:
+        clamp(9px,1vw,11px);
+
+    line-height:1.2;
+
+    font-weight:400;
+
+    overflow:hidden;
+
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    text-align:center;
+}
+
+
 /* =======================================================
    WATCH AGAIN CARD
 

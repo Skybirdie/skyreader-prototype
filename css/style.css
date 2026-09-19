@@ -1773,6 +1773,22 @@ html[data-theme="dark"] #readerPanel #toolbar .iconButton{
   #viewerBackground{
     padding-top:max(8px,env(safe-area-inset-top));
     padding-bottom:max(8px,env(safe-area-inset-bottom));
+    /*
+     * Left/right intentionally have no 8px floor (unlike top/bottom
+     * above): the base rule's padding:clamp(8px,1.5vh,28px) applies
+     * to all four sides, and this landing screen state (no book
+     * open, so #app.viewerFocus's own !important padding override
+     * doesn't apply here) was still inheriting that horizontal
+     * value, shrinking #viewerArea - #viewerLibrary's absolute-
+     * positioning containing block - and making #viewerLibrary
+     * render narrower than .video-landing/.slideshow-landing,
+     * neither of which have any horizontal padding on their own
+     * containing viewer element at this breakpoint. Zeroing it out
+     * (bar safe-area insets, for notched phones in landscape)
+     * makes all three landings reach the same true screen edges.
+     */
+    padding-left:env(safe-area-inset-left);
+    padding-right:env(safe-area-inset-right);
   }
 
   #viewerLibrary{padding:10px;height:63%;width:100%}
