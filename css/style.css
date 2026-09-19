@@ -187,19 +187,6 @@ html:fullscreen #topBar{
     position: relative;
 }
 
-#workspacePrimaryLogo {
-    position: absolute;
-    top: 45px;
-    left: clamp(15px, 1.2vw, 25px);
-
-    width: clamp(70px, 7vw, 120px);
-    height: auto;
-    opacity: 0.5;
-    filter: drop-shadow(0 5px 18px rgba(0,0,0,.16));
-    display: block;
-    z-index: 20;
-    pointer-events: none;
-}
 
 
 
@@ -2776,28 +2763,97 @@ max-width:35vw;
 }
 
 /* =========================================================
-   Primary logo — visible over Video and Slideshow
-========================================================= */
+   PRIMARY LOGO — position by active section
 
-#workspacePrimaryLogo {
-    position: fixed !important;
-    top: 45px !important;
-    left: clamp(10px, 1.5vw, 20px) !important;
-    width: clamp(70px, 7vw, 120px) !important;
-    height: auto !important;
-    display: block !important;
-    z-index: 1500 !important;
-    pointer-events: none !important;
+   Sits below that section's own top bar and to the right of
+   that section's own left panel:
+
+     Reader (Books):  #topBar         + #libraryPanel
+     Video:           .video-top-bar  + .video-library
+     Slideshow:       .slideshow-top-bar + .slideshow-library
+
+   All three panels are 360px wide and all three top bars use
+   the same clamp(44px,5.5vh,68px) height by design (see
+   --header-height, --video-topbar-height and
+   --slideshow-topbar-height), so a single pair of offsets
+   covers all three sections. If any of those panel widths
+   ever changes independently, update --workspace-logo-panel
+   or split this into per-section rules.
+
+   z-index 4000 is intentional, not just "big enough": the
+   previous value (1500) sat below both .video-section
+   (2000) and .slideshow-section (3000), which are fixed
+   siblings of #app in the same root stacking context, so the
+   logo was actually being painted behind those two sections
+   entirely. 4000 clears all of them.
+
+   Excluded everywhere via body.sky-share-mode: ShareViewer
+   re-parents this element into its own shell in Share Mode,
+   and share.css positions it there instead - loaded after
+   this file, so it always wins in that state regardless of
+   what is below.
+   ========================================================= */
+
+:root {
+    --workspace-logo-gap: 20px;
+    --workspace-logo-panel: 360px;
 }
 
+#workspacePrimaryLogo {
+    position: fixed;
+
+    width: clamp(70px, 7vw, 120px);
+    height: auto;
+
+    opacity: 0.5;
+    filter: drop-shadow(0 5px 18px rgba(0,0,0,.16));
+
+    display: block;
+    z-index: 4000;
+    pointer-events: none;
+
+    transition:
+        left .28s cubic-bezier(.25,.8,.25,1),
+        top .18s ease;
+}
+
+/* Default: below the top bar, right of the left panel */
+body:not(.sky-share-mode) #workspacePrimaryLogo:not(.sky-share-primary-logo) {
+    top: calc(var(--header-height) + var(--workspace-logo-gap));
+    left: calc(var(--workspace-logo-panel) + var(--workspace-logo-gap));
+}
+
+/* Reader focus mode: #libraryPanel is hidden, so there is no
+   panel left to sit beside. */
+body:not(.sky-share-mode) #app.viewerFocus #workspacePrimaryLogo:not(.sky-share-primary-logo) {
+    left: var(--workspace-logo-gap);
+}
+
+/* Video focus mode: .video-top-bar and .video-library are both
+   hidden for immersive playback - same reasoning as above. */
+body:not(.sky-share-mode):has(#videoSection.videoFocus) #workspacePrimaryLogo:not(.sky-share-primary-logo) {
+    top: var(--workspace-logo-gap);
+    left: var(--workspace-logo-gap);
+}
+
+/* Narrow screens (<1000px): every section's left panel becomes
+   an off-canvas drawer here (see the max-width:999px rules for
+   #libraryPanel, .video-library and .slideshow-library), so
+   there is no in-flow panel to sit beside. */
+@media (max-width:999px) {
+
+    body:not(.sky-share-mode) #workspacePrimaryLogo:not(.sky-share-primary-logo) {
+        left: var(--workspace-logo-gap) !important;
+    }
+}
 
 @media (max-width:700px) {
 
-    #workspacePrimaryLogo {
-        top: 35px !important;
-        left: 8px !important;
-        width: 72px !important;
-        z-index: 10000 !important;
+    :root {
+        --workspace-logo-gap: 8px;
     }
 
+    #workspacePrimaryLogo {
+        width: 72px;
+    }
 }
