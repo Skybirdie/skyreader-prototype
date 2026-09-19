@@ -10,15 +10,21 @@ window.ShareManager = (function () {
         "/__sky_share_prime";
 
     /*
-     * SkyMedia is normally embedded inside the Glide page.
-     * In that situation window.location.origin is the Glide
-     * origin, not the Cloudflare Worker origin.  The share-prime
-     * request must therefore always target the Worker.  A runtime
-     * override is supported for future deployments, while the
-     * current production Worker remains the safe default.
-     */
-    const SHARE_PRIME_BASE_URL =
+       The public short-link catalog lives on the Cloudflare Worker.
+       The app itself may be embedded inside Glide, so never derive this
+       from window.location.origin.
+    */
+    const SKYMEDIA_BASE_URL =
         "https://skyreader-prototype.sliburd81.workers.dev";
+
+    function getWorkerBaseUrl() {
+        const configured =
+            window.__SKY_WORKER_BASE_URL;
+
+        return String(
+            configured || SKYMEDIA_BASE_URL
+        ).replace(/\/$/, "");
+    }
 
 
     /* =====================================================
@@ -208,16 +214,10 @@ window.ShareManager = (function () {
         id
     ) {
 
-        const workerBase =
-            cleanString(
-                window.__SKY_WORKER_BASE_URL
-            ) ||
-            SHARE_PRIME_BASE_URL;
-
         const endpoint =
             new URL(
                 SHARE_PRIME_PATH,
-                workerBase.replace(/\/+$/, "") + "/"
+                getWorkerBaseUrl()
             );
 
         const minimalItem =
@@ -322,10 +322,19 @@ window.ShareManager = (function () {
             );
         }
 
-        return primeShare(
-            item,
-            normalizedSection,
-            normalizedId
+        /*
+           The catalog is already published for the app's dataset, so the
+           share button no longer needs to POST/prime a new KV record.
+           Build the canonical direct-ID URL immediately. This also means
+           sharing works when SkyMedia is embedded in Glide because the
+           resulting URL always points to the Worker, not Glide.
+        */
+        return (
+            getWorkerBaseUrl() +
+            "/s/" +
+            encodeURIComponent(normalizedSection) +
+            "/" +
+            encodeURIComponent(normalizedId)
         );
     }
 
