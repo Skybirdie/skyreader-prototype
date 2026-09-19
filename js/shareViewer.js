@@ -1059,17 +1059,13 @@ function stopShareLoading() {
     ===================================================== */
     gif.style.setProperty(
         "border-radius",
-        "50%",
+        "0",
         "important"
     );
 
     gif.style.setProperty(
         "box-shadow",
-        "inset 0 2px 3px rgba(255, 255, 255, 0.35), " +
-        "inset 0 -4px 6px rgba(0, 0, 0, 0.25), " +
-        "0 3px 0 #2fa588, " +
-        "0 6px 14px rgba(0, 0, 0, 0.35), " +
-        "0 0 22px rgba(84, 231, 196, 0.6)",
+        "inset 0 22px 22px -22px rgba(84, 231, 196, 0.6)",
         "important"
     );
 
