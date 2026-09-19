@@ -1638,15 +1638,17 @@ function closeVideo() {
     /*
     ---------------------------------------------------
      Show landing again.
+
+     Previously waited 1s (setTimeout) before removing "hidden"
+     so the landing would float back in. The landing is already
+     "hidden" from openVideo() by this point, so removing it here
+     immediately still transitions cleanly from its hidden
+     position (see .video-landing in video.css) - it just no
+     longer waits a second to start.
     ---------------------------------------------------
     */
 
     if (landingElement) {
-
-        landingElement.classList.add(
-            "hidden"
-        );
-
 
         if (window.__skyVideoLandingTimer) {
 
@@ -1654,24 +1656,18 @@ function closeVideo() {
                 window.__skyVideoLandingTimer
             );
 
+            window.__skyVideoLandingTimer =
+                null;
+
         }
 
+        landingElement.classList.add(
+            "hidden"
+        );
 
-        window.__skyVideoLandingTimer =
-            window.setTimeout(
-                () => {
-
-                    if (currentVideo) {
-                        return;
-                    }
-
-                    landingElement.classList.remove(
-                        "hidden"
-                    );
-
-                },
-                1000
-            );
+        landingElement.classList.remove(
+            "hidden"
+        );
 
     }
 
@@ -2123,4 +2119,3 @@ return {
 };
 
 })();
-

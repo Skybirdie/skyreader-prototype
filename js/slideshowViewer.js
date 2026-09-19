@@ -876,11 +876,17 @@ if (
         if(root)root.classList.remove("has-slideshow");
         setPlaybackChrome(false);
         if(landing){
+            /*
+             * Previously waited 1s (setTimeout) before removing
+             * "hidden" so the landing would float back in. The
+             * landing is already "hidden" from open() by this
+             * point, so removing it here immediately still
+             * transitions cleanly from its hidden position (see
+             * .slideshow-landing in slideshow.css) - it just no
+             * longer waits a second to start.
+             */
             landing.classList.add("hidden");
-            window.setTimeout(()=>{
-                if(!landing || root?.classList.contains("has-slideshow")) return;
-                landing.classList.remove("hidden");
-            },1000);
+            landing.classList.remove("hidden");
         }
         current=null;
         index=0;
@@ -1027,4 +1033,4 @@ return {
 };
 
 
-})();    
+})();

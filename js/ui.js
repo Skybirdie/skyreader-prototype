@@ -1795,38 +1795,34 @@ if(libraryRevealTimer){
  */
 const narrowScreen=window.innerWidth<=999;
 
-const reveal=()=>{
+/*
+ * Previously waited 1s (via delayReturn -> setTimeout) before
+ * revealing the landing after a book closed. Now reveals
+ * immediately - delayReturn is still passed through to
+ * SkyReader.showViewerLibrary() below, which uses it purely to
+ * decide whether to play the "isReturning" float-in animation
+ * (see #viewerLibrary.isReturning in style.css), not to delay it.
+ */
+/*
+ * Desktop: library remains visible.
+ * Narrow: viewer landing can appear, but the drawer stays closed.
+ */
+sidebarVisible=!narrowScreen;
 
-    libraryRevealTimer=null;
+if(typeof SkyReader!=="undefined" &&
+   typeof SkyReader.showViewerLibrary==="function"){
 
-    /*
-     * Desktop: library remains visible.
-     * Narrow: viewer landing can appear, but the drawer stays closed.
-     */
-    sidebarVisible=!narrowScreen;
+    SkyReader.showViewerLibrary(Boolean(delayReturn));
 
-    if(typeof SkyReader!=="undefined" &&
-       typeof SkyReader.showViewerLibrary==="function"){
+}
 
-        SkyReader.showViewerLibrary(Boolean(delayReturn));
+if(dom.library){
 
-    }
+    dom.library.classList.toggle(
+        "libraryHidden",
+        narrowScreen
+    );
 
-    if(dom.library){
-
-        dom.library.classList.toggle(
-            "libraryHidden",
-            narrowScreen
-        );
-
-    }
-
-};
-
-if(delayReturn){
-    libraryRevealTimer=window.setTimeout(reveal,1000);
-}else{
-    reveal();
 }
 
 };
