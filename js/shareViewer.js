@@ -1048,23 +1048,16 @@ function stopShareLoading() {
         "important"
     );
 
-    /* Fully rounded (pill/circle, depending on the gif's own
-       aspect ratio) with a layered, colored shadow stack so
-       it reads as a raised 3D button sitting on the artwork:
-         - inset highlight/shade  -> glossy, rounded-surface feel
-         - solid "step" shadow    -> extruded edge / depth
-         - soft ambient shadow    -> grounds it against the page
-         - outer glow             -> accent-colored button glow
-    ===================================================== */
+
     gif.style.setProperty(
         "border-radius",
-        "0",
+        "50%",
         "important"
     );
 
     gif.style.setProperty(
-        "box-shadow",
-        "0 40px 0 -40px rgba(84, 231, 196, 0.6)",
+        "filter",
+        "drop-shadow(0px 15px 10px rgba(84, 231, 196, 0.6))",
         "important"
     );
 
