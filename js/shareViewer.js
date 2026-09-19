@@ -15,14 +15,41 @@
  • Previous / Next are independent edge controls.
  • Previous hidden on page 1.
  • Next hidden on final page.
- • Existing Reader wheel navigation retained.
- • Last-page mouse click cannot close the book in Share Mode.
+ • Share-owned wheel navigation.
+ • Share-owned horizontal swipe navigation.
+ • Existing PageFlip mouse-click navigation retained.
+ • Direct mouse interaction on final page cannot close
+   the shared book.
+ • Forward wheel/swipe cannot move beyond final page.
  • X closes the document but does NOT return to Reader landing.
- • X shows the large Open Meditation Mornings button.
+ • X shows the large Open Meditation Mornings image button.
  • Fullscreen keeps background.jpg.
  • Share header disappears in fullscreen.
  • Status bar remains directly below the symmetrical page gap.
  • Welcome banner remains directly below status bar.
+ • Existing Reader page indicator is preserved and explicitly
+   synchronized by Share Mode after the Reader surface is moved.
+
+ BOOK STATUS FORMAT
+ --------------------------------------------------------
+      Book Title        [ 2–3 / 24 ]
+
+ • Book title is plain text.
+ • Page/spread count is the only content inside #pageIndicator.
+ • The title is NOT placed inside #pageIndicator.
+
+ CLOSED STATE
+ --------------------------------------------------------
+ • Applies to BOOK, VIDEO, and SLIDESHOW shares.
+ • Existing small bottom-right Open Meditation Mornings
+   button is unchanged.
+ • A separate large assets/go-button.png image is centered
+   on desktop.
+ • assets/go-button-mobile.png is used on smaller screens.
+ • Mobile Go button can fill the viewport width.
+ • Large image links to Meditation Mornings.
+ • Item-specific controls disappear when closed.
+ • Share header disappears when closed.
 =========================================================
 */
 
@@ -39,6 +66,7 @@ window.ShareViewer = (function () {
     let statusElement = null;
 
     let closedPanel = null;
+
     let bookControlsBound = false;
     let pageStateTimer = null;
 
@@ -47,37 +75,6 @@ window.ShareViewer = (function () {
 
     let controlsIdleTimer = null;
     let controlsActivityBound = false;
-
-    /* Standalone Share Mode loading sequence. */
-    const SHARE_LOADING_INTERVAL = 2500;
-    const SHARE_LOADING_MESSAGES = [
-        "1 In the beginning was the Word,",
-        "and the Word was with God,",
-        "and the Word was God.",
-        "2 The same was in the beginning with God.",
-        "3 All things were made by him;",
-        "and without him was not any thing made that was made.",
-        "4 In him was life;",
-        "and the life was the light of men.",
-        "5 And the light shineth in darkness;",
-        "and the darkness comprehended it not.",
-        "12 But as many as received him,",
-        "to them gave he power to become the sons of God,",
-        "even to them that believe on his name:",
-        "13 Which were born, not of blood,",
-        "nor of the will of the flesh,",
-        "nor of the will of man, but of God.",
-        "14 And the Word was made flesh,",
-        "and dwelt among us,",
-        "and we beheld his glory,",
-        "the glory as of the only begotten of the Father,",
-        "full of grace and truth."
-    ];
-
-    let shareLoadingOverlay = null;
-    let shareLoadingText = null;
-    let shareLoadingTimer = null;
-    let shareLoadingIndex = 0;
 
     let bookGestureBound = false;
     let bookWheelTarget = null;
@@ -88,178 +85,87 @@ window.ShareViewer = (function () {
     let bookTouchStartY = 0;
     let bookSuppressClickUntil = 0;
 
+    let shareClosing = false;
+
+    let mediaCloseClickBound = false;
+
+    /*
+     * Final-page protection.
+     */
+    let lastPageProtectionBound = false;
+
+    /*
+     * Responsive Reader handling.
+     */
+    let bookResizeObserver = null;
+    let bookResizeTimer = null;
+    let bookResizeRaf = 0;
+    let bookResponsiveRefreshBound = false;
+    let bookInitialLayoutReady = false;
+    let bookResponsiveLastWidth = 0;
+    let bookResponsiveLastHeight = 0;
+
+    let bookWindowResizeHandler = null;
+    let bookVisualResizeHandler = null;
+
     const BOOK_TOUCH_THRESHOLD = 48;
 
     const GLIDE_MEDIA_URL =
         "https://meditationmornings.glide.page/dl/media";
 
+/* Standalone Share Mode loading sequence. */
+const SHARE_LOADING_INTERVAL = 2500;
 
-    /* =====================================================
-       SHARE LOADING SEQUENCE
-    ===================================================== */
+const SHARE_LOADING_MESSAGES = [
+    "1. In the beginning was the Word,",
+    "and the Word was with God,",
+    "and the Word was God.",
+    "2. The same was in the beginning with God.",
+    "3. All things were made by him;",
+    "and without him was not any thing made that was made.",
+    "4. In him was life;",
+    "and the life was the light of men.",
+    "5. And the light shineth in darkness;",
+    "and the darkness comprehended it not.",
+    "12. But as many as received him,",
+    "to them gave he power to become the sons of God,",
+    "even to them that believe on his name:",
+    "13. Which were born, not of blood,",
+    "nor of the will of the flesh,",
+    "nor of the will of man, but of God.",
+    "14. And the Word was made flesh,",
+    "and dwelt among us,",
+    "and we beheld his glory,",
+    "the glory as of the only begotten of the Father,",
+    "full of grace and truth."
+];
 
-    function createShareLoadingOverlay() {
-        if (shareLoadingOverlay || !shell) return;
-
-        shareLoadingOverlay = createElement("div", "sky-share-loading");
-        shareLoadingOverlay.setAttribute("role", "status");
-        shareLoadingOverlay.setAttribute("aria-live", "polite");
-        shareLoadingOverlay.setAttribute("aria-busy", "true");
-        shareLoadingOverlay.hidden = true;
-
-        const inner = createElement("div", "sky-share-loading-inner");
-
-        const image = document.createElement("img");
-        image.className = "sky-share-loading-image";
-        image.src = "assets/loading.gif";
-        image.alt = "";
-        image.setAttribute("aria-hidden", "true");
-
-        shareLoadingText = createElement("span", "sky-share-loading-text");
-
-        inner.appendChild(image);
-        inner.appendChild(shareLoadingText);
-        shareLoadingOverlay.appendChild(inner);
-
-        const main = shell.querySelector(".sky-share-main");
-        (main || shell).appendChild(shareLoadingOverlay);
-    }
-
-    function setShareLoadingMessage() {
-        if (shareLoadingText) {
-            shareLoadingText.textContent =
-                SHARE_LOADING_MESSAGES[shareLoadingIndex] || SHARE_LOADING_MESSAGES[0];
-        }
-    }
-
-    function startShareLoading() {
-        createShareLoadingOverlay();
-        if (!shareLoadingOverlay) return;
-
-        if (shareLoadingTimer) {
-            window.clearInterval(shareLoadingTimer);
-            shareLoadingTimer = null;
-        }
-
-        shareLoadingIndex = 0;
-        setShareLoadingMessage();
-        shareLoadingOverlay.hidden = false;
-        shareLoadingOverlay.setAttribute("aria-busy", "true");
-        shareLoadingOverlay.classList.add("is-active");
-
-        shareLoadingTimer = window.setInterval(() => {
-            shareLoadingIndex =
-                (shareLoadingIndex + 1) % SHARE_LOADING_MESSAGES.length;
-            setShareLoadingMessage();
-        }, SHARE_LOADING_INTERVAL);
-    }
-
-    function stopShareLoading() {
-        if (shareLoadingTimer) {
-            window.clearInterval(shareLoadingTimer);
-            shareLoadingTimer = null;
-        }
-
-        if (!shareLoadingOverlay) return;
-
-        shareLoadingOverlay.classList.remove("is-active");
-        shareLoadingOverlay.hidden = true;
-        shareLoadingOverlay.setAttribute("aria-busy", "false");
-    }
-
-    async function waitForSharedVideoReady(item) {
-        const video = document.getElementById("videoPlayer");
-        const iframe = document.getElementById("videoIframePlayer");
-
-        const isYouTube =
-            window.ContentContract &&
-            typeof ContentContract.isYouTubeUrl === "function" &&
-            ContentContract.isYouTubeUrl(item?.video);
-
-        if (isYouTube) {
-            if (!iframe) return;
-
-            await new Promise((resolve, reject) => {
-                const cleanup = () => {
-                    iframe.removeEventListener("load", onLoad);
-                    iframe.removeEventListener("error", onError);
-                };
-                const onLoad = () => { cleanup(); resolve(); };
-                const onError = () => {
-                    cleanup();
-                    reject(new Error("The shared video player could not be loaded."));
-                };
-
-                iframe.addEventListener("load", onLoad);
-                iframe.addEventListener("error", onError);
-            });
-            return;
-        }
-
-        if (!video) return;
-        if (video.readyState >= 2) return;
-
-        await new Promise((resolve, reject) => {
-            const cleanup = () => {
-                video.removeEventListener("loadeddata", onReady);
-                video.removeEventListener("canplay", onReady);
-                video.removeEventListener("error", onError);
-            };
-            const onReady = () => { cleanup(); resolve(); };
-            const onError = () => {
-                cleanup();
-                reject(new Error("The shared video could not be loaded."));
-            };
-
-            video.addEventListener("loadeddata", onReady);
-            video.addEventListener("canplay", onReady);
-            video.addEventListener("error", onError);
-        });
-    }
-
-    async function waitForSharedSlideshowReady() {
-        const viewer = document.getElementById("slideshowViewer");
-        if (!viewer) return;
-
-        const image = viewer.querySelector(".slideshow-slide img");
-        if (!image) return;
-
-        if (image.complete) {
-            if (image.naturalWidth > 0) return;
-            throw new Error("The shared slideshow image could not be loaded.");
-        }
-
-        await new Promise((resolve, reject) => {
-            const cleanup = () => {
-                image.removeEventListener("load", onLoad);
-                image.removeEventListener("error", onError);
-            };
-            const onLoad = () => { cleanup(); resolve(); };
-            const onError = () => {
-                cleanup();
-                reject(new Error("The shared slideshow image could not be loaded."));
-            };
-
-            image.addEventListener("load", onLoad);
-            image.addEventListener("error", onError);
-        });
-    }
-
+let shareLoadingOverlay = null;
+let shareLoadingText = null;
+let shareLoadingTimer = null;
+let shareLoadingIndex = 0;
 
     /* =====================================================
        BASIC HELPERS
     ===================================================== */
 
-    function createElement(tag, className, text) {
+    function createElement(
+        tag,
+        className,
+        text
+    ) {
 
-        const el = document.createElement(tag);
+        const el =
+            document.createElement(tag);
 
         if (className) {
-            el.className = className;
+            el.className =
+                className;
         }
 
         if (text !== undefined) {
-            el.textContent = text;
+            el.textContent =
+                text;
         }
 
         return el;
@@ -268,11 +174,12 @@ window.ShareViewer = (function () {
 
     function isBookShare() {
 
-        const section = String(
-            activeTarget?.section ||
-            activeItem?.type ||
-            ""
-        ).toLowerCase();
+        const section =
+            String(
+                activeTarget?.section ||
+                activeItem?.type ||
+                ""
+            ).toLowerCase();
 
         return (
             section === "reader" ||
@@ -281,9 +188,40 @@ window.ShareViewer = (function () {
     }
 
 
+    function isVideoShare() {
+
+        const section =
+            String(
+                activeTarget?.section ||
+                activeItem?.type ||
+                ""
+            ).toLowerCase();
+
+        return section === "video";
+    }
+
+
+    function isSlideshowShare() {
+
+        const section =
+            String(
+                activeTarget?.section ||
+                activeItem?.type ||
+                ""
+            ).toLowerCase();
+
+        return (
+            section === "slideshow" ||
+            section === "slides"
+        );
+    }
+
+
     function sectionLabel(section) {
 
-        switch (String(section || "").toLowerCase()) {
+        switch (
+            String(section || "").toLowerCase()
+        ) {
 
             case "reader":
             case "book":
@@ -302,6 +240,719 @@ window.ShareViewer = (function () {
     }
 
 
+function createShareLoadingOverlay() {
+    if (shareLoadingOverlay || !shell) return;
+
+    shareLoadingOverlay = createElement("div", "sky-share-loading");
+    shareLoadingOverlay.setAttribute("role", "status");
+    shareLoadingOverlay.setAttribute("aria-live", "polite");
+    shareLoadingOverlay.setAttribute("aria-busy", "true");
+    shareLoadingOverlay.hidden = true;
+
+    const inner = createElement("div", "sky-share-loading-inner");
+
+    const image = document.createElement("img");
+    image.className = "sky-share-loading-image";
+    image.src = "/assets/loading.gif";
+    image.alt = "";
+    image.setAttribute("aria-hidden", "true");
+
+    shareLoadingText = createElement("span", "sky-share-loading-text");
+
+    inner.appendChild(image);
+    inner.appendChild(shareLoadingText);
+    shareLoadingOverlay.appendChild(inner);
+
+    const main = shell.querySelector(".sky-share-main");
+    (main || shell).appendChild(shareLoadingOverlay);
+}
+
+function setShareLoadingMessage() {
+    if (shareLoadingText) {
+        shareLoadingText.textContent =
+            SHARE_LOADING_MESSAGES[shareLoadingIndex] ||
+            SHARE_LOADING_MESSAGES[0];
+    }
+}
+
+function startShareLoading() {
+    createShareLoadingOverlay();
+    if (!shareLoadingOverlay) return;
+
+    if (shareLoadingTimer) {
+        window.clearInterval(shareLoadingTimer);
+        shareLoadingTimer = null;
+    }
+
+    shareLoadingIndex = 0;
+    setShareLoadingMessage();
+
+    shareLoadingOverlay.hidden = false;
+    shareLoadingOverlay.setAttribute("aria-busy", "true");
+    shareLoadingOverlay.classList.add("is-active");
+
+    shareLoadingTimer = window.setInterval(() => {
+        shareLoadingIndex =
+            (shareLoadingIndex + 1) % SHARE_LOADING_MESSAGES.length;
+
+        setShareLoadingMessage();
+    }, SHARE_LOADING_INTERVAL);
+}
+
+function stopShareLoading() {
+    if (shareLoadingTimer) {
+        window.clearInterval(shareLoadingTimer);
+        shareLoadingTimer = null;
+    }
+
+    if (!shareLoadingOverlay) return;
+
+    shareLoadingOverlay.classList.remove("is-active");
+    shareLoadingOverlay.hidden = true;
+    shareLoadingOverlay.setAttribute("aria-busy", "false");
+}
+
+
+    /* =====================================================
+       SHARE BOOK PAGE INDICATOR
+    ===================================================== */
+
+    function updateShareBookIndicator() {
+
+        if (!isBookShare()) {
+            return;
+        }
+
+
+        if (
+            !window.Reader ||
+            typeof Reader.currentPage !==
+                "function" ||
+            typeof Reader.pages !==
+                "function"
+        ) {
+            return;
+        }
+
+
+        const indicator =
+            document.getElementById(
+                "pageIndicator"
+            );
+
+
+        const readerTitle =
+            document.getElementById(
+                "readerTitle"
+            );
+
+
+        const book =
+            typeof Reader.book ===
+                "function"
+                ? Reader.book()
+                : null;
+
+
+        const title =
+            String(
+                book?.title ||
+                activeItem?.title ||
+                ""
+            ).trim();
+
+
+        if (readerTitle) {
+
+            readerTitle.textContent =
+                title;
+
+            readerTitle.hidden =
+                false;
+
+            readerTitle.removeAttribute(
+                "aria-hidden"
+            );
+
+            readerTitle.style.removeProperty(
+                "display"
+            );
+
+            readerTitle.style.removeProperty(
+                "visibility"
+            );
+
+            readerTitle.style.removeProperty(
+                "opacity"
+            );
+        }
+
+
+        if (!indicator) {
+            return;
+        }
+
+
+        if (
+            typeof window.updatePageIndicator ===
+                "function"
+        ) {
+
+            try {
+
+                window.updatePageIndicator();
+
+            }
+            catch (error) {
+
+                console.warn(
+                    "[SkyMedia Share] Reader page indicator refresh:",
+                    error
+                );
+            }
+        }
+
+
+        const page =
+            Number(
+                Reader.currentPage()
+            ) || 1;
+
+
+        const pages =
+            Number(
+                Reader.pages()
+            ) || 0;
+
+
+        let label = "";
+
+
+        if (
+            typeof Reader.spread ===
+                "function"
+        ) {
+
+            try {
+
+                const spread =
+                    Reader.spread();
+
+
+                if (
+                    spread &&
+                    spread.label !==
+                        undefined &&
+                    spread.label !==
+                        null
+                ) {
+
+                    label =
+                        String(
+                            spread.label
+                        ).trim();
+                }
+
+            }
+            catch (error) {
+
+                console.warn(
+                    "[SkyMedia Share] Reader spread lookup:",
+                    error
+                );
+            }
+        }
+
+
+        if (!label) {
+            label =
+                String(page);
+        }
+
+
+        indicator.textContent =
+            label +
+            " / " +
+            (pages || "");
+
+
+        indicator.hidden =
+            false;
+
+        indicator.removeAttribute(
+            "aria-hidden"
+        );
+
+        indicator.tabIndex =
+            0;
+
+        indicator.style.removeProperty(
+            "display"
+        );
+
+        indicator.style.removeProperty(
+            "visibility"
+        );
+
+        indicator.style.removeProperty(
+            "opacity"
+        );
+
+        indicator.classList.add(
+            "pageIndicatorActive"
+        );
+    }
+
+
+    /* =====================================================
+       CLOSED-STATE GO BUTTON
+    ===================================================== */
+
+    function updateClosedGoButtonLayout() {
+
+        if (!closedPanel) {
+            return;
+        }
+
+
+        const button =
+            closedPanel.querySelector(
+                ".sky-share-closed-go-button"
+            );
+
+
+        if (!button) {
+            return;
+        }
+
+
+        const mobile =
+            window.matchMedia(
+                "(max-width: 700px)"
+            ).matches;
+
+
+        if (mobile) {
+
+            button.style.setProperty(
+                "width",
+                "100vw",
+                "important"
+            );
+
+            button.style.setProperty(
+                "max-width",
+                "100vw",
+                "important"
+            );
+
+            button.style.setProperty(
+                "max-height",
+                "100vh",
+                "important"
+            );
+
+        }
+        else {
+
+            button.style.setProperty(
+                "width",
+                "min(92vw, 1400px)",
+                "important"
+            );
+
+            button.style.setProperty(
+                "max-width",
+                "92vw",
+                "important"
+            );
+
+            button.style.setProperty(
+                "max-height",
+                "84vh",
+                "important"
+            );
+        }
+    }
+
+
+    function createClosedGoButton() {
+
+    if (!closedPanel) {
+        return null;
+    }
+
+
+    let button =
+        closedPanel.querySelector(
+            ".sky-share-closed-go-button"
+        );
+
+
+    if (button) {
+
+        updateClosedGoButtonLayout();
+
+        return button;
+    }
+
+
+    button =
+        document.createElement("a");
+
+
+    button.className =
+        "sky-share-closed-go-button";
+
+
+    button.href =
+        GLIDE_MEDIA_URL;
+
+
+    button.target =
+        "_blank";
+
+
+    button.rel =
+        "noopener noreferrer";
+
+
+    button.setAttribute(
+        "aria-label",
+        "Open Meditation Mornings"
+    );
+
+
+    button.style.setProperty(
+        "position",
+        "absolute",
+        "important"
+    );
+
+    button.style.setProperty(
+        "left",
+        "50%",
+        "important"
+    );
+
+    button.style.setProperty(
+        "top",
+        "50%",
+        "important"
+    );
+
+    button.style.setProperty(
+        "transform",
+        "translate(-50%, -50%)",
+        "important"
+    );
+
+    button.style.setProperty(
+        "height",
+        "auto",
+        "important"
+    );
+
+    button.style.setProperty(
+        "padding",
+        "0",
+        "important"
+    );
+
+    button.style.setProperty(
+        "margin",
+        "0",
+        "important"
+    );
+
+    button.style.setProperty(
+        "border",
+        "0",
+        "important"
+    );
+
+    button.style.setProperty(
+        "outline",
+        "none",
+        "important"
+    );
+
+    button.style.setProperty(
+        "text-decoration",
+        "none",
+        "important"
+    );
+
+    button.style.setProperty(
+        "cursor",
+        "pointer",
+        "important"
+    );
+
+    button.style.setProperty(
+        "box-sizing",
+        "border-box",
+        "important"
+    );
+
+    button.style.setProperty(
+        "z-index",
+        "10000",
+        "important"
+    );
+
+    button.style.setProperty(
+        "display",
+        "block",
+        "important"
+    );
+
+    button.style.setProperty(
+        "pointer-events",
+        "auto",
+        "important"
+    );
+
+
+    const picture =
+        document.createElement(
+            "picture"
+        );
+
+
+    const mobileSource =
+        document.createElement(
+            "source"
+        );
+
+
+    mobileSource.media =
+        "(max-width: 700px)";
+
+
+    mobileSource.srcset =
+        new URL(
+            "/assets/go-button-mobile.png",
+            window.location.origin
+        ).href;
+
+
+    picture.appendChild(
+        mobileSource
+    );
+
+
+    const image =
+        document.createElement(
+            "img"
+        );
+
+
+    image.src =
+        new URL(
+            "/assets/go-button.png",
+            window.location.origin
+        ).href;
+
+
+    image.alt =
+        "Open Meditation Mornings";
+
+
+    image.draggable =
+        false;
+
+
+    image.style.setProperty(
+        "display",
+        "block",
+        "important"
+    );
+
+    image.style.setProperty(
+        "width",
+        "100%",
+        "important"
+    );
+
+    image.style.setProperty(
+        "height",
+        "auto",
+        "important"
+    );
+
+    image.style.setProperty(
+        "max-width",
+        "100%",
+        "important"
+    );
+
+    image.style.setProperty(
+        "max-height",
+        "100vh",
+        "important"
+    );
+
+    image.style.setProperty(
+        "object-fit",
+        "contain",
+        "important"
+    );
+
+    image.style.setProperty(
+        "pointer-events",
+        "none",
+        "important"
+    );
+
+    image.style.setProperty(
+        "user-select",
+        "none",
+        "important"
+    );
+
+    image.style.setProperty(
+        "-webkit-user-drag",
+        "none",
+        "important"
+    );
+
+
+    picture.appendChild(
+        image
+    );
+
+    button.appendChild(
+        picture
+    );
+
+
+    /* =====================================================
+       OVERLAY GIF
+       -----------------------------------------------------
+       120px wide; height remains automatic to preserve the
+       GIF's native aspect ratio. pointer-events:none keeps
+       the underlying Go button fully clickable.
+    ===================================================== */
+
+    const gif =
+        document.createElement(
+            "img"
+        );
+
+
+    gif.src =
+        new URL(
+            "/assets/go-button-gif.gif",
+            window.location.origin
+        ).href;
+
+
+    gif.alt =
+        "";
+
+
+    gif.setAttribute(
+        "aria-hidden",
+        "true"
+    );
+
+
+    gif.draggable =
+        false;
+
+
+    gif.style.setProperty(
+        "position",
+        "absolute",
+        "important"
+    );
+
+    gif.style.setProperty(
+        "right",
+        "35%",
+        "important"
+    );
+
+    gif.style.setProperty(
+        "bottom",
+        "25%",
+        "important"
+    );
+
+
+    gif.style.setProperty(
+        "width",
+        "120px",
+        "important"
+    );
+
+    gif.style.setProperty(
+        "height",
+        "auto",
+        "important"
+    );
+
+    gif.style.setProperty(
+        "max-width",
+        "40%",
+        "important"
+    );
+
+    gif.style.setProperty(
+        "max-height",
+        "none",
+        "important"
+    );
+
+    gif.style.setProperty(
+        "object-fit",
+        "contain",
+        "important"
+    );
+
+    gif.style.setProperty(
+        "pointer-events",
+        "none",
+        "important"
+    );
+
+    gif.style.setProperty(
+        "user-select",
+        "none",
+        "important"
+    );
+
+    gif.style.setProperty(
+        "-webkit-user-drag",
+        "none",
+        "important"
+    );
+
+    gif.style.setProperty(
+        "z-index",
+        "2",
+        "important"
+    );
+
+
+    button.appendChild(
+        gif
+    );
+
+
+    closedPanel.appendChild(
+        button
+    );
+
+
+    updateClosedGoButtonLayout();
+
+
+    return button;
+}
+
+
     /* =====================================================
        SHARE SHELL
     ===================================================== */
@@ -312,134 +963,213 @@ window.ShareViewer = (function () {
             return;
         }
 
-        shell = createElement(
-            "div",
-            "sky-share-shell"
+
+        shell =
+            createElement(
+                "div",
+                "sky-share-shell"
+            );
+
+
+        shell.id =
+            "skyShareShell";
+
+
+        const header =
+            createElement(
+                "header",
+                "sky-share-header"
+            );
+
+
+        const brand =
+            createElement(
+                "div",
+                "sky-share-brand"
+            );
+
+
+        const section =
+            createElement(
+                "div",
+                "sky-share-section"
+            );
+
+
+        header.appendChild(
+            brand
         );
 
-        shell.id = "skyShareShell";
-
-
-        const header = createElement(
-            "header",
-            "sky-share-header"
-        );
-
-        const brand = createElement(
-            "div",
-            "sky-share-brand"
-        );
-
-        const section = createElement(
-            "div",
-            "sky-share-section"
-        );
-
-        header.appendChild(brand);
-        header.appendChild(section);
-
-
-        const main = createElement(
-            "main",
-            "sky-share-main"
-        );
-
-
-        const heading = createElement(
-            "div",
-            "sky-share-heading"
-        );
-
-        titleElement = createElement(
-            "h1",
-            "sky-share-title"
-        );
-
-        subtitleElement = createElement(
-            "div",
-            "sky-share-subtitle"
-        );
-
-        heading.appendChild(titleElement);
-        heading.appendChild(subtitleElement);
-
-
-        mediaHost = createElement(
-            "div",
-            "sky-share-media-host"
-        );
-
-        mediaHost.id = "skyShareMediaHost";
-
-
-        statusElement = createElement(
-            "div",
-            "sky-share-status"
+        header.appendChild(
+            section
         );
 
 
-        /*
-         * Share Mode has its own shell, so the normal workspace
-         * primary logo cannot remain visible after #workspace is
-         * isolated.  Use a separate image in the Share shell.
-         * This does NOT move or modify #workspacePrimaryLogo.
-         */
-        const primaryLogo = document.createElement("img");
-
-        primaryLogo.className = "sky-share-primary-logo";
-        primaryLogo.src = "assets/primary-logo.png";
-        primaryLogo.alt = "";
-        primaryLogo.setAttribute("aria-hidden", "true");
+        const main =
+            createElement(
+                "main",
+                "sky-share-main"
+            );
 
 
-        /*
-         * This is the original persistent bottom-right Share
-         * button.  It is deliberately separate from the central
-         * button created later by showClosedPanel().
-         */
-        const actions = createElement(
-            "div",
-            "sky-share-actions"
+        const heading =
+            createElement(
+                "div",
+                "sky-share-heading"
+            );
+
+
+        titleElement =
+            createElement(
+                "h1",
+                "sky-share-title"
+            );
+
+
+        subtitleElement =
+            createElement(
+                "div",
+                "sky-share-subtitle"
+            );
+
+
+        heading.appendChild(
+            titleElement
         );
 
-        const openButton = createElement(
-            "a",
-            "sky-share-open-button",
-            "Open Meditation Mornings"
+        heading.appendChild(
+            subtitleElement
         );
 
-        openButton.href = GLIDE_MEDIA_URL;
-        openButton.target = "_blank";
-        openButton.rel = "noopener noreferrer";
 
-        const closeButton = createElement(
-            "button",
-            "sky-share-close-button",
-            "×"
+        mediaHost =
+            createElement(
+                "div",
+                "sky-share-media-host"
+            );
+
+
+        mediaHost.id =
+            "skyShareMediaHost";
+
+
+        statusElement =
+            createElement(
+                "div",
+                "sky-share-status"
+            );
+
+
+        const primaryLogo =
+            document.getElementById(
+                "workspacePrimaryLogo"
+            );
+
+
+        if (primaryLogo) {
+
+            primaryLogo.classList.add(
+                "sky-share-primary-logo"
+            );
+
+            primaryLogo.style.display =
+                "block";
+
+            shell.appendChild(
+                primaryLogo
+            );
+        }
+
+
+        const actions =
+            createElement(
+                "div",
+                "sky-share-actions"
+            );
+
+
+        const openButton =
+            createElement(
+                "a",
+                "sky-share-open-button",
+                "Open Meditation Mornings"
+            );
+
+
+        openButton.href =
+            GLIDE_MEDIA_URL;
+
+        openButton.target =
+            "_blank";
+
+        openButton.rel =
+            "noopener noreferrer";
+
+
+        const closeButton =
+            createElement(
+                "button",
+                "sky-share-close-button",
+                "×"
+            );
+
+
+        closeButton.type =
+            "button";
+
+        closeButton.setAttribute(
+            "aria-label",
+            "Close"
         );
 
-        closeButton.type = "button";
-        closeButton.setAttribute("aria-label", "Close");
-        closeButton.title = "Close";
-        closeButton.addEventListener("click", close);
-
-        actions.appendChild(openButton);
-        actions.appendChild(closeButton);
+        closeButton.title =
+            "Close";
 
 
-        main.appendChild(heading);
-        main.appendChild(mediaHost);
-        main.appendChild(statusElement);
+        closeButton.addEventListener(
+            "click",
+            close
+        );
 
-        createShareLoadingOverlay();
+
+        actions.appendChild(
+            openButton
+        );
+
+        actions.appendChild(
+            closeButton
+        );
 
 
-        shell.appendChild(header);
-        shell.appendChild(main);
-        shell.appendChild(primaryLogo);
-        shell.appendChild(actions);
+        main.appendChild(
+            heading
+        );
 
-        document.body.appendChild(shell);
+        main.appendChild(
+            mediaHost
+        );
+
+        main.appendChild(
+            statusElement
+        );
+
+
+        shell.appendChild(
+            header
+        );
+
+        shell.appendChild(
+            main
+        );
+
+        shell.appendChild(
+            actions
+        );
+
+
+        document.body.appendChild(
+            shell
+        );
     }
 
 
@@ -452,6 +1182,7 @@ window.ShareViewer = (function () {
         document.body.classList.add(
             "sky-share-mode"
         );
+
 
         const selectors = [
 
@@ -491,11 +1222,36 @@ window.ShareViewer = (function () {
         ];
 
 
-        selectors.forEach(selector => {
+        selectors.forEach(
+            selector => {
 
-            document
-                .querySelectorAll(selector)
-                .forEach(el => {
+                document
+                    .querySelectorAll(
+                        selector
+                    )
+                    .forEach(
+                        el => {
+
+                            el.dataset.skyShareHidden =
+                                "true";
+
+                            el.style.setProperty(
+                                "display",
+                                "none",
+                                "important"
+                            );
+                        }
+                    );
+            }
+        );
+
+
+        document
+            .querySelectorAll(
+                "[data-app-target], .app-switch-button"
+            )
+            .forEach(
+                el => {
 
                     el.dataset.skyShareHidden =
                         "true";
@@ -505,39 +1261,29 @@ window.ShareViewer = (function () {
                         "none",
                         "important"
                     );
-                });
-        });
-
-
-        document
-            .querySelectorAll(
-                "[data-app-target], .app-switch-button"
-            )
-            .forEach(el => {
-
-                el.dataset.skyShareHidden =
-                    "true";
-
-                el.style.setProperty(
-                    "display",
-                    "none",
-                    "important"
-                );
-            });
+                }
+            );
     }
 
 
     /* =====================================================
-       MOVE READER SURFACE
+       MOVE SURFACE
     ===================================================== */
 
     function moveIntoShareHost(element) {
 
-        if (!element || !mediaHost) {
+        if (
+            !element ||
+            !mediaHost
+        ) {
             return;
         }
 
-        mediaHost.appendChild(element);
+
+        mediaHost.appendChild(
+            element
+        );
+
 
         element.style.removeProperty(
             "display"
@@ -546,36 +1292,39 @@ window.ShareViewer = (function () {
 
 
     /* =====================================================
-       REPLACE BUTTON
-       ===================================================== */
-
-    /*
-     * Clone the Reader button so the normal Reader listener
-     * attached to the original button does not remain active.
-     *
-     * Share Mode then owns these controls directly.
-     */
+       BUTTON CLONE
+    ===================================================== */
 
     function replaceButton(id) {
 
         const oldButton =
-            document.getElementById(id);
+            document.getElementById(
+                id
+            );
+
 
         if (!oldButton) {
             return null;
         }
 
-        const newButton =
-            oldButton.cloneNode(true);
 
-        oldButton.replaceWith(newButton);
+        const newButton =
+            oldButton.cloneNode(
+                true
+            );
+
+
+        oldButton.replaceWith(
+            newButton
+        );
+
 
         return newButton;
     }
 
 
     /* =====================================================
-       MUTE ICON
+       MUTE
     ===================================================== */
 
     function updateMuteIcon() {
@@ -585,20 +1334,26 @@ window.ShareViewer = (function () {
                 "muteButton"
             );
 
+
         if (!button) {
             return;
         }
 
-        const muted = !!(
-            window.AudioController &&
-            typeof AudioController.isMuted ===
-                "function" &&
-            AudioController.isMuted()
-        );
+
+        const muted =
+            !!(
+                window.AudioController &&
+                typeof AudioController.isMuted ===
+                    "function" &&
+                AudioController.isMuted()
+            );
 
 
         const use =
-            button.querySelector("use");
+            button.querySelector(
+                "use"
+            );
+
 
         if (use) {
 
@@ -621,18 +1376,27 @@ window.ShareViewer = (function () {
             muted
         );
 
+
         button.setAttribute(
             "aria-pressed",
-            muted ? "true" : "false"
+            muted
+                ? "true"
+                : "false"
         );
+
 
         button.setAttribute(
             "aria-label",
-            muted ? "Unmute" : "Mute"
+            muted
+                ? "Unmute"
+                : "Mute"
         );
 
+
         button.title =
-            muted ? "Unmute" : "Mute";
+            muted
+                ? "Unmute"
+                : "Mute";
     }
 
 
@@ -647,15 +1411,22 @@ window.ShareViewer = (function () {
                 "viewerFullscreenButton"
             );
 
+
         if (!button) {
             return;
         }
 
+
         const active =
-            document.fullscreenElement === shell;
+            document.fullscreenElement ===
+            shell;
+
 
         const use =
-            button.querySelector("use");
+            button.querySelector(
+                "use"
+            );
+
 
         if (use) {
 
@@ -667,10 +1438,14 @@ window.ShareViewer = (function () {
             );
         }
 
+
         button.setAttribute(
             "aria-pressed",
-            active ? "true" : "false"
+            active
+                ? "true"
+                : "false"
         );
+
 
         button.setAttribute(
             "aria-label",
@@ -678,6 +1453,7 @@ window.ShareViewer = (function () {
                 ? "Exit fullscreen"
                 : "Fullscreen"
         );
+
 
         button.title =
             active
@@ -687,7 +1463,7 @@ window.ShareViewer = (function () {
 
 
     /* =====================================================
-       PAGE BUTTON VISIBILITY
+       PAGE BUTTONS
     ===================================================== */
 
     function updatePageButtons() {
@@ -695,6 +1471,7 @@ window.ShareViewer = (function () {
         if (!isBookShare()) {
             return;
         }
+
 
         if (
             !window.Reader ||
@@ -712,6 +1489,7 @@ window.ShareViewer = (function () {
                 Reader.currentPage()
             ) || 1;
 
+
         const pages =
             Number(
                 Reader.pages()
@@ -722,6 +1500,7 @@ window.ShareViewer = (function () {
             document.getElementById(
                 "previousButton"
             );
+
 
         const next =
             document.getElementById(
@@ -762,20 +1541,28 @@ window.ShareViewer = (function () {
                     : "false"
             );
         }
+
+
+        updateShareBookIndicator();
     }
 
 
     /* =====================================================
-       PAGE STATE WATCHER
+       PAGE WATCHER
     ===================================================== */
 
     function startPageWatcher() {
 
         stopPageWatcher();
 
+
         pageStateTimer =
             setInterval(
-                updatePageButtons,
+                function () {
+
+                    updatePageButtons();
+
+                },
                 150
             );
     }
@@ -789,7 +1576,8 @@ window.ShareViewer = (function () {
                 pageStateTimer
             );
 
-            pageStateTimer = null;
+            pageStateTimer =
+                null;
         }
     }
 
@@ -804,25 +1592,30 @@ window.ShareViewer = (function () {
             return;
         }
 
+
         if (
-            document.fullscreenElement === shell
+            document.fullscreenElement ===
+            shell
         ) {
             return;
         }
 
+
         if (
             typeof shell.requestFullscreen ===
-            "function"
+                "function"
         ) {
 
             shell.requestFullscreen()
-                .catch(error => {
+                .catch(
+                    error => {
 
-                    console.warn(
-                        "[SkyMedia Share] Fullscreen failed.",
-                        error
-                    );
-                });
+                        console.warn(
+                            "[SkyMedia Share] Fullscreen failed.",
+                            error
+                        );
+                    }
+                );
         }
     }
 
@@ -836,50 +1629,74 @@ window.ShareViewer = (function () {
         ) {
 
             document.exitFullscreen()
-                .catch(() => {});
+                .catch(
+                    () => {}
+                );
         }
     }
 
 
     /* =====================================================
-       SHARE BOOK CONTROLS
+       BOOK CONTROLS
     ===================================================== */
 
     function bindBookControls() {
 
         if (bookControlsBound) {
+
             updateMuteIcon();
             updatePageButtons();
+
             return;
         }
+
 
         const toolbar =
             document.getElementById(
                 "toolbar"
             );
 
+
         if (!toolbar) {
             return;
         }
 
-        bookControlsBound = true;
+
+        bookControlsBound =
+            true;
 
 
-        /*
-         * Replace the Reader buttons before rearranging them.
-         */
-        replaceButton("previousButton");
-        replaceButton("nextButton");
-        replaceButton("muteButton");
-        replaceButton("readerShareButton");
-        replaceButton("viewerFullscreenButton");
-        replaceButton("readerCloseButton");
+        replaceButton(
+            "previousButton"
+        );
 
-        /*
-         * Rotate and bookmark are deliberately removed.
-         */
-        replaceButton("rotateButton");
-        replaceButton("bookmarkAddButton");
+        replaceButton(
+            "nextButton"
+        );
+
+        replaceButton(
+            "muteButton"
+        );
+
+        replaceButton(
+            "readerShareButton"
+        );
+
+        replaceButton(
+            "viewerFullscreenButton"
+        );
+
+        replaceButton(
+            "readerCloseButton"
+        );
+
+        replaceButton(
+            "rotateButton"
+        );
+
+        replaceButton(
+            "bookmarkAddButton"
+        );
 
 
         const previous =
@@ -913,18 +1730,12 @@ window.ShareViewer = (function () {
             );
 
 
-        /*
-         * IMPORTANT:
-         *
-         * Previous and Next are removed from the toolbar.
-         * They become independent controls positioned relative
-         * to the Share media host.
-         */
         if (previous) {
             mediaHost.appendChild(
                 previous
             );
         }
+
 
         if (next) {
             mediaHost.appendChild(
@@ -933,11 +1744,6 @@ window.ShareViewer = (function () {
         }
 
 
-        /*
-         * The toolbar now contains ONLY:
-         *
-         * Mute | Share | Fullscreen | X
-         */
         toolbar.replaceChildren(
             mute,
             share,
@@ -946,10 +1752,6 @@ window.ShareViewer = (function () {
         );
 
 
-        /* -------------------------------------------------
-           Previous
-        ------------------------------------------------- */
-
         previous?.addEventListener(
             "click",
             event => {
@@ -957,15 +1759,20 @@ window.ShareViewer = (function () {
                 event.preventDefault();
                 event.stopPropagation();
 
+
                 const page =
                     Number(
                         Reader.currentPage?.()
                     ) || 1;
 
+
                 if (page <= 1) {
+
                     updatePageButtons();
+
                     return;
                 }
+
 
                 if (
                     window.SRNavigation &&
@@ -975,6 +1782,7 @@ window.ShareViewer = (function () {
 
                     SRNavigation.previous();
                 }
+
 
                 setTimeout(
                     updatePageButtons,
@@ -989,10 +1797,6 @@ window.ShareViewer = (function () {
         );
 
 
-        /* -------------------------------------------------
-           Next
-        ------------------------------------------------- */
-
         next?.addEventListener(
             "click",
             event => {
@@ -1000,10 +1804,12 @@ window.ShareViewer = (function () {
                 event.preventDefault();
                 event.stopPropagation();
 
+
                 const page =
                     Number(
                         Reader.currentPage?.()
                     ) || 1;
+
 
                 const pages =
                     Number(
@@ -1017,6 +1823,7 @@ window.ShareViewer = (function () {
                 ) {
 
                     updatePageButtons();
+
                     return;
                 }
 
@@ -1029,6 +1836,7 @@ window.ShareViewer = (function () {
 
                     SRNavigation.next();
                 }
+
 
                 setTimeout(
                     updatePageButtons,
@@ -1043,16 +1851,13 @@ window.ShareViewer = (function () {
         );
 
 
-        /* -------------------------------------------------
-           Mute
-        ------------------------------------------------- */
-
         mute?.addEventListener(
             "click",
             event => {
 
                 event.preventDefault();
                 event.stopPropagation();
+
 
                 if (
                     window.AudioController &&
@@ -1063,14 +1868,11 @@ window.ShareViewer = (function () {
                     AudioController.toggleMute();
                 }
 
+
                 updateMuteIcon();
             }
         );
 
-
-        /* -------------------------------------------------
-           Share
-        ------------------------------------------------- */
 
         share?.addEventListener(
             "click",
@@ -1078,6 +1880,7 @@ window.ShareViewer = (function () {
 
                 event.preventDefault();
                 event.stopPropagation();
+
 
                 const book =
                     window.Reader &&
@@ -1095,11 +1898,6 @@ window.ShareViewer = (function () {
                         "function"
                 ) {
 
-                    /*
-                     * This is the existing KV/short-link
-                     * implementation. No long URL is constructed
-                     * by ShareViewer.
-                     */
                     await ShareManager.share(
                         "reader",
                         book
@@ -1109,16 +1907,13 @@ window.ShareViewer = (function () {
         );
 
 
-        /* -------------------------------------------------
-           Fullscreen
-        ------------------------------------------------- */
-
         fullscreen?.addEventListener(
             "click",
             event => {
 
                 event.preventDefault();
                 event.stopPropagation();
+
 
                 if (
                     document.fullscreenElement ===
@@ -1127,17 +1922,14 @@ window.ShareViewer = (function () {
 
                     exitFullscreen();
 
-                } else {
+                }
+                else {
 
                     enterFullscreen();
                 }
             }
         );
 
-
-        /* -------------------------------------------------
-           X
-        ------------------------------------------------- */
 
         closeButton?.addEventListener(
             "click",
@@ -1152,97 +1944,391 @@ window.ShareViewer = (function () {
 
 
         updateMuteIcon();
+
         updatePageButtons();
 
         startPageWatcher();
     }
 
 
+async function waitForSharedVideoReady(item) {
+    const video = document.getElementById("videoPlayer");
+    const iframe = document.getElementById("videoIframePlayer");
+
+    const isYouTube =
+        window.ContentContract &&
+        typeof ContentContract.isYouTubeUrl === "function" &&
+        ContentContract.isYouTubeUrl(item?.video);
+
+    if (isYouTube) {
+        if (!iframe) return;
+
+        await new Promise((resolve, reject) => {
+            const cleanup = () => {
+                iframe.removeEventListener("load", onLoad);
+                iframe.removeEventListener("error", onError);
+            };
+
+            const onLoad = () => {
+                cleanup();
+                resolve();
+            };
+
+            const onError = () => {
+                cleanup();
+                reject(
+                    new Error(
+                        "The shared video player could not be loaded."
+                    )
+                );
+            };
+
+            iframe.addEventListener("load", onLoad);
+            iframe.addEventListener("error", onError);
+        });
+
+        return;
+    }
+
+    if (!video) return;
+    if (video.readyState >= 2) return;
+
+    await new Promise((resolve, reject) => {
+        const cleanup = () => {
+            video.removeEventListener("loadeddata", onReady);
+            video.removeEventListener("canplay", onReady);
+            video.removeEventListener("error", onError);
+        };
+
+        const onReady = () => {
+            cleanup();
+            resolve();
+        };
+
+        const onError = () => {
+            cleanup();
+            reject(
+                new Error("The shared video could not be loaded.")
+            );
+        };
+
+        video.addEventListener("loadeddata", onReady);
+        video.addEventListener("canplay", onReady);
+        video.addEventListener("error", onError);
+    });
+}
+
+async function waitForSharedSlideshowReady() {
+    const viewer = document.getElementById("slideshowViewer");
+    if (!viewer) return;
+
+    const image = viewer.querySelector(".slideshow-slide img");
+    if (!image) return;
+
+    if (image.complete) {
+        if (image.naturalWidth > 0) return;
+
+        throw new Error(
+            "The shared slideshow image could not be loaded."
+        );
+    }
+
+    await new Promise((resolve, reject) => {
+        const cleanup = () => {
+            image.removeEventListener("load", onLoad);
+            image.removeEventListener("error", onError);
+        };
+
+        const onLoad = () => {
+            cleanup();
+            resolve();
+        };
+
+        const onError = () => {
+            cleanup();
+            reject(
+                new Error(
+                    "The shared slideshow image could not be loaded."
+                )
+            );
+        };
+
+        image.addEventListener("load", onLoad);
+        image.addEventListener("error", onError);
+    });
+}
+
+
     /* =====================================================
-       BOOK WHEEL / SWIPE NAVIGATION
-
-       Share Mode owns page-turn wheel and touch-swipe input
-       directly, scoped to the reparented book surface.
-
-       Wheel: navigation.js's own listener is bound to the
-       original #viewerArea node, which survives being moved
-       into the Share media host -- but that is exactly the
-       kind of implicit, easy-to-break coupling this file's
-       original comments warned against relying on. Owning it
-       here makes wheel navigation resilient to any future
-       change in how/when the Reader surface is reparented.
-
-       Touch: navigation.js's swipe handler is bound to
-       #viewerBackground, which is the PARENT of #viewerArea
-       and is never moved into the Share host -- it stays
-       behind in #workspace, which isolateApplication() hides.
-       A hidden, detached-from-view element cannot receive
-       touch input, so mobile swipe was silently dead. Binding
-       fresh listeners to the actual visible Share surface
-       fixes this for every touch device.
-
-       navigation.js's own wheel/touch handling is disabled for
-       the duration (SRNavigation.enableWheel/enableTouch) so a
-       single gesture can never be double-counted.
+       ITEM CONTROL CLEANUP
     ===================================================== */
 
-    function isBookOnLastPage() {
+    function hideSharedItemControls() {
 
-        if (!isBookShare()) {
-            return false;
-        }
+        const selectors = [
 
-        if (
-            !window.Reader ||
-            typeof Reader.currentPage !== "function" ||
-            typeof Reader.pages !== "function"
-        ) {
-            return false;
-        }
+            "#toolbar",
+            "#statusBar",
+            "#previousButton",
+            "#nextButton",
+            "#previousPage",
+            "#nextPage",
 
-        const page = Number(Reader.currentPage()) || 1;
-        const pages = Number(Reader.pages()) || 0;
+            "#videoTopBar",
+            "#videoToolbar",
+            "#videoControls",
+            "#videoViewerControls",
+            "#videoPlayerControls",
+            ".video-controls",
+            ".video-player-controls",
+            ".video-control-bar",
+            ".video-toolbar",
 
-        return pages > 0 && page >= pages;
+            "#slideshowTopBar",
+            "#slideshowToolbar",
+            "#slideshowControls",
+            "#slideshowViewerControls",
+            ".slideshow-top-bar",
+            ".slideshow-controls",
+            ".slideshow-control-bar",
+            ".slideshow-toolbar",
+            ".slideshow-buttons"
+        ];
+
+
+        selectors.forEach(
+            selector => {
+
+                document
+                    .querySelectorAll(
+                        selector
+                    )
+                    .forEach(
+                        element => {
+
+                            element.style.setProperty(
+                                "display",
+                                "none",
+                                "important"
+                            );
+
+                            element.style.setProperty(
+                                "visibility",
+                                "hidden",
+                                "important"
+                            );
+
+                            element.style.setProperty(
+                                "opacity",
+                                "0",
+                                "important"
+                            );
+
+                            element.style.setProperty(
+                                "pointer-events",
+                                "none",
+                                "important"
+                            );
+                        }
+                    );
+            }
+        );
     }
 
 
-    /*
-     * In Share Mode the final page is a real page, not a close
-     * gesture.  The normal Reader/PageFlip stack may interpret
-     * an attempted forward turn or a page click on the final page
-     * as a request to close the Reader.  Share Mode must consume
-     * those attempts instead.
-     */
-    function protectLastPageInteraction(event) {
+    /* =====================================================
+       ITEM SURFACE CLEANUP
+    ===================================================== */
 
-        if (!isBookOnLastPage()) {
-            return;
+    function hideSharedItemSurfaces() {
+
+        if (mediaHost) {
+
+            mediaHost.style.setProperty(
+                "display",
+                "none",
+                "important"
+            );
+
+            mediaHost.style.setProperty(
+                "visibility",
+                "hidden",
+                "important"
+            );
+
+            mediaHost.style.setProperty(
+                "opacity",
+                "0",
+                "important"
+            );
+
+            mediaHost.style.setProperty(
+                "pointer-events",
+                "none",
+                "important"
+            );
         }
 
-        const target = event.target;
 
-        /* Never interfere with the Share Mode X/toolbar controls. */
+        [
+            "#viewerArea",
+            "#videoViewer",
+            "#slideshowViewer",
+            "#videoSection",
+            "#slideshowSection"
+        ].forEach(
+            selector => {
+
+                document
+                    .querySelectorAll(
+                        selector
+                    )
+                    .forEach(
+                        element => {
+
+                            element.style.setProperty(
+                                "display",
+                                "none",
+                                "important"
+                            );
+
+                            element.style.setProperty(
+                                "visibility",
+                                "hidden",
+                                "important"
+                            );
+
+                            element.style.setProperty(
+                                "opacity",
+                                "0",
+                                "important"
+                            );
+
+                            element.style.setProperty(
+                                "pointer-events",
+                                "none",
+                                "important"
+                            );
+                        }
+                    );
+            }
+        );
+
+
+        if (statusElement) {
+
+            statusElement.style.setProperty(
+                "display",
+                "none",
+                "important"
+            );
+
+            statusElement.style.setProperty(
+                "visibility",
+                "hidden",
+                "important"
+            );
+
+            statusElement.style.setProperty(
+                "opacity",
+                "0",
+                "important"
+            );
+        }
+    }
+
+
+    /* =====================================================
+       VIDEO / SLIDESHOW STOP
+    ===================================================== */
+
+    function stopNonBookMedia() {
+
         if (
-            target &&
-            target.closest &&
-            target.closest(
-                "#toolbar, #previousButton, #nextButton, #pageJump, #pageIndicator, #muteButton, #readerShareButton, #viewerFullscreenButton, #readerCloseButton"
-            )
+            isVideoShare() &&
+            window.VideoViewer &&
+            typeof VideoViewer.close ===
+                "function"
         ) {
-            return;
-        }
 
-        if (event.type === "wheel") {
-            if (Number(event.deltaY) <= 0) {
-                return;
+            try {
+
+                VideoViewer.close();
+
+            }
+            catch (error) {
+
+                console.warn(
+                    "[SkyMedia Share] Video close cleanup:",
+                    error
+                );
             }
         }
 
-        event.preventDefault();
-        event.stopImmediatePropagation();
+
+        if (
+            isSlideshowShare() &&
+            window.SlideshowViewer &&
+            typeof SlideshowViewer.close ===
+                "function"
+        ) {
+
+            try {
+
+                SlideshowViewer.close();
+
+            }
+            catch (error) {
+
+                console.warn(
+                    "[SkyMedia Share] Slideshow close cleanup:",
+                    error
+                );
+            }
+        }
+
+
+        if (mediaHost) {
+
+            mediaHost
+                .querySelectorAll(
+                    "video, audio"
+                )
+                .forEach(
+                    media => {
+
+                        try {
+                            media.pause();
+                        }
+                        catch (error) {
+                            /* ignore */
+                        }
+                    }
+                );
+        }
+
+
+        document
+            .querySelectorAll(
+                "#videoViewer video, #videoViewer audio"
+            )
+            .forEach(
+                media => {
+
+                    try {
+                        media.pause();
+                    }
+                    catch (error) {
+                        /* ignore */
+                    }
+                }
+            );
     }
 
+
+    /* =====================================================
+       BOOK WHEEL NAVIGATION
+    ===================================================== */
 
     function onBookWheel(event) {
 
@@ -1250,108 +2336,281 @@ window.ShareViewer = (function () {
             return;
         }
 
-        /* Ctrl+wheel belongs to the zoom controller. */
+
         if (event.ctrlKey) {
             return;
         }
 
-        if (isBookOnLastPage() && event.deltaY > 0) {
-            event.preventDefault();
-            event.stopImmediatePropagation();
+
+        if (!window.SRNavigation) {
             return;
         }
+
+
+        const forward =
+            event.deltaY > 0 ||
+            event.deltaX > 0;
+
+
+        const backward =
+            event.deltaY < 0 ||
+            event.deltaX < 0;
+
+
+        if (
+            !forward &&
+            !backward
+        ) {
+            return;
+        }
+
+
+        const page =
+            Number(
+                Reader.currentPage?.()
+            ) || 1;
+
+
+        const pages =
+            Number(
+                Reader.pages?.()
+            ) || 0;
+
+
+        /*
+         * HARD STOP at the final page.
+         */
+        if (
+            forward &&
+            pages > 0 &&
+            page >= pages
+        ) {
+
+            event.preventDefault();
+            event.stopPropagation();
+
+            if (
+                typeof event.stopImmediatePropagation ===
+                    "function"
+            ) {
+
+                event.stopImmediatePropagation();
+            }
+
+
+            updatePageButtons();
+
+            return;
+        }
+
+
+        /*
+         * HARD STOP at the first page when moving backward.
+         */
+        if (
+            backward &&
+            page <= 1
+        ) {
+
+            event.preventDefault();
+            event.stopPropagation();
+
+            if (
+                typeof event.stopImmediatePropagation ===
+                    "function"
+            ) {
+
+                event.stopImmediatePropagation();
+            }
+
+
+            updatePageButtons();
+
+            return;
+        }
+
 
         if (bookWheelLocked) {
+
+            event.preventDefault();
+            event.stopPropagation();
+
             return;
         }
+
+
+        bookWheelLocked =
+            true;
+
+
+        setTimeout(
+            function () {
+
+                bookWheelLocked =
+                    false;
+
+            },
+            220
+        );
+
+
+        /*
+         * Share Mode owns the wheel event.
+         */
+        event.preventDefault();
+        event.stopPropagation();
 
         if (
-            window.SRNavigation &&
-            typeof SRNavigation.busy === "function" &&
-            SRNavigation.busy()
+            typeof event.stopImmediatePropagation ===
+                "function"
         ) {
-            return;
+
+            event.stopImmediatePropagation();
         }
 
-        if (
-            !window.SRNavigation ||
-            typeof SRNavigation.next !== "function" ||
-            typeof SRNavigation.previous !== "function"
-        ) {
-            return;
+
+        if (forward) {
+
+            if (
+                typeof SRNavigation.next ===
+                    "function"
+            ) {
+
+                SRNavigation.next();
+            }
+
+        }
+        else {
+
+            if (
+                typeof SRNavigation.previous ===
+                    "function"
+            ) {
+
+                SRNavigation.previous();
+            }
         }
 
-        bookWheelLocked = true;
 
-        setTimeout(() => {
-            bookWheelLocked = false;
-        }, 250);
+        setTimeout(
+            updatePageButtons,
+            80
+        );
 
-        if (event.deltaY > 0) {
-            SRNavigation.next();
-        } else if (event.deltaY < 0) {
-            SRNavigation.previous();
-        }
-
-        setTimeout(updatePageButtons, 80);
-        setTimeout(updatePageButtons, 500);
+        setTimeout(
+            updatePageButtons,
+            500
+        );
     }
 
+
+    /* =====================================================
+       BOOK TOUCH START
+    ===================================================== */
 
     function onBookTouchStart(event) {
 
         if (!isBookShare()) {
-            bookTouchTracking = false;
+
+            bookTouchTracking =
+                false;
+
             return;
         }
 
-        /* Pinch/2-finger gestures belong to zoom, never a page turn. */
-        if (event.touches.length !== 1) {
-            bookTouchTracking = false;
+
+        if (
+            event.touches.length !== 1
+        ) {
+
+            bookTouchTracking =
+                false;
+
             return;
         }
 
-        const target = event.target;
+
+        const target =
+            event.target;
+
 
         if (
             target &&
             target.closest &&
             target.closest(
-                "#toolbar, #previousButton, #nextButton, #pageJump, #pageIndicator"
+                [
+                    "#toolbar",
+                    "#previousButton",
+                    "#nextButton",
+                    "#pageJump",
+                    "#pageIndicator",
+                    ".sky-share-actions"
+                ].join(", ")
             )
         ) {
-            bookTouchTracking = false;
+
+            bookTouchTracking =
+                false;
+
             return;
         }
 
-        bookTouchTracking = true;
-        bookTouchStartX = event.touches[0].clientX;
-        bookTouchStartY = event.touches[0].clientY;
+
+        bookTouchTracking =
+            true;
+
+
+        bookTouchStartX =
+            event.touches[0].clientX;
+
+
+        bookTouchStartY =
+            event.touches[0].clientY;
     }
 
 
+    /* =====================================================
+       BOOK TOUCH MOVE
+    ===================================================== */
+
     function onBookTouchMove(event) {
 
-        if (!bookTouchTracking || event.touches.length !== 1) {
+        if (
+            !bookTouchTracking ||
+            event.touches.length !== 1
+        ) {
             return;
         }
 
-        const dx = event.touches[0].clientX - bookTouchStartX;
-        const dy = event.touches[0].clientY - bookTouchStartY;
 
-        /*
-         * Ignore vertical movement. Once a horizontal swipe is
-         * established, stop the browser from treating it as a
-         * competing scroll/refresh gesture.
-         */
+        const dx =
+            event.touches[0].clientX -
+            bookTouchStartX;
+
+
+        const dy =
+            event.touches[0].clientY -
+            bookTouchStartY;
+
+
         if (
-            Math.abs(dx) > BOOK_TOUCH_THRESHOLD &&
-            Math.abs(dx) > Math.abs(dy)
+            Math.abs(dx) >
+                BOOK_TOUCH_THRESHOLD &&
+            Math.abs(dx) >
+                Math.abs(dy)
         ) {
+
+            /*
+             * Prevent browser horizontal scrolling.
+             */
             event.preventDefault();
         }
     }
 
+
+    /* =====================================================
+       BOOK TOUCH END
+    ===================================================== */
 
     function onBookTouchEnd(event) {
 
@@ -1359,76 +2618,189 @@ window.ShareViewer = (function () {
             return;
         }
 
-        bookTouchTracking = false;
+
+        bookTouchTracking =
+            false;
+
 
         if (!isBookShare()) {
             return;
         }
 
-        if (
-            window.SRNavigation &&
-            typeof SRNavigation.busy === "function" &&
-            SRNavigation.busy()
-        ) {
+
+        if (!window.SRNavigation) {
             return;
         }
+
 
         const touch =
             event.changedTouches &&
             event.changedTouches[0];
 
+
         if (!touch) {
             return;
         }
 
-        const dx = touch.clientX - bookTouchStartX;
-        const dy = touch.clientY - bookTouchStartY;
+
+        const dx =
+            touch.clientX -
+            bookTouchStartX;
+
+
+        const dy =
+            touch.clientY -
+            bookTouchStartY;
+
 
         if (
-            Math.abs(dx) < BOOK_TOUCH_THRESHOLD ||
-            Math.abs(dx) <= Math.abs(dy)
+            Math.abs(dx) <
+                BOOK_TOUCH_THRESHOLD ||
+            Math.abs(dx) <=
+                Math.abs(dy)
         ) {
             return;
         }
 
-        if (
-            !window.SRNavigation ||
-            typeof SRNavigation.next !== "function" ||
-            typeof SRNavigation.previous !== "function"
-        ) {
-            return;
-        }
+
+        const forward =
+            dx < 0;
+
+
+        const page =
+            Number(
+                Reader.currentPage?.()
+            ) || 1;
+
+
+        const pages =
+            Number(
+                Reader.pages?.()
+            ) || 0;
+
 
         /*
-         * Stop the click synthesized after a successful swipe from
-         * activating a page underneath the finger (e.g. the
-         * last-page-click-closes guard).
+         * Do not permit a forward swipe beyond the
+         * final page.
          */
-        bookSuppressClickUntil = Date.now() + 500;
-        event.preventDefault();
-
-        if (dx < 0) {
-            SRNavigation.next();
-        } else {
-            SRNavigation.previous();
-        }
-
-        setTimeout(updatePageButtons, 80);
-        setTimeout(updatePageButtons, 500);
-    }
-
-
-    function onBookTouchClickCapture(event) {
-
-        if (Date.now() < bookSuppressClickUntil) {
+        if (
+            forward &&
+            pages > 0 &&
+            page >= pages
+        ) {
 
             event.preventDefault();
             event.stopPropagation();
 
-            bookSuppressClickUntil = 0;
+            updatePageButtons();
+
+            return;
+        }
+
+
+        /*
+         * Do not permit backward swipe before page 1.
+         */
+        if (
+            !forward &&
+            page <= 1
+        ) {
+
+            event.preventDefault();
+            event.stopPropagation();
+
+            updatePageButtons();
+
+            return;
+        }
+
+
+        event.preventDefault();
+        event.stopPropagation();
+
+
+        if (
+            typeof event.stopImmediatePropagation ===
+                "function"
+        ) {
+
+            event.stopImmediatePropagation();
+        }
+
+
+        bookSuppressClickUntil =
+            Date.now() + 500;
+
+
+        if (forward) {
+
+            if (
+                typeof SRNavigation.next ===
+                    "function"
+            ) {
+
+                SRNavigation.next();
+            }
+
+        }
+        else {
+
+            if (
+                typeof SRNavigation.previous ===
+                    "function"
+            ) {
+
+                SRNavigation.previous();
+            }
+        }
+
+
+        setTimeout(
+            updatePageButtons,
+            80
+        );
+
+        setTimeout(
+            updatePageButtons,
+            500
+        );
+    }
+
+
+    /* =====================================================
+       CANCEL SYNTHESIZED CLICK AFTER SWIPE
+    ===================================================== */
+
+    function onBookTouchClickCapture(
+        event
+    ) {
+
+        if (
+            Date.now() <
+            bookSuppressClickUntil
+        ) {
+
+            event.preventDefault();
+            event.stopPropagation();
+
+            if (
+                typeof event.stopImmediatePropagation ===
+                    "function"
+            ) {
+
+                event.stopImmediatePropagation();
+            }
+
+
+            bookSuppressClickUntil =
+                0;
         }
     }
 
+
+    /* =====================================================
+       BOOK GESTURES
+    ===================================================== */
 
     function bindBookGestures() {
 
@@ -1436,58 +2808,70 @@ window.ShareViewer = (function () {
             return;
         }
 
-        bookGestureBound = true;
+
+        bookGestureBound =
+            true;
+
 
         bookWheelTarget =
-            document.getElementById("viewerArea") ||
+            document.getElementById(
+                "viewerArea"
+            ) ||
             mediaHost;
 
-        bookTouchTarget = mediaHost;
 
-        if (bookWheelTarget) {
-            bookWheelTarget.addEventListener(
-                "wheel",
-                protectLastPageInteraction,
-                { passive: false, capture: true }
-            );
-        }
+        bookTouchTarget =
+            mediaHost;
 
-        if (bookTouchTarget) {
-            bookTouchTarget.addEventListener(
-                "click",
-                protectLastPageInteraction,
-                true
-            );
-        }
 
+        /*
+         * Wheel is capture-phase so PageFlip/other listeners
+         * cannot consume it first.
+         */
         if (bookWheelTarget) {
 
             bookWheelTarget.addEventListener(
                 "wheel",
                 onBookWheel,
-                { passive: true }
+                {
+                    passive: false,
+                    capture: true
+                }
             );
         }
+
 
         if (bookTouchTarget) {
 
             bookTouchTarget.addEventListener(
                 "touchstart",
                 onBookTouchStart,
-                { passive: true }
+                {
+                    passive: true,
+                    capture: true
+                }
             );
+
 
             bookTouchTarget.addEventListener(
                 "touchmove",
                 onBookTouchMove,
-                { passive: false }
+                {
+                    passive: false,
+                    capture: true
+                }
             );
+
 
             bookTouchTarget.addEventListener(
                 "touchend",
                 onBookTouchEnd,
-                { passive: false }
+                {
+                    passive: false,
+                    capture: true
+                }
             );
+
 
             bookTouchTarget.addEventListener(
                 "click",
@@ -1496,22 +2880,19 @@ window.ShareViewer = (function () {
             );
         }
 
-        if (window.SRNavigation) {
 
-            if (
-                typeof SRNavigation.enableWheel ===
-                    "function"
-            ) {
-                SRNavigation.enableWheel(false);
-            }
-
-            if (
-                typeof SRNavigation.enableTouch ===
-                    "function"
-            ) {
-                SRNavigation.enableTouch(false);
-            }
-        }
+        /*
+         * IMPORTANT:
+         *
+         * Do NOT call:
+         *
+         *     SRNavigation.enableWheel(false)
+         *     SRNavigation.enableTouch(false)
+         *
+         * Those global state changes were contributing to the
+         * navigation regressions. Share Mode's capture-phase
+         * handlers already own the wheel/swipe events.
+         */
     }
 
 
@@ -1521,43 +2902,35 @@ window.ShareViewer = (function () {
             return;
         }
 
-        bookGestureBound = false;
 
         if (bookWheelTarget) {
 
             bookWheelTarget.removeEventListener(
                 "wheel",
-                protectLastPageInteraction,
+                onBookWheel,
                 true
             );
-
-            bookWheelTarget.removeEventListener(
-                "wheel",
-                onBookWheel
-            );
         }
+
 
         if (bookTouchTarget) {
 
             bookTouchTarget.removeEventListener(
-                "click",
-                protectLastPageInteraction,
+                "touchstart",
+                onBookTouchStart,
                 true
             );
 
             bookTouchTarget.removeEventListener(
-                "touchstart",
-                onBookTouchStart
-            );
-
-            bookTouchTarget.removeEventListener(
                 "touchmove",
-                onBookTouchMove
+                onBookTouchMove,
+                true
             );
 
             bookTouchTarget.removeEventListener(
                 "touchend",
-                onBookTouchEnd
+                onBookTouchEnd,
+                true
             );
 
             bookTouchTarget.removeEventListener(
@@ -1567,79 +2940,360 @@ window.ShareViewer = (function () {
             );
         }
 
-        bookWheelTarget = null;
-        bookTouchTarget = null;
-        bookTouchTracking = false;
 
-        if (window.SRNavigation) {
+        bookWheelTarget =
+            null;
 
-            if (
-                typeof SRNavigation.enableWheel ===
-                    "function"
-            ) {
-                SRNavigation.enableWheel(true);
-            }
 
-            if (
-                typeof SRNavigation.enableTouch ===
-                    "function"
-            ) {
-                SRNavigation.enableTouch(true);
-            }
-        }
+        bookTouchTarget =
+            null;
+
+
+        bookTouchTracking =
+            false;
+
+
+        bookWheelLocked =
+            false;
+
+
+        bookGestureBound =
+            false;
     }
 
 
     /* =====================================================
-       LAST PAGE CLICK PROTECTION
+       FINAL-PAGE MOUSE CLOSE PROTECTION
     ===================================================== */
 
-    function bindLastPageProtection() {
+    function isAllowedLastPageControl(
+        target
+    ) {
 
         if (
-            document.body.dataset
-                .skyShareLastPageGuard ===
-            "true"
+            !target ||
+            !target.closest
+        ) {
+            return false;
+        }
+
+
+        return !!target.closest(
+            [
+                "#toolbar",
+                "#previousButton",
+                "#nextButton",
+                "#muteButton",
+                "#readerShareButton",
+                "#viewerFullscreenButton",
+                "#readerCloseButton",
+                "#pageIndicator",
+                "#pageJump",
+                "#pageJumpInput",
+                ".sky-share-actions",
+                ".sky-share-close-button"
+            ].join(",")
+        );
+    }
+
+
+    function isFinalPageBookSurface(
+        target
+    ) {
+
+        if (!isBookShare()) {
+            return false;
+        }
+
+
+        if (
+            !window.Reader ||
+            typeof Reader.currentPage !==
+                "function" ||
+            typeof Reader.pages !==
+                "function"
+        ) {
+            return false;
+        }
+
+
+        const current =
+            Number(
+                Reader.currentPage()
+            ) || 1;
+
+
+        const total =
+            Number(
+                Reader.pages()
+            ) || 0;
+
+
+        if (
+            !total ||
+            current < total
+        ) {
+            return false;
+        }
+
+
+        if (
+            isAllowedLastPageControl(
+                target
+            )
+        ) {
+            return false;
+        }
+
+
+        const viewer =
+            document.getElementById(
+                "viewerArea"
+            );
+
+
+        if (!viewer) {
+            return false;
+        }
+
+
+        return viewer.contains(
+            target
+        );
+    }
+
+
+    function blockFinalPageMouseEvent(
+        event
+    ) {
+
+        if (
+            !isFinalPageBookSurface(
+                event.target
+            )
         ) {
             return;
         }
 
-        document.body.dataset
-            .skyShareLastPageGuard =
-            "true";
+
+        /*
+         * We only block mouse interaction here.
+         *
+         * Touch swipes are handled by Share's touch
+         * navigation system.
+         */
+        if (
+            event.type === "pointerdown" &&
+            event.pointerType &&
+            event.pointerType !== "mouse"
+        ) {
+            return;
+        }
+
+
+        if (
+            event.type === "pointerup" &&
+            event.pointerType &&
+            event.pointerType !== "mouse"
+        ) {
+            return;
+        }
+
+
+        event.preventDefault();
+        event.stopPropagation();
+
+
+        if (
+            typeof event.stopImmediatePropagation ===
+                "function"
+        ) {
+
+            event.stopImmediatePropagation();
+        }
+    }
+
+
+    function bindLastPageProtection() {
+
+        if (lastPageProtectionBound) {
+            return;
+        }
+
+
+        lastPageProtectionBound =
+            true;
 
 
         /*
-         * Normal SRNavigation has a bubble-phase listener
-         * which closes the Reader when skyreader:last-page-click
-         * fires.
-         *
-         * This Share listener is capture-phase and therefore
-         * intercepts that event before normal Reader navigation
-         * can close the document.
+         * Pointer events happen before click.
          */
         document.addEventListener(
-            "skyreader:last-page-click",
-            event => {
-
-                if (
-                    !document.body.classList.contains(
-                        "sky-share-mode"
-                    )
-                ) {
-                    return;
-                }
-
-                if (!isBookShare()) {
-                    return;
-                }
-
-                event.preventDefault();
-                event.stopImmediatePropagation();
-
-                updatePageButtons();
-            },
+            "pointerdown",
+            blockFinalPageMouseEvent,
             true
+        );
+
+
+        document.addEventListener(
+            "pointerup",
+            blockFinalPageMouseEvent,
+            true
+        );
+
+
+        document.addEventListener(
+            "mousedown",
+            blockFinalPageMouseEvent,
+            true
+        );
+
+
+        document.addEventListener(
+            "mouseup",
+            blockFinalPageMouseEvent,
+            true
+        );
+
+
+        /*
+         * Final fallback.
+         */
+        document.addEventListener(
+            "click",
+            blockFinalPageMouseEvent,
+            true
+        );
+    }
+
+
+    function unbindLastPageProtection() {
+
+        if (!lastPageProtectionBound) {
+            return;
+        }
+
+
+        document.removeEventListener(
+            "pointerdown",
+            blockFinalPageMouseEvent,
+            true
+        );
+
+
+        document.removeEventListener(
+            "pointerup",
+            blockFinalPageMouseEvent,
+            true
+        );
+
+
+        document.removeEventListener(
+            "mousedown",
+            blockFinalPageMouseEvent,
+            true
+        );
+
+
+        document.removeEventListener(
+            "mouseup",
+            blockFinalPageMouseEvent,
+            true
+        );
+
+
+        document.removeEventListener(
+            "click",
+            blockFinalPageMouseEvent,
+            true
+        );
+
+
+        lastPageProtectionBound =
+            false;
+    }
+
+
+    /* =====================================================
+       CLOSED-STATE SHARE HEADER
+    ===================================================== */
+
+    function hideClosedStateHeader() {
+
+        if (!shell) {
+            return;
+        }
+
+
+        const header =
+            shell.querySelector(
+                ".sky-share-header"
+            );
+
+
+        if (!header) {
+            return;
+        }
+
+
+        header.style.setProperty(
+            "display",
+            "none",
+            "important"
+        );
+
+        header.style.setProperty(
+            "visibility",
+            "hidden",
+            "important"
+        );
+
+        header.style.setProperty(
+            "opacity",
+            "0",
+            "important"
+        );
+
+        header.style.setProperty(
+            "pointer-events",
+            "none",
+            "important"
+        );
+    }
+
+
+    function restoreShareHeader() {
+
+        if (!shell) {
+            return;
+        }
+
+
+        const header =
+            shell.querySelector(
+                ".sky-share-header"
+            );
+
+
+        if (!header) {
+            return;
+        }
+
+
+        header.style.removeProperty(
+            "display"
+        );
+
+        header.style.removeProperty(
+            "visibility"
+        );
+
+        header.style.removeProperty(
+            "opacity"
+        );
+
+        header.style.removeProperty(
+            "pointer-events"
         );
     }
 
@@ -1650,63 +3304,145 @@ window.ShareViewer = (function () {
 
     function showClosedPanel() {
 
-    if (!shell) {
-        return;
-    }
+        if (!shell) {
+            return;
+        }
 
-    shell.classList.add(
-        "sky-share-document-closed"
-    );
 
-    if (!closedPanel) {
-
-        closedPanel = createElement(
-            "div",
-            "sky-share-closed-panel"
+        shell.classList.add(
+            "sky-share-document-closed"
         );
 
-        /*
-         * This is the SECOND, central button.
-         * The persistent bottom-right .sky-share-open-button is
-         * created by createShell() and remains untouched.
-         *
-         * The central button intentionally has its own class so
-         * its appearance can later be replaced by an image-backed
-         * floating design without changing the persistent logo
-         * button.
-         */
-        const centerButton = createElement(
-            "a",
-            "sky-share-closed-open-button",
-            "Open Meditation Mornings"
-        );
 
-        centerButton.href =
-            GLIDE_MEDIA_URL;
+        hideClosedStateHeader();
 
-        centerButton.target =
-            "_blank";
+        hideSharedItemControls();
 
-        centerButton.rel =
-            "noopener noreferrer";
+        hideSharedItemSurfaces();
 
-        closedPanel.appendChild(
-            centerButton
-        );
 
-        shell
-            .querySelector(
-                ".sky-share-main"
-            )
-            ?.appendChild(
-                closedPanel
+        if (titleElement) {
+
+            titleElement.style.setProperty(
+                "display",
+                "none",
+                "important"
             );
+        }
+
+
+        if (subtitleElement) {
+
+            subtitleElement.style.setProperty(
+                "display",
+                "none",
+                "important"
+            );
+        }
+
+
+        if (!closedPanel) {
+
+            closedPanel =
+                createElement(
+                    "div",
+                    "sky-share-closed-panel"
+                );
+
+
+            const main =
+                shell.querySelector(
+                    ".sky-share-main"
+                );
+
+
+            if (main) {
+
+                const mainStyle =
+                    getComputedStyle(main);
+
+
+                if (
+                    mainStyle.position ===
+                    "static"
+                ) {
+
+                    main.style.setProperty(
+                        "position",
+                        "relative",
+                        "important"
+                    );
+                }
+
+
+                main.appendChild(
+                    closedPanel
+                );
+            }
+        }
+
+
+        closedPanel.hidden =
+            false;
+
+
+        closedPanel.style.setProperty(
+            "display",
+            "block",
+            "important"
+        );
+
+        closedPanel.style.setProperty(
+            "position",
+            "absolute",
+            "important"
+        );
+
+        closedPanel.style.setProperty(
+            "inset",
+            "0",
+            "important"
+        );
+
+        closedPanel.style.setProperty(
+            "width",
+            "100%",
+            "important"
+        );
+
+        closedPanel.style.setProperty(
+            "height",
+            "100%",
+            "important"
+        );
+
+        closedPanel.style.setProperty(
+            "overflow",
+            "hidden",
+            "important"
+        );
+
+        closedPanel.style.setProperty(
+            "box-sizing",
+            "border-box",
+            "important"
+        );
+
+        closedPanel.style.setProperty(
+            "pointer-events",
+            "none",
+            "important"
+        );
+
+        closedPanel.style.setProperty(
+            "z-index",
+            "9999",
+            "important"
+        );
+
+
+        createClosedGoButton();
     }
-
-    closedPanel.hidden = false;
-
-    closedPanel.style.display = "flex";
-}
 
 
     /* =====================================================
@@ -1717,112 +3453,237 @@ window.ShareViewer = (function () {
 
         stopShareLoading();
 
-        stopPageWatcher();
-        detachBookZoom();
-        stopControlsIdleTimer();
-        unbindBookGestures();
+        if (shareClosing) {
+            return;
+        }
 
-        exitFullscreen();
+
+        if (
+            shell &&
+            shell.classList.contains(
+                "sky-share-document-closed"
+            )
+        ) {
+            return;
+        }
+
+
+        shareClosing =
+            true;
 
 
         try {
 
-            if (
-                isBookShare() &&
-                window.Reader &&
-                typeof Reader.close ===
-                    "function" &&
-                Reader.isOpen()
-            ) {
+            stopPageWatcher();
 
-                Reader.close({
-                    playSound: false
-                });
+            unbindLastPageProtection();
+
+            unbindBookResponsiveRefresh();
+
+            detachBookZoom();
+
+            stopControlsIdleTimer();
+
+            unbindBookGestures();
+
+            exitFullscreen();
+
+
+            hideSharedItemControls();
+
+
+            stopNonBookMedia();
+
+
+            try {
+
+                if (
+                    isBookShare() &&
+                    window.Reader &&
+                    typeof Reader.close ===
+                        "function" &&
+                    Reader.isOpen()
+                ) {
+
+                    Reader.close({
+                        playSound: false
+                    });
+                }
+
+            }
+            catch (error) {
+
+                console.warn(
+                    "[SkyMedia Share] Reader close cleanup:",
+                    error
+                );
             }
 
-        } catch (error) {
 
-            console.warn(
-                "[SkyMedia Share] Reader close cleanup:",
-                error
+            isolateApplication();
+
+
+            [
+                "#workspace",
+                "#topBar",
+                "#topSearchGroup",
+                "#topBarRightControls",
+                "#library",
+                "#libraryPanel",
+                "#readerLibrary",
+                "#readerDrawer",
+                "#toolbar",
+                "#viewerArea",
+                "#statusBar"
+            ].forEach(
+                selector => {
+
+                    document
+                        .querySelectorAll(
+                            selector
+                        )
+                        .forEach(
+                            el => {
+
+                                el.style.setProperty(
+                                    "display",
+                                    "none",
+                                    "important"
+                                );
+
+                                el.style.setProperty(
+                                    "visibility",
+                                    "hidden",
+                                    "important"
+                                );
+
+                                el.style.setProperty(
+                                    "opacity",
+                                    "0",
+                                    "important"
+                                );
+
+                                el.style.setProperty(
+                                    "pointer-events",
+                                    "none",
+                                    "important"
+                                );
+                            }
+                        );
+                }
             );
-        }
 
 
-        /*
-         * Reader.close() normally restores the Reader landing.
-         * That is correct for normal Reader use but NOT for Share Mode.
-         *
-         * Immediately reassert Share Mode isolation.
-         */
-        isolateApplication();
+            [
+                "#videoTopBar",
+                "#videoToolbar",
+                "#videoControls",
+                "#videoViewerControls",
+                "#videoPlayerControls",
+                ".video-controls",
+                ".video-player-controls",
+                ".video-control-bar",
+                ".video-toolbar",
 
+                "#slideshowTopBar",
+                "#slideshowToolbar",
+                "#slideshowControls",
+                "#slideshowViewerControls",
+                ".slideshow-top-bar",
+                ".slideshow-controls",
+                ".slideshow-control-bar",
+                ".slideshow-toolbar",
+                ".slideshow-buttons"
+            ].forEach(
+                selector => {
 
-        /*
-         * Hide every normal Reader surface that Reader.close()
-         * may have restored.
-         */
-        [
-            "#workspace",
-            "#topBar",
-            "#topSearchGroup",
-            "#topBarRightControls",
-            "#library",
-            "#libraryPanel",
-            "#readerLibrary",
-            "#readerDrawer",
-            "#toolbar",
-            "#viewerArea",
-            "#statusBar"
-        ].forEach(selector => {
+                    document
+                        .querySelectorAll(
+                            selector
+                        )
+                        .forEach(
+                            el => {
+
+                                el.style.setProperty(
+                                    "display",
+                                    "none",
+                                    "important"
+                                );
+
+                                el.style.setProperty(
+                                    "visibility",
+                                    "hidden",
+                                    "important"
+                                );
+
+                                el.style.setProperty(
+                                    "opacity",
+                                    "0",
+                                    "important"
+                                );
+
+                                el.style.setProperty(
+                                    "pointer-events",
+                                    "none",
+                                    "important"
+                                );
+                            }
+                        );
+                }
+            );
+
 
             document
-                .querySelectorAll(selector)
-                .forEach(el => {
+                .querySelectorAll(
+                    ".sr-welcome-banner"
+                )
+                .forEach(
+                    el => {
 
-                    el.style.setProperty(
-                        "display",
-                        "none",
-                        "important"
-                    );
-                });
-        });
+                        el.style.setProperty(
+                            "display",
+                            "none",
+                            "important"
+                        );
 
-
-        document
-            .querySelectorAll(
-                ".sr-welcome-banner"
-            )
-            .forEach(el => {
-
-                el.style.setProperty(
-                    "display",
-                    "none",
-                    "important"
+                        el.style.setProperty(
+                            "visibility",
+                            "hidden",
+                            "important"
+                        );
+                    }
                 );
-            });
 
 
-        /*
-         * Share shell remains the visible application.
-         */
-        showClosedPanel();
+            hideSharedItemSurfaces();
+
+
+            showClosedPanel();
+
+        }
+        catch (error) {
+
+            console.error(
+                "[SkyMedia Share] Close cleanup:",
+                error
+            );
+
+        }
+        finally {
+
+            shareClosing =
+                false;
+        }
     }
 
 
     /* =====================================================
-       CONTROLS IDLE TIMEOUT (10s)
+       CONTROLS IDLE TIMEOUT
     ===================================================== */
 
-    /*
-     * All Share Mode controls (book toolbar/previous/next,
-     * and, via the same "sky-share-controls-hidden" class,
-     * the video/slideshow chrome) fade out after 10 seconds
-     * of no pointer/touch/keyboard activity, and reappear
-     * immediately on the next interaction.
-     */
+    const CONTROLS_IDLE_MS =
+        10000;
 
-    const CONTROLS_IDLE_MS = 10000;
 
     function showControls() {
 
@@ -1831,22 +3692,42 @@ window.ShareViewer = (function () {
         );
     }
 
+
     function scheduleControlsHide() {
 
         if (controlsIdleTimer) {
-            clearTimeout(controlsIdleTimer);
+
+            clearTimeout(
+                controlsIdleTimer
+            );
         }
 
-        controlsIdleTimer = setTimeout(() => {
 
-            controlsIdleTimer = null;
+        controlsIdleTimer =
+            setTimeout(
+                () => {
 
-            document.body.classList.add(
-                "sky-share-controls-hidden"
+                    controlsIdleTimer =
+                        null;
+
+
+                    if (
+                        !shell ||
+                        !shell.classList.contains(
+                            "sky-share-document-closed"
+                        )
+                    ) {
+
+                        document.body.classList.add(
+                            "sky-share-controls-hidden"
+                        );
+                    }
+
+                },
+                CONTROLS_IDLE_MS
             );
-
-        }, CONTROLS_IDLE_MS);
     }
+
 
     function registerControlsActivity() {
 
@@ -1858,19 +3739,26 @@ window.ShareViewer = (function () {
             return;
         }
 
+
         showControls();
+
         scheduleControlsHide();
     }
+
 
     function bindControlsIdleTimer() {
 
         if (controlsActivityBound) {
 
             registerControlsActivity();
+
             return;
         }
 
-        controlsActivityBound = true;
+
+        controlsActivityBound =
+            true;
+
 
         [
             "pointerdown",
@@ -1879,25 +3767,36 @@ window.ShareViewer = (function () {
             "touchstart",
             "keydown",
             "wheel"
-        ].forEach(type => {
+        ].forEach(
+            type => {
 
-            document.addEventListener(
-                type,
-                registerControlsActivity,
-                { passive: true }
-            );
-        });
+                document.addEventListener(
+                    type,
+                    registerControlsActivity,
+                    {
+                        passive: true
+                    }
+                );
+            }
+        );
+
 
         registerControlsActivity();
     }
+
 
     function stopControlsIdleTimer() {
 
         if (controlsIdleTimer) {
 
-            clearTimeout(controlsIdleTimer);
-            controlsIdleTimer = null;
+            clearTimeout(
+                controlsIdleTimer
+            );
+
+            controlsIdleTimer =
+                null;
         }
+
 
         showControls();
     }
@@ -1920,6 +3819,7 @@ window.ShareViewer = (function () {
                 ) {
                     return;
                 }
+
 
                 updateFullscreenIcon();
             }
@@ -1945,8 +3845,10 @@ window.ShareViewer = (function () {
                     return;
                 }
 
+
                 if (
-                    event.key !== "Escape"
+                    event.key !==
+                    "Escape"
                 ) {
                     return;
                 }
@@ -1961,31 +3863,543 @@ window.ShareViewer = (function () {
                 ) {
 
                     exitFullscreen();
+
                     return;
                 }
 
 
                 if (
-                    isBookShare() &&
+                    shell &&
                     !shell.classList.contains(
                         "sky-share-document-closed"
                     )
                 ) {
 
-                    /*
-                     * ESC must never turn the final page into a
-                     * hidden Reader-close gesture.  The document
-                     * remains open until the explicit Share Mode X
-                     * button is used.
-                     */
-                    if (isBookOnLastPage()) {
-                        return;
-                    }
-
                     close();
                 }
             }
         );
+    }
+
+
+    /* =====================================================
+       READER INITIAL VISIBILITY
+    ===================================================== */
+
+    function setBookInitialVisibility(
+        visible
+    ) {
+
+        const host =
+            mediaHost ||
+            document.getElementById(
+                "skyShareMediaHost"
+            );
+
+
+        const viewer =
+            document.getElementById(
+                "viewerArea"
+            );
+
+
+        if (host) {
+
+            if (visible) {
+
+                host.classList.remove(
+                    "sky-share-book-layout-pending"
+                );
+
+                host.style.removeProperty(
+                    "visibility"
+                );
+
+                host.style.removeProperty(
+                    "opacity"
+                );
+
+                host.style.removeProperty(
+                    "pointer-events"
+                );
+
+            }
+            else {
+
+                host.classList.add(
+                    "sky-share-book-layout-pending"
+                );
+
+                host.style.setProperty(
+                    "visibility",
+                    "hidden",
+                    "important"
+                );
+
+                host.style.setProperty(
+                    "opacity",
+                    "0",
+                    "important"
+                );
+
+                host.style.setProperty(
+                    "pointer-events",
+                    "none",
+                    "important"
+                );
+            }
+        }
+
+
+        if (viewer) {
+
+            if (visible) {
+
+                viewer.classList.remove(
+                    "sky-share-book-layout-pending"
+                );
+
+                viewer.style.removeProperty(
+                    "visibility"
+                );
+
+                viewer.style.removeProperty(
+                    "opacity"
+                );
+
+                viewer.style.removeProperty(
+                    "pointer-events"
+                );
+
+            }
+            else {
+
+                viewer.classList.add(
+                    "sky-share-book-layout-pending"
+                );
+
+                viewer.style.setProperty(
+                    "visibility",
+                    "hidden",
+                    "important"
+                );
+
+                viewer.style.setProperty(
+                    "opacity",
+                    "0",
+                    "important"
+                );
+
+                viewer.style.setProperty(
+                    "pointer-events",
+                    "none",
+                    "important"
+                );
+            }
+        }
+    }
+
+
+    /* =====================================================
+       RESPONSIVE READER REFRESH
+    ===================================================== */
+
+    function scheduleBookResponsiveRefresh(
+        delay = 100
+    ) {
+
+        if (!isBookShare()) {
+            return;
+        }
+
+
+        if (
+            shell &&
+            shell.classList.contains(
+                "sky-share-document-closed"
+            )
+        ) {
+            return;
+        }
+
+
+        if (
+            !window.Reader ||
+            typeof Reader.refresh !==
+                "function"
+        ) {
+            return;
+        }
+
+
+        if (bookResizeTimer) {
+
+            clearTimeout(
+                bookResizeTimer
+            );
+
+            bookResizeTimer =
+                null;
+        }
+
+
+        bookResizeTimer =
+            setTimeout(
+                function () {
+
+                    bookResizeTimer =
+                        null;
+
+
+                    if (bookResizeRaf) {
+
+                        cancelAnimationFrame(
+                            bookResizeRaf
+                        );
+                    }
+
+
+                    bookResizeRaf =
+                        requestAnimationFrame(
+                            function () {
+
+                                bookResizeRaf =
+                                    0;
+
+
+                                if (
+                                    !isBookShare() ||
+                                    (
+                                        shell &&
+                                        shell.classList.contains(
+                                            "sky-share-document-closed"
+                                        )
+                                    )
+                                ) {
+                                    return;
+                                }
+
+
+                                if (!mediaHost) {
+                                    return;
+                                }
+
+
+                                const rect =
+                                    mediaHost.getBoundingClientRect();
+
+
+                                const width =
+                                    Math.round(
+                                        rect.width
+                                    );
+
+
+                                const height =
+                                    Math.round(
+                                        rect.height
+                                    );
+
+
+                                if (
+                                    width <= 0 ||
+                                    height <= 0
+                                ) {
+                                    return;
+                                }
+
+
+                                const initialLayout =
+                                    !bookInitialLayoutReady;
+
+
+                                /*
+                                 * Once the initial layout is visible,
+                                 * do not refresh unless the actual
+                                 * Share media area changed.
+                                 */
+                                if (
+                                    !initialLayout &&
+                                    width ===
+                                        bookResponsiveLastWidth &&
+                                    height ===
+                                        bookResponsiveLastHeight
+                                ) {
+                                    return;
+                                }
+
+
+                                bookResponsiveLastWidth =
+                                    width;
+
+
+                                bookResponsiveLastHeight =
+                                    height;
+
+
+                                try {
+
+                                    Reader.refresh();
+
+                                }
+                                catch (error) {
+
+                                    console.warn(
+                                        "[SkyMedia Share] Responsive Reader refresh:",
+                                        error
+                                    );
+
+                                }
+
+
+                                updatePageButtons();
+
+                                updateShareBookIndicator();
+
+
+                                /*
+                                 * Only the first layout gets the
+                                 * hidden settling sequence.
+                                 */
+                                if (initialLayout) {
+
+                                    requestAnimationFrame(
+                                        function () {
+
+                                            requestAnimationFrame(
+                                                function () {
+
+                                                    if (
+                                                        !isBookShare() ||
+                                                        (
+                                                            shell &&
+                                                            shell.classList.contains(
+                                                                "sky-share-document-closed"
+                                                            )
+                                                        )
+                                                    ) {
+                                                        return;
+                                                    }
+
+
+                                                    try {
+
+                                                        Reader.refresh();
+
+                                                    }
+                                                    catch (error) {
+
+                                                        console.warn(
+                                                            "[SkyMedia Share] Final initial Reader refresh:",
+                                                            error
+                                                        );
+
+                                                    }
+
+
+                                                    updatePageButtons();
+
+                                                    updateShareBookIndicator();
+
+
+                                                    bookInitialLayoutReady =
+                                                        true;
+
+
+                                                    setBookInitialVisibility(
+                                                        true
+                                                    );
+
+                                                }
+                                            );
+                                        }
+                                    );
+                                }
+
+                            }
+                        );
+
+                },
+                delay
+            );
+    }
+
+
+    function bindBookResponsiveRefresh() {
+
+        if (bookResponsiveRefreshBound) {
+            return;
+        }
+
+
+        bookResponsiveRefreshBound =
+            true;
+
+
+        bookResponsiveLastWidth =
+            0;
+
+
+        bookResponsiveLastHeight =
+            0;
+
+
+        /*
+         * Window resize handler.
+         */
+        bookWindowResizeHandler =
+            function () {
+
+                scheduleBookResponsiveRefresh(
+                    100
+                );
+            };
+
+
+        window.addEventListener(
+            "resize",
+            bookWindowResizeHandler,
+            {
+                passive: true
+            }
+        );
+
+
+        /*
+         * Visual viewport resize handler.
+         */
+        if (
+            window.visualViewport
+        ) {
+
+            bookVisualResizeHandler =
+                function () {
+
+                    scheduleBookResponsiveRefresh(
+                        100
+                    );
+                };
+
+
+            window.visualViewport.addEventListener(
+                "resize",
+                bookVisualResizeHandler,
+                {
+                    passive: true
+                }
+            );
+        }
+
+
+        /*
+         * Only observe the stable Share media host.
+         *
+         * Do NOT observe #viewerArea or .sky-share-main.
+         */
+        if (
+            typeof ResizeObserver ===
+                "function" &&
+            mediaHost
+        ) {
+
+            bookResizeObserver =
+                new ResizeObserver(
+                    function () {
+
+                        scheduleBookResponsiveRefresh(
+                            100
+                        );
+                    }
+                );
+
+
+            bookResizeObserver.observe(
+                mediaHost
+            );
+        }
+
+
+        /*
+         * Guaranteed initial refresh.
+         */
+        scheduleBookResponsiveRefresh(
+            100
+        );
+    }
+
+
+    function unbindBookResponsiveRefresh() {
+
+        if (bookResizeTimer) {
+
+            clearTimeout(
+                bookResizeTimer
+            );
+
+            bookResizeTimer =
+                null;
+        }
+
+
+        if (bookResizeRaf) {
+
+            cancelAnimationFrame(
+                bookResizeRaf
+            );
+
+            bookResizeRaf =
+                0;
+        }
+
+
+        if (bookResizeObserver) {
+
+            bookResizeObserver.disconnect();
+
+            bookResizeObserver =
+                null;
+        }
+
+
+        if (
+            bookWindowResizeHandler
+        ) {
+
+            window.removeEventListener(
+                "resize",
+                bookWindowResizeHandler
+            );
+
+            bookWindowResizeHandler =
+                null;
+        }
+
+
+        if (
+            bookVisualResizeHandler &&
+            window.visualViewport
+        ) {
+
+            window.visualViewport.removeEventListener(
+                "resize",
+                bookVisualResizeHandler
+            );
+
+            bookVisualResizeHandler =
+                null;
+        }
+
+
+        bookResponsiveRefreshBound =
+            false;
+
+
+        bookResponsiveLastWidth =
+            0;
+
+
+        bookResponsiveLastHeight =
+            0;
     }
 
 
@@ -2012,6 +4426,7 @@ window.ShareViewer = (function () {
                 "viewerArea"
             );
 
+
         if (!viewer) {
 
             throw new Error(
@@ -2021,15 +4436,40 @@ window.ShareViewer = (function () {
 
 
         /*
-         * Open the book through the existing Reader first.
+         * Hide complete Share media surface BEFORE Reader.open().
+         * This prevents the initial PageFlip frame from flashing.
          */
-        await Reader.open(item);
+        bookInitialLayoutReady =
+            false;
+
+
+        setBookInitialVisibility(
+            false
+        );
+
+
+        await Reader.open(
+            item
+        );
 
 
         /*
-         * Move the live Reader surface into Share Mode.
+         * Move the Reader surface once.
          */
-        moveIntoShareHost(viewer);
+        moveIntoShareHost(
+            viewer
+        );
+
+
+        viewer.classList.add(
+            "sky-share-responsive-book"
+        );
+
+
+        viewer.classList.add(
+            "sky-share-book-layout-pending"
+        );
+
 
         viewer.classList.add(
             "sky-share-mounted-viewer"
@@ -2037,80 +4477,154 @@ window.ShareViewer = (function () {
 
 
         /*
-         * Move the Reader toolbar into Share Mode.
+         * Move toolbar.
          */
         const toolbar =
             document.getElementById(
                 "toolbar"
             );
 
+
         if (toolbar) {
-            moveIntoShareHost(toolbar);
+
+            moveIntoShareHost(
+                toolbar
+            );
         }
 
 
         /*
-         * Status MUST immediately follow viewerArea.
+         * Move status bar.
          */
         const status =
             document.getElementById(
                 "statusBar"
             );
 
+
         if (status) {
-            moveIntoShareHost(status);
 
-            /*
-             * Restore the ACTUAL Reader status bar.  We do not
-             * recreate the page count or page-jump controls here;
-             * #pageIndicator, #pageJump, #pageJumpInput and
-             * #pageJumpButton remain the original Reader controls
-             * and ui.js continues to operate them.
-             */
-            status.hidden = false;
-            status.removeAttribute("aria-hidden");
-            status.style.removeProperty("visibility");
-            status.style.removeProperty("opacity");
-            status.style.removeProperty("display");
+            moveIntoShareHost(
+                status
+            );
 
-            const pageIndicator =
-                document.getElementById("pageIndicator");
 
-            if (pageIndicator) {
-                pageIndicator.style.removeProperty("display");
-                pageIndicator.style.removeProperty("visibility");
+            status.hidden =
+                false;
+
+            status.removeAttribute(
+                "aria-hidden"
+            );
+
+            status.style.removeProperty(
+                "visibility"
+            );
+
+            status.style.removeProperty(
+                "opacity"
+            );
+
+            status.style.removeProperty(
+                "display"
+            );
+
+
+            const readerTitle =
+                document.getElementById(
+                    "readerTitle"
+                );
+
+
+            if (readerTitle) {
+
+                readerTitle.hidden =
+                    false;
+
+                readerTitle.removeAttribute(
+                    "aria-hidden"
+                );
+
+                readerTitle.style.removeProperty(
+                    "display"
+                );
+
+                readerTitle.style.removeProperty(
+                    "visibility"
+                );
+
+                readerTitle.style.removeProperty(
+                    "opacity"
+                );
             }
 
+
+            const pageIndicator =
+                document.getElementById(
+                    "pageIndicator"
+                );
+
+
+            if (pageIndicator) {
+
+                pageIndicator.hidden =
+                    false;
+
+                pageIndicator.removeAttribute(
+                    "aria-hidden"
+                );
+
+                pageIndicator.style.removeProperty(
+                    "display"
+                );
+
+                pageIndicator.style.removeProperty(
+                    "visibility"
+                );
+
+                pageIndicator.style.removeProperty(
+                    "opacity"
+                );
+            }
+
+
             const pageJump =
-                document.getElementById("pageJump");
+                document.getElementById(
+                    "pageJump"
+                );
+
 
             if (pageJump) {
-                /* ui.js owns the hidden/open state. */
-                pageJump.style.removeProperty("display");
-                pageJump.style.removeProperty("visibility");
+
+                pageJump.style.removeProperty(
+                    "display"
+                );
+
+                pageJump.style.removeProperty(
+                    "visibility"
+                );
             }
         }
 
 
         /*
-         * Welcome MUST remain immediately below status.
+         * Welcome banner.
          */
         const welcome =
             document.querySelector(
                 ".sr-welcome-banner"
             );
 
+
         if (welcome) {
-            moveIntoShareHost(welcome);
+
+            moveIntoShareHost(
+                welcome
+            );
         }
 
 
         /*
-         * Tell SRNavigation which book Share Mode owns.
-         *
-         * Do NOT attach another wheel listener.
-         * The existing navigation.js wheel listener already
-         * belongs to #viewerArea.
+         * Reader navigation ownership.
          */
         if (window.SRNavigation) {
 
@@ -2118,74 +4632,100 @@ window.ShareViewer = (function () {
                 typeof SRNavigation.initialize ===
                     "function"
             ) {
+
                 SRNavigation.initialize();
             }
+
 
             if (
                 typeof SRNavigation.setCurrentBook ===
                     "function"
             ) {
-                SRNavigation.setCurrentBook(item);
+
+                SRNavigation.setCurrentBook(
+                    item
+                );
             }
         }
 
 
         bindBookControls();
+
+        bindBookGestures();
+
         bindLastPageProtection();
 
+
         updateMuteIcon();
+
         updatePageButtons();
 
 
-        requestAnimationFrame(() => {
+        if (
+            typeof window.updatePageIndicator ===
+                "function"
+        ) {
 
-            if (
-                window.Reader &&
-                typeof Reader.refresh ===
-                    "function"
-            ) {
-                Reader.refresh();
+            window.updatePageIndicator();
+        }
+
+
+        updateShareBookIndicator();
+
+
+        /*
+         * One ordinary Reader refresh before responsive
+         * monitoring takes over.
+         */
+        requestAnimationFrame(
+            function () {
+
+                if (
+                    window.Reader &&
+                    typeof Reader.refresh ===
+                        "function"
+                ) {
+
+                    try {
+
+                        Reader.refresh();
+
+                    }
+                    catch (error) {
+
+                        console.warn(
+                            "[SkyMedia Share] Initial Reader refresh:",
+                            error
+                        );
+                    }
+                }
+
+
+                updatePageButtons();
+
+                updateShareBookIndicator();
             }
+        );
 
-            updatePageButtons();
-        });
 
-        /*
-         * Pinch-zoom and Ctrl+wheel zoom are provided by the
-         * existing SkyMediaZoom controller (see zoomController.js),
-         * the same one slideshowViewer.js already attaches to its
-         * own stage. The Reader itself never attaches it, and Share
-         * Mode's book view is a fresh mount each time, so ShareViewer
-         * must attach it explicitly here.
-         *
-         * This does not add a second wheel handler: SkyMediaZoom
-         * only reacts to wheel events carrying ctrlKey, which
-         * navigation.js's own page-turn handler already ignores
-         * (see onWheel() in navigation.js), so the two never compete
-         * for the same gesture.
-         *
-         * PageFlip (.stf__parent) may not exist the instant
-         * Reader.open() resolves, so this is attempted a few times
-         * as the page settles -- matching the retry timing
-         * updatePageButtons() already uses elsewhere in this file.
-         */
         attachBookZoom();
-        setTimeout(attachBookZoom, 150);
-        setTimeout(attachBookZoom, 600);
 
 
-        /*
-         * Wheel scroll and touch swipe navigation for the share book
-         * viewer. See the "BOOK WHEEL / SWIPE NAVIGATION" section
-         * above for why this is owned here rather than left to
-         * navigation.js's app-level listeners.
-         */
-        bindBookGestures();
+        setTimeout(
+            attachBookZoom,
+            150
+        );
+
+
+        setTimeout(
+            attachBookZoom,
+            600
+        );
     }
 
 
     /* =====================================================
-       BOOK ZOOM (pinch / Ctrl+wheel)
+       BOOK ZOOM
     ===================================================== */
 
     function attachBookZoom() {
@@ -2194,41 +4734,59 @@ window.ShareViewer = (function () {
             return;
         }
 
+
         const viewer =
             document.getElementById(
                 "viewerArea"
             );
 
+
         if (!viewer) {
             return;
         }
 
+
         const target =
-            viewer.querySelector(".stf__parent") ||
-            document.getElementById("pageContainer") ||
+            viewer.querySelector(
+                ".stf__parent"
+            ) ||
+            document.getElementById(
+                "pageContainer"
+            ) ||
             viewer;
+
 
         if (
             bookZoomController &&
             bookZoomTarget === target
         ) {
-            /*
-             * Already attached to the current target -- nothing
-             * to do on this retry pass.
-             */
+
             return;
         }
 
+
         if (bookZoomController) {
+
             bookZoomController.destroy();
-            bookZoomController = null;
+
+            bookZoomController =
+                null;
         }
 
-        bookZoomController =
-            SkyMediaZoom.create(viewer);
 
-        bookZoomController.setTarget(target);
-        bookZoomTarget = target;
+        bookZoomController =
+            SkyMediaZoom.create(
+                viewer
+            );
+
+
+        bookZoomController.setTarget(
+            target
+        );
+
+
+        bookZoomTarget =
+            target;
     }
 
 
@@ -2237,9 +4795,239 @@ window.ShareViewer = (function () {
         if (bookZoomController) {
 
             bookZoomController.destroy();
-            bookZoomController = null;
-            bookZoomTarget = null;
+
+            bookZoomController =
+                null;
+
+            bookZoomTarget =
+                null;
         }
+    }
+
+
+    /* =====================================================
+       VIDEO / SLIDESHOW CLOSE BRIDGES
+    ===================================================== */
+
+    function bindViewerCloseBridges() {
+
+        /*
+         * Video.
+         */
+        if (
+            window.VideoViewer &&
+            typeof VideoViewer.close ===
+                "function"
+        ) {
+
+            if (
+                !VideoViewer._skyShareOriginalClose
+            ) {
+
+                const originalClose =
+                    VideoViewer.close;
+
+
+                VideoViewer._skyShareOriginalClose =
+                    originalClose;
+
+
+                VideoViewer.close =
+                    function (...args) {
+
+                        if (
+                            started &&
+                            isVideoShare() &&
+                            !shareClosing &&
+                            !shell?.classList.contains(
+                                "sky-share-document-closed"
+                            )
+                        ) {
+
+                            close();
+
+                            return;
+                        }
+
+
+                        return originalClose.apply(
+                            this,
+                            args
+                        );
+                    };
+            }
+        }
+
+
+        /*
+         * Slideshow.
+         */
+        if (
+            window.SlideshowViewer &&
+            typeof SlideshowViewer.close ===
+                "function"
+        ) {
+
+            if (
+                !SlideshowViewer._skyShareOriginalClose
+            ) {
+
+                const originalClose =
+                    SlideshowViewer.close;
+
+
+                SlideshowViewer._skyShareOriginalClose =
+                    originalClose;
+
+
+                SlideshowViewer.close =
+                    function (...args) {
+
+                        if (
+                            started &&
+                            isSlideshowShare() &&
+                            !shareClosing &&
+                            !shell?.classList.contains(
+                                "sky-share-document-closed"
+                            )
+                        ) {
+
+                            close();
+
+                            return;
+                        }
+
+
+                        return originalClose.apply(
+                            this,
+                            args
+                        );
+                    };
+            }
+        }
+    }
+
+
+    function bindMediaCloseClickBridge() {
+
+        if (mediaCloseClickBound) {
+            return;
+        }
+
+
+        mediaCloseClickBound =
+            true;
+
+
+        document.addEventListener(
+            "click",
+            function (event) {
+
+                if (!started) {
+                    return;
+                }
+
+
+                if (shareClosing) {
+                    return;
+                }
+
+
+                if (
+                    shell &&
+                    shell.classList.contains(
+                        "sky-share-document-closed"
+                    )
+                ) {
+                    return;
+                }
+
+
+                if (
+                    !isVideoShare() &&
+                    !isSlideshowShare()
+                ) {
+                    return;
+                }
+
+
+                const target =
+                    event.target;
+
+
+                if (
+                    !target ||
+                    !target.closest
+                ) {
+                    return;
+                }
+
+
+                const button =
+                    target.closest(
+                        "button, a, [role='button'], [data-action]"
+                    );
+
+
+                if (!button) {
+                    return;
+                }
+
+
+                const metadata =
+                    [
+                        button.id,
+                        button.className,
+                        button.getAttribute(
+                            "aria-label"
+                        ),
+                        button.getAttribute(
+                            "title"
+                        ),
+                        button.getAttribute(
+                            "data-action"
+                        )
+                    ]
+                    .filter(Boolean)
+                    .join(" ");
+
+
+                if (
+                    /fullscreen/i.test(
+                        metadata
+                    )
+                ) {
+                    return;
+                }
+
+
+                if (
+                    !/close/i.test(
+                        metadata
+                    )
+                ) {
+                    return;
+                }
+
+
+                event.preventDefault();
+                event.stopPropagation();
+
+
+                if (
+                    typeof event.stopImmediatePropagation ===
+                        "function"
+                ) {
+
+                    event.stopImmediatePropagation();
+                }
+
+
+                close();
+
+            },
+            true
+        );
     }
 
 
@@ -2247,74 +5035,84 @@ window.ShareViewer = (function () {
        VIDEO
     ===================================================== */
 
-    async function prepareVideo(item) {
+    /* =====================================================
+   VIDEO
+===================================================== */
+
+async function prepareVideo(item) {
+
+    if (
+        window.VideoLibrary &&
+        typeof VideoLibrary.init === "function"
+    ) {
+
+        VideoLibrary.init();
 
         if (
-            window.VideoLibrary &&
-            typeof VideoLibrary.init ===
-                "function"
+            typeof VideoLibrary.load === "function" &&
+            window.Manifest &&
+            typeof Manifest.videos === "function"
         ) {
 
-            VideoLibrary.init();
-
-            if (
-                typeof VideoLibrary.load ===
-                    "function" &&
-                window.Manifest &&
-                typeof Manifest.videos ===
-                    "function"
-            ) {
-
-                VideoLibrary.load(
-                    Manifest.videos()
-                );
-            }
-        }
-
-
-        const viewer =
-            document.getElementById(
-                "videoViewer"
-            );
-
-        if (!viewer) {
-
-            throw new Error(
-                "Share Mode: #videoViewer not found."
+            VideoLibrary.load(
+                Manifest.videos()
             );
         }
+    }
 
 
-        if (
-            window.VideoViewer &&
-            typeof VideoViewer.init ===
-                "function"
-        ) {
-            VideoViewer.init();
-        }
-
-
-        moveIntoShareHost(viewer);
-
-
-        if (
-            !window.VideoViewer ||
-            typeof VideoViewer.openVideo !==
-                "function"
-        ) {
-
-            throw new Error(
-                "Share Mode: VideoViewer.openVideo() unavailable."
-            );
-        }
-
-
-        VideoViewer.openVideo(
-            item
+    const viewer =
+        document.getElementById(
+            "videoViewer"
         );
 
-        await waitForSharedVideoReady(item);
+
+    if (!viewer) {
+
+        throw new Error(
+            "Share Mode: #videoViewer not found."
+        );
     }
+
+
+    if (
+        window.VideoViewer &&
+        typeof VideoViewer.init === "function"
+    ) {
+
+        VideoViewer.init();
+    }
+
+
+    moveIntoShareHost(
+        viewer
+    );
+
+
+    if (
+        !window.VideoViewer ||
+        typeof VideoViewer.openVideo !== "function"
+    ) {
+
+        throw new Error(
+            "Share Mode: VideoViewer.openVideo() unavailable."
+        );
+    }
+
+
+    await VideoViewer.openVideo(
+        item
+    );
+
+    await waitForSharedVideoReady(
+        item
+    );
+
+
+    bindViewerCloseBridges();
+
+    bindMediaCloseClickBridge();
+}
 
 
     /* =====================================================
@@ -2422,7 +5220,10 @@ window.ShareViewer = (function () {
        OPEN ITEM
     ===================================================== */
 
-    async function openItem(item, target) {
+    async function openItem(
+        item,
+        target
+    ) {
 
         const section =
             String(
@@ -2432,22 +5233,96 @@ window.ShareViewer = (function () {
             ).toLowerCase();
 
 
-        activeItem = item;
-        activeTarget = target;
+        activeItem =
+            item;
 
-        /*
-         * A large portion of share.css (status bar, welcome
-         * banner, previous/next positioning and [hidden]
-         * page-state logic, centering, breathing room, etc.)
-         * is written against "body.sky-share-mode.sky-share-book".
-         * That class must be set here or all of those rules are
-         * permanently dead -- nothing else in this file ever
-         * adds it.
-         */
+
+        activeTarget =
+            target;
+
+
         document.body.classList.toggle(
             "sky-share-book",
-            section === "reader" || section === "book"
+            section === "reader" ||
+            section === "book"
         );
+
+
+        bookInitialLayoutReady =
+            false;
+
+
+        if (closedPanel) {
+
+            closedPanel.hidden =
+                true;
+
+            closedPanel.style.setProperty(
+                "display",
+                "none",
+                "important"
+            );
+        }
+
+
+        if (mediaHost) {
+
+            mediaHost.style.removeProperty(
+                "display"
+            );
+
+            mediaHost.style.removeProperty(
+                "visibility"
+            );
+
+            mediaHost.style.removeProperty(
+                "opacity"
+            );
+
+            mediaHost.style.removeProperty(
+                "pointer-events"
+            );
+        }
+
+
+        if (titleElement) {
+
+            titleElement.style.removeProperty(
+                "display"
+            );
+        }
+
+
+        if (subtitleElement) {
+
+            subtitleElement.style.removeProperty(
+                "display"
+            );
+        }
+
+
+        if (statusElement) {
+
+            statusElement.style.removeProperty(
+                "display"
+            );
+
+            statusElement.style.removeProperty(
+                "visibility"
+            );
+
+            statusElement.style.removeProperty(
+                "opacity"
+            );
+        }
+
+
+        shell.classList.remove(
+            "sky-share-document-closed"
+        );
+
+
+        restoreShareHeader();
 
 
         titleElement.textContent =
@@ -2469,10 +5344,13 @@ window.ShareViewer = (function () {
                 ".sky-share-section"
             );
 
+
         if (sectionElement) {
 
             sectionElement.textContent =
-                sectionLabel(section);
+                sectionLabel(
+                    section
+                );
         }
 
 
@@ -2481,7 +5359,9 @@ window.ShareViewer = (function () {
 
         if (section === "video") {
 
-            await prepareVideo(item);
+            await prepareVideo(
+                item
+            );
 
         }
         else if (
@@ -2489,7 +5369,9 @@ window.ShareViewer = (function () {
             section === "slides"
         ) {
 
-            await prepareSlideshow(item);
+            await prepareSlideshow(
+                item
+            );
 
         }
         else if (
@@ -2497,7 +5379,9 @@ window.ShareViewer = (function () {
             section === "book"
         ) {
 
-            await prepareBook(item);
+            await prepareBook(
+                item
+            );
 
         }
         else {
@@ -2509,8 +5393,26 @@ window.ShareViewer = (function () {
         }
 
 
-        stopShareLoading();
-        statusElement.textContent = "";
+        /*
+         * Non-books do not use Reader's initial hidden-layout
+         * mechanism.
+         */
+        if (!isBookShare()) {
+
+            setBookInitialVisibility(
+                true
+            );
+        }
+
+
+        if (
+            !isBookShare() &&
+            statusElement
+        ) {
+
+            statusElement.textContent =
+                "";
+        }
     }
 
 
@@ -2518,82 +5420,158 @@ window.ShareViewer = (function () {
        START
     ===================================================== */
 
-    async function start(item, target) {
+    async function start(
+    item,
+    target
+) {
 
-        if (started) {
-            return;
-        }
-
-        if (!item) {
-
-            throw new Error(
-                "Share Mode: no item supplied."
-            );
-        }
-
-        if (!target) {
-
-            throw new Error(
-                "Share Mode: no target supplied."
-            );
-        }
+    if (started) {
+        return;
+    }
 
 
-        started = true;
+    if (!item) {
 
-        activeItem = item;
-        activeTarget = target;
-
-
-        try {
-
-            createShell();
-            startShareLoading();
-
-            bindEscape();
-            bindFullscreenChange();
-            bindLastPageProtection();
+        throw new Error(
+            "Share Mode: no item supplied."
+        );
+    }
 
 
-            await openItem(
-                item,
-                target
-            );
+    if (!target) {
+
+        throw new Error(
+            "Share Mode: no target supplied."
+        );
+    }
+
+
+    started =
+        true;
+
+
+    activeItem =
+        item;
+
+
+    activeTarget =
+        target;
+
+
+    try {
+
+        createShell();
+
+        startShareLoading();
+
+
+        bindEscape();
+
+        bindFullscreenChange();
+
+
+        /*
+         * Do NOT bind last-page protection yet.
+         *
+         * The Reader surface does not exist in Share Mode
+         * until prepareBook() runs.
+         */
+        await openItem(
+            item,
+            target
+        );
+
+
+        isolateApplication();
+
+
+        /*
+         * Loading is finished only after the shared item has
+         * successfully prepared.
+         */
+        stopShareLoading();
+
+
+        /*
+         * Reader-specific post-isolation setup.
+         */
+        if (isBookShare()) {
+
+            const status =
+                document.getElementById(
+                    "statusBar"
+                );
+
+
+            if (status) {
+
+                status.hidden =
+                    false;
+
+                status.removeAttribute(
+                    "aria-hidden"
+                );
+
+                status.style.removeProperty(
+                    "display"
+                );
+
+                status.style.removeProperty(
+                    "visibility"
+                );
+
+                status.style.removeProperty(
+                    "opacity"
+                );
+            }
+
+
+            updatePageButtons();
+
+            updateShareBookIndicator();
 
 
             /*
-             * Hide normal application only after the shared
-             * item has successfully opened.
+             * Start responsive monitoring only after the
+             * final Share layout exists.
              */
-            isolateApplication();
-
-
-            bindControlsIdleTimer();
-
-
-            shell.style.zIndex =
-                "999999";
-
-
-        } catch (error) {
-
-            stopShareLoading();
-            started = false;
-
-            if (statusElement) {
-                statusElement.textContent =
-                    error?.message ||
-                    "Unable to open shared item.";
-            }
-
-            console.error(
-                "[SkyMedia Share] STARTUP FAILED:",
-                error
-            );
-
-            throw error;
+            bindBookResponsiveRefresh();
         }
+
+
+        bindControlsIdleTimer();
+
+
+        shell.style.zIndex =
+            "999999";
+
     }
+    catch (error) {
+
+        started =
+            false;
+
+
+        console.error(
+            "[SkyMedia Share] STARTUP FAILED:",
+            error
+        );
+
+
+        stopShareLoading();
+
+
+        if (statusElement) {
+
+            statusElement.textContent =
+                error?.message ||
+                "Unable to open shared item.";
+        }
+
+
+        throw error;
+    }
+}
 
 
     /* =====================================================
@@ -2607,14 +5585,17 @@ window.ShareViewer = (function () {
         close,
 
         isStarted() {
+
             return started;
         },
 
         getItem() {
+
             return activeItem;
         },
 
         getTarget() {
+
             return activeTarget;
         }
     };
