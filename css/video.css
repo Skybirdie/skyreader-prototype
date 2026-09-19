@@ -1514,9 +1514,13 @@ html[data-theme="dark"] .video-narrow-library-toggle{
 
     pointer-events:auto;
 
+    /* Timing/easing matches .sky-share-closed-go-button.sky-share-go-float-in
+       (skyShareGoFloatIn, share.css) - same float-in feel as Share Mode's
+       go-button, just moving up from below (see the "hidden" transform
+       below) instead of in from the left. */
     transition:
-        opacity .82s cubic-bezier(.22,.61,.36,1),
-        transform .82s cubic-bezier(.22,.61,.36,1),
+        opacity 650ms cubic-bezier(0.16, 1, 0.3, 1),
+        transform 650ms cubic-bezier(0.16, 1, 0.3, 1),
         visibility 0s linear 0s;
 }
 
