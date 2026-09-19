@@ -87,6 +87,9 @@ window.ShareViewer = (function () {
 
     let shareClosing = false;
 
+    let shareCopiedCue = null;
+    let shareCopiedCueTimer = null;
+
     let mediaCloseClickBound = false;
 
     /*
@@ -144,9 +147,6 @@ let shareLoadingOverlay = null;
 let shareLoadingText = null;
 let shareLoadingTimer = null;
 let shareLoadingIndex = 0;
-
-let shareCopiedCue = null;
-let shareCopiedCueTimer = null;
 
     /* =====================================================
        BASIC HELPERS
@@ -217,85 +217,6 @@ let shareCopiedCueTimer = null;
             section === "slideshow" ||
             section === "slides"
         );
-    }
-
-
-    function isBookOnLastPage() {
-
-        if (!isBookShare()) return false;
-
-        if (!window.Reader ||
-            typeof Reader.currentPage !== "function" ||
-            typeof Reader.pages !== "function") return false;
-
-        const page = Number(Reader.currentPage()) || 1;
-        const pages = Number(Reader.pages()) || 0;
-
-        return pages > 0 && page >= pages;
-    }
-
-
-    function protectLastPageInteraction(event) {
-
-        if (!isBookOnLastPage()) return;
-
-        const target = event.target;
-
-        if (target && target.closest && target.closest(
-            "#toolbar, #previousButton, #nextButton, #pageJump, #pageIndicator, #muteButton, #readerShareButton, #viewerFullscreenButton, #readerCloseButton, .sky-share-actions"
-        )) return;
-
-        if (event.type === "wheel") {
-            const forward = Number(event.deltaY) > 0 || Number(event.deltaX) > 0;
-            if (!forward) return;
-        }
-
-        event.preventDefault();
-        event.stopImmediatePropagation();
-    }
-
-
-    function showShareCopiedCue() {
-
-        if (!document.body) return;
-
-        if (shareCopiedCueTimer) {
-            clearTimeout(shareCopiedCueTimer);
-            shareCopiedCueTimer = null;
-        }
-
-        if (shareCopiedCue) {
-            shareCopiedCue.remove();
-            shareCopiedCue = null;
-        }
-
-        const cue = document.createElement("img");
-        cue.src = new URL("/assets/link-copied.gif", window.location.origin).href;
-        cue.alt = "";
-        cue.setAttribute("aria-hidden", "true");
-        cue.draggable = false;
-        cue.style.setProperty("position", "fixed", "important");
-        cue.style.setProperty("left", "50%", "important");
-        cue.style.setProperty("top", "50%", "important");
-        cue.style.setProperty("transform", "translate(-50%, -50%)", "important");
-        cue.style.setProperty("width", "45px", "important");
-        cue.style.setProperty("height", "45px", "important");
-        cue.style.setProperty("object-fit", "contain", "important");
-        cue.style.setProperty("pointer-events", "none", "important");
-        cue.style.setProperty("user-select", "none", "important");
-        cue.style.setProperty("-webkit-user-drag", "none", "important");
-        cue.style.setProperty("z-index", "2147483647", "important");
-
-        document.body.appendChild(cue);
-        shareCopiedCue = cue;
-
-        shareCopiedCueTimer = setTimeout(() => {
-            if (shareCopiedCue === cue) {
-                cue.remove();
-                shareCopiedCue = null;
-            }
-            shareCopiedCueTimer = null;
-        }, 1400);
     }
 
 
@@ -1719,6 +1640,74 @@ function stopShareLoading() {
 
 
     /* =====================================================
+       SHARE-LINK COPIED CUE
+    ===================================================== */
+
+    function showShareCopiedCue() {
+
+        if (shareCopiedCueTimer) {
+            clearTimeout(shareCopiedCueTimer);
+            shareCopiedCueTimer = null;
+        }
+
+        if (shareCopiedCue) {
+            shareCopiedCue.remove();
+            shareCopiedCue = null;
+        }
+
+        const image = document.createElement("img");
+
+        image.className = "sky-share-link-copied-cue";
+        image.src = new URL(
+            "/assets/link-copied.gif",
+            window.location.origin
+        ).href;
+        image.alt = "";
+        image.setAttribute("aria-hidden", "true");
+
+        image.style.setProperty("position", "fixed", "important");
+        image.style.setProperty("left", "50%", "important");
+        image.style.setProperty("top", "50%", "important");
+        image.style.setProperty("transform", "translate(-50%, -50%)", "important");
+        image.style.setProperty("width", "45px", "important");
+        image.style.setProperty("height", "45px", "important");
+        image.style.setProperty("max-width", "45px", "important");
+        image.style.setProperty("max-height", "45px", "important");
+        image.style.setProperty("object-fit", "contain", "important");
+        image.style.setProperty("pointer-events", "none", "important");
+        image.style.setProperty("z-index", "2147483647", "important");
+        image.style.setProperty("opacity", "1", "important");
+        image.style.setProperty("transition", "opacity 250ms ease", "important");
+
+        document.body.appendChild(image);
+        shareCopiedCue = image;
+
+        shareCopiedCueTimer = setTimeout(() => {
+
+            if (!shareCopiedCue) {
+                shareCopiedCueTimer = null;
+                return;
+            }
+
+            shareCopiedCue.style.setProperty("opacity", "0", "important");
+
+            const cue = shareCopiedCue;
+
+            shareCopiedCueTimer = setTimeout(() => {
+                cue.remove();
+
+                if (shareCopiedCue === cue) {
+                    shareCopiedCue = null;
+                }
+
+                shareCopiedCueTimer = null;
+            }, 300);
+
+        }, 1000);
+    }
+
+
+    /* =====================================================
        BOOK CONTROLS
     ===================================================== */
 
@@ -1980,12 +1969,23 @@ function stopShareLoading() {
                         "function"
                 ) {
 
-                    await ShareManager.share(
-                        "reader",
-                        book
-                    );
+                    try {
 
-                    showShareCopiedCue();
+                        await ShareManager.share(
+                            "reader",
+                            book
+                        );
+
+                        showShareCopiedCue();
+
+                    }
+                    catch (error) {
+
+                        console.error(
+                            "[SkyMedia Share] Share-link action failed:",
+                            error
+                        );
+                    }
                 }
             }
         );
@@ -2962,12 +2962,6 @@ async function waitForSharedSlideshowReady() {
                 onBookTouchClickCapture,
                 true
             );
-
-            bookTouchTarget.addEventListener(
-                "click",
-                protectLastPageInteraction,
-                true
-            );
         }
 
 
@@ -3028,12 +3022,6 @@ async function waitForSharedSlideshowReady() {
                 onBookTouchClickCapture,
                 true
             );
-
-            bookTouchTarget.removeEventListener(
-                "click",
-                protectLastPageInteraction,
-                true
-            );
         }
 
 
@@ -3078,7 +3066,6 @@ async function waitForSharedSlideshowReady() {
             [
                 "#toolbar",
                 "#previousButton",
-                "#nextButton",
                 "#muteButton",
                 "#readerShareButton",
                 "#viewerFullscreenButton",
@@ -3210,6 +3197,46 @@ async function waitForSharedSlideshowReady() {
     }
 
 
+    function blockFinalPageWheel(event) {
+
+        if (!isBookShare() || event.ctrlKey) {
+            return;
+        }
+
+        const forward =
+            Number(event.deltaY) > 0 ||
+            Number(event.deltaX) > 0;
+
+        if (!forward) {
+            return;
+        }
+
+        if (
+            !window.Reader ||
+            typeof Reader.currentPage !== "function" ||
+            typeof Reader.pages !== "function"
+        ) {
+            return;
+        }
+
+        const current = Number(Reader.currentPage()) || 1;
+        const total = Number(Reader.pages()) || 0;
+
+        if (!total || current < total) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        if (typeof event.stopImmediatePropagation === "function") {
+            event.stopImmediatePropagation();
+        }
+
+        updatePageButtons();
+    }
+
+
     function bindLastPageProtection() {
 
         if (lastPageProtectionBound) {
@@ -3219,6 +3246,32 @@ async function waitForSharedSlideshowReady() {
 
         lastPageProtectionBound =
             true;
+
+
+        /*
+         * Some Reader/PageFlip builds signal the final-page close
+         * through a custom event. Intercept it before Reader's
+         * normal listener can turn it into a close.
+         */
+        document.addEventListener(
+            "skyreader:last-page-click",
+            blockFinalPageMouseEvent,
+            true
+        );
+
+
+        /*
+         * Wheel is intercepted at document capture because the
+         * visible Reader surface may be nested/reparented.
+         */
+        document.addEventListener(
+            "wheel",
+            blockFinalPageWheel,
+            {
+                capture: true,
+                passive: false
+            }
+        );
 
 
         /*
@@ -3268,6 +3321,22 @@ async function waitForSharedSlideshowReady() {
         if (!lastPageProtectionBound) {
             return;
         }
+
+
+        document.removeEventListener(
+            "skyreader:last-page-click",
+            blockFinalPageMouseEvent,
+            true
+        );
+
+
+        document.removeEventListener(
+            "wheel",
+            blockFinalPageWheel,
+            {
+                capture: true
+            }
+        );
 
 
         document.removeEventListener(
@@ -3975,15 +4044,11 @@ async function waitForSharedSlideshowReady() {
 
 
                 if (
-                    isBookShare() &&
+                    shell &&
                     !shell.classList.contains(
                         "sky-share-document-closed"
                     )
                 ) {
-
-                    if (isBookOnLastPage()) {
-                        return;
-                    }
 
                     close();
                 }
