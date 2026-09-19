@@ -45,19 +45,6 @@ window.Manifest = {
             const manifest =
                 ContentContract.normalizeManifest(rawManifest);
 
-console.log(
-    "[Manifest] Slideshow-005 after normalization:",
-    manifest.content.find(item => item.id === "slideshow-005")
-);
-
-console.log(
-    "[Manifest] Raw slideshow-005:",
-    Array.isArray(rawManifest?.content)
-        ? rawManifest.content.find(item => item.id === "slideshow-005")
-        : rawManifest?.slideshow?.["slideshow-005"]
-);
-
-
             if (!manifest.content.length) {
                 throw new Error("No visible content is available.");
             }
