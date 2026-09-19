@@ -99,11 +99,17 @@ window.dispatchEvent(new Event("skyreader-pdfjs-ready"));
 <style>
 /* =========================================================
    PRIMARY LOGO — CRITICAL FIRST-PAINT SIZE
+
    Prevents primary-logo.png from appearing at natural size
-   during the initial Share Mode paint.
+   during the initial Share Mode paint - deliberately scoped
+   to body.sky-share-mode only. Previously unscoped, so being
+   !important AND loaded after every external stylesheet made
+   it permanently win over any Reader/Video/Slideshow
+   positioning rule in style.css, everywhere, not just during
+   Share Mode's first paint.
    ========================================================= */
 
-#workspacePrimaryLogo {
+body.sky-share-mode #workspacePrimaryLogo {
     position: fixed !important;
     top: 40px !important;
     left: 20px !important;
@@ -245,18 +251,7 @@ window.dispatchEvent(new Event("skyreader-pdfjs-ready"));
     src="assets/primary-logo.png"
     alt=""
     aria-hidden="true"
-    width="120"
-    style="
-        position:fixed;
-        top:40px;
-        left:20px;
-        width:120px;
-        max-width:120px;
-        height:auto;
-        display:block;
-        z-index:1000001;
-        pointer-events:none;
-    ">
+    width="120">
 
 <aside id="libraryPanel">
 
