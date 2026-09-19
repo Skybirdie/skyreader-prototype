@@ -596,34 +596,31 @@ function stopShareLoading() {
 
         updateClosedGoButtonLayout();
 
+        playGoButtonEntrance(
+            button
+        );
+
         return button;
     }
 
 
+    /* =====================================================
+       OUTER GO-BUTTON CONTAINER
+       -----------------------------------------------------
+       Plain (non-link) wrapper. It only displays the large
+       go-button / go-button-mobile artwork and hosts the
+       clickable gif overlay below. pointer-events:none keeps
+       clicks anywhere on the artwork from doing anything -
+       only the gif's own <a> (sky-share-closed-go-link) is
+       clickable.
+    ===================================================== */
+
     button =
-        document.createElement("a");
+        document.createElement("div");
 
 
     button.className =
         "sky-share-closed-go-button";
-
-
-    button.href =
-        GLIDE_MEDIA_URL;
-
-
-    button.target =
-        "_blank";
-
-
-    button.rel =
-        "noopener noreferrer";
-
-
-    button.setAttribute(
-        "aria-label",
-        "Open Meditation Mornings"
-    );
 
 
     button.style.setProperty(
@@ -644,10 +641,13 @@ function stopShareLoading() {
         "important"
     );
 
+    /* No "important" here on purpose: the entrance animation
+       (sky-share-go-float-in, defined in share.css) needs to
+       be able to drive this property. It settles back to this
+       exact value once the animation finishes. */
     button.style.setProperty(
         "transform",
-        "translate(-50%, -50%)",
-        "important"
+        "translate(-50%, -50%)"
     );
 
     button.style.setProperty(
@@ -688,7 +688,7 @@ function stopShareLoading() {
 
     button.style.setProperty(
         "cursor",
-        "pointer",
+        "default",
         "important"
     );
 
@@ -712,7 +712,7 @@ function stopShareLoading() {
 
     button.style.setProperty(
         "pointer-events",
-        "auto",
+        "none",
         "important"
     );
 
@@ -758,8 +758,16 @@ function stopShareLoading() {
         ).href;
 
 
+    /* Decorative now - the clickable element is goLink below,
+       so this shouldn't be announced as a link by itself. */
     image.alt =
-        "Open Meditation Mornings";
+        "";
+
+
+    image.setAttribute(
+        "aria-hidden",
+        "true"
+    );
 
 
     image.draggable =
@@ -831,12 +839,161 @@ function stopShareLoading() {
 
 
     /* =====================================================
-       OVERLAY GIF
+       CLICKABLE GO-BUTTON-GIF OVERLAY
        -----------------------------------------------------
-       120px wide; height remains automatic to preserve the
-       GIF's native aspect ratio. pointer-events:none keeps
-       the underlying Go button fully clickable.
+       This <a> is now the ONLY clickable region of the whole
+       go-button graphic - the big go-button / go-button-mobile
+       artwork behind it is inert (pointer-events:none above).
+
+       Sized as a percentage of the go-button container (which
+       has a definite, explicitly-set width) so it scales with
+       both the desktop and mobile artwork, and positioned so
+       it sits horizontally centered and vertically centered
+       within the LOWER 25% band of that artwork:
+         bottom: 12.5%              -> midpoint of the 0%-25%
+                                        band, measured from the
+                                        bottom edge
+         transform: translate(-50%, 50%)
+                                     -> centers the link itself
+                                        on that point, both axes
     ===================================================== */
+
+    const goLink =
+        document.createElement(
+            "a"
+        );
+
+
+    goLink.href =
+        GLIDE_MEDIA_URL;
+
+
+    goLink.target =
+        "_blank";
+
+
+    goLink.rel =
+        "noopener noreferrer";
+
+
+    goLink.className =
+        "sky-share-closed-go-link";
+
+
+    goLink.setAttribute(
+        "aria-label",
+        "Open Meditation Mornings"
+    );
+
+
+    goLink.style.setProperty(
+        "position",
+        "absolute",
+        "important"
+    );
+
+    goLink.style.setProperty(
+        "left",
+        "50%",
+        "important"
+    );
+
+    goLink.style.setProperty(
+        "bottom",
+        "12.5%",
+        "important"
+    );
+
+    goLink.style.setProperty(
+        "transform",
+        "translate(-50%, 50%)",
+        "important"
+    );
+
+    goLink.style.setProperty(
+        "width",
+        "30%",
+        "important"
+    );
+
+    goLink.style.setProperty(
+        "max-width",
+        "220px",
+        "important"
+    );
+
+    goLink.style.setProperty(
+        "min-width",
+        "70px",
+        "important"
+    );
+
+    goLink.style.setProperty(
+        "display",
+        "block",
+        "important"
+    );
+
+    goLink.style.setProperty(
+        "line-height",
+        "0",
+        "important"
+    );
+
+    goLink.style.setProperty(
+        "padding",
+        "0",
+        "important"
+    );
+
+    goLink.style.setProperty(
+        "margin",
+        "0",
+        "important"
+    );
+
+    goLink.style.setProperty(
+        "border",
+        "0",
+        "important"
+    );
+
+    goLink.style.setProperty(
+        "outline",
+        "none",
+        "important"
+    );
+
+    goLink.style.setProperty(
+        "text-decoration",
+        "none",
+        "important"
+    );
+
+    goLink.style.setProperty(
+        "cursor",
+        "pointer",
+        "important"
+    );
+
+    goLink.style.setProperty(
+        "pointer-events",
+        "auto",
+        "important"
+    );
+
+    goLink.style.setProperty(
+        "-webkit-tap-highlight-color",
+        "transparent",
+        "important"
+    );
+
+    goLink.style.setProperty(
+        "z-index",
+        "2",
+        "important"
+    );
+
 
     const gif =
         document.createElement(
@@ -866,27 +1023,14 @@ function stopShareLoading() {
 
 
     gif.style.setProperty(
-        "position",
-        "absolute",
+        "display",
+        "block",
         "important"
     );
-
-    gif.style.setProperty(
-        "right",
-        "35%",
-        "important"
-    );
-
-    gif.style.setProperty(
-        "bottom",
-        "25%",
-        "important"
-    );
-
 
     gif.style.setProperty(
         "width",
-        "120px",
+        "100%",
         "important"
     );
 
@@ -897,20 +1041,22 @@ function stopShareLoading() {
     );
 
     gif.style.setProperty(
-        "max-width",
-        "40%",
-        "important"
-    );
-
-    gif.style.setProperty(
-        "max-height",
-        "none",
-        "important"
-    );
-
-    gif.style.setProperty(
         "object-fit",
         "contain",
+        "important"
+    );
+
+    /* Box-shadow + rounded corners so the gif itself reads
+       as a distinct button sitting on top of the artwork. */
+    gif.style.setProperty(
+        "border-radius",
+        "14px",
+        "important"
+    );
+
+    gif.style.setProperty(
+        "box-shadow",
+        "0 8px 20px rgba(0, 0, 0, 0.4), 0 2px 6px rgba(0, 0, 0, 0.3)",
         "important"
     );
 
@@ -932,15 +1078,13 @@ function stopShareLoading() {
         "important"
     );
 
-    gif.style.setProperty(
-        "z-index",
-        "2",
-        "important"
+
+    goLink.appendChild(
+        gif
     );
 
-
     button.appendChild(
-        gif
+        goLink
     );
 
 
@@ -951,9 +1095,43 @@ function stopShareLoading() {
 
     updateClosedGoButtonLayout();
 
+    playGoButtonEntrance(
+        button
+    );
+
 
     return button;
 }
+
+
+    /* =====================================================
+       GO BUTTON ENTRANCE (FLOAT IN FROM LEFT)
+       -----------------------------------------------------
+       Adds/restarts the CSS "sky-share-go-float-in" animation
+       (defined in share.css) so the go-button / go-button-
+       mobile artwork and its gif overlay float in together
+       from the left, every time the closed-state panel is
+       shown - not just the first time it's created.
+    ===================================================== */
+
+    function playGoButtonEntrance(button) {
+
+        if (!button) {
+            return;
+        }
+
+        button.classList.remove(
+            "sky-share-go-float-in"
+        );
+
+        // Force a reflow so re-adding the class below restarts
+        // the animation instead of being a no-op.
+        void button.offsetWidth;
+
+        button.classList.add(
+            "sky-share-go-float-in"
+        );
+    }
 
 
     /* =====================================================
