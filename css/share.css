@@ -3561,9 +3561,7 @@ body.sky-share-mode #workspacePrimaryLogo {
 @media (max-width:700px) {
 
 body.sky-share-mode #workspacePrimaryLogo {
-        top: calc(
-        var(--sky-share-upper-safe) - 3px
-    ) !important;
+        top: 50px !important;
     }
 
 }
