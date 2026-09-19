@@ -2410,7 +2410,11 @@ padding: 10px;
            rule for why this isn't a plain 50%. */
         top:calc(50% - (var(--video-statusbar-height,28px) + var(--video-welcome-height,22px)) / 2);
 
-        width:calc(100% - 32px);
+        /* Matches #viewerLibrary's width:100% at this same breakpoint
+           (style.css) and .slideshow-landing's width:100% at its mobile
+           breakpoint (slideshow.css) - all three landings are full-bleed
+           on mobile so they occupy the same screen width. */
+        width:100%;
 
         height:60%;
 
@@ -2678,8 +2682,8 @@ and (orientation:landscape){
     .video-landing{
         left:50%;
 
-        width:
-            calc(100% - 32px);
+        /* Kept in sync with the portrait rule above - see its comment. */
+        width:100%;
 
         margin:0;
 
