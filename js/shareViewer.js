@@ -1194,7 +1194,7 @@ function stopShareLoading() {
 
     gif.style.setProperty(
         "filter",
-        "drop-shadow(0px 15px 10px rgba(84, 231, 196, 0.6))",
+        "drop-shadow(0px 15px 2px rgba(84, 231, 196, 0.8))",
         "important"
     );
 
