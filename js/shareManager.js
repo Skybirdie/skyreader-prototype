@@ -314,6 +314,85 @@ window.ShareManager = (function () {
 
 
     /* =====================================================
+       LINK COPIED FEEDBACK
+
+       A brief centered link-copied.gif over the current
+       screen whenever a share link is copied to the
+       clipboard. Native share (navigator.share) hands off to
+       the OS share sheet instead of copying, so it does not
+       trigger this - only the clipboard path below does.
+    ===================================================== */
+
+    const LINK_COPIED_IMAGE_ID = "skyLinkCopiedFeedback";
+    const LINK_COPIED_IMAGE_SRC = "assets/link-copied.gif";
+    const LINK_COPIED_VISIBLE_MS = 1100;
+
+    let linkCopiedHideTimer = null;
+
+    function getLinkCopiedElement() {
+
+        let el = document.getElementById(
+            LINK_COPIED_IMAGE_ID
+        );
+
+        if (el) {
+            return el;
+        }
+
+        el = document.createElement("img");
+
+        el.id = LINK_COPIED_IMAGE_ID;
+        el.alt = "Link copied";
+        el.setAttribute("aria-hidden", "true");
+
+        document.body.appendChild(el);
+
+        return el;
+    }
+
+    function showLinkCopiedFeedback() {
+
+        if (
+            typeof document === "undefined" ||
+            !document.body
+        ) {
+
+            return;
+        }
+
+        const el = getLinkCopiedElement();
+
+        if (linkCopiedHideTimer) {
+
+            clearTimeout(linkCopiedHideTimer);
+            linkCopiedHideTimer = null;
+        }
+
+        /*
+         * Reset the src on every trigger so the GIF restarts
+         * from its first frame on repeated, rapid share taps
+         * instead of staying frozen on its last frame.
+         */
+
+        el.classList.remove("visible");
+        el.src = "";
+        el.src = LINK_COPIED_IMAGE_SRC;
+
+        requestAnimationFrame(() => {
+
+            el.classList.add("visible");
+        });
+
+        linkCopiedHideTimer = setTimeout(() => {
+
+            el.classList.remove("visible");
+            linkCopiedHideTimer = null;
+
+        }, LINK_COPIED_VISIBLE_MS);
+    }
+
+
+    /* =====================================================
        SILENT CLIPBOARD
 
        IMPORTANT:
@@ -500,15 +579,16 @@ window.ShareManager = (function () {
         if (copied) {
 
             /*
-             * Deliberately silent.
-             *
-             * ShareViewer already owns the polished
-             * non-blocking feedback system.
+             * No alert/prompt - showLinkCopiedFeedback()
+             * plays link-copied.gif as the visible
+             * confirmation instead.
              */
 
             console.info(
                 "[ShareManager] Share link copied."
             );
+
+            showLinkCopiedFeedback();
 
             return url;
         }
