@@ -223,7 +223,12 @@ window.SlideshowViewer = (function () {
         const recentContainer = document.getElementById("slideshowLandingRecent");
         if (recentContainer) recentContainer.innerHTML = "";
         const mediaRow = document.querySelector(".slideshow-landing-media-row");
-        const list = window.SlideshowLibrary ? SlideshowLibrary.getDisplayed() : [];
+        const rawList = window.SlideshowLibrary ? SlideshowLibrary.getSlideshows() : [];
+        const list =
+            window.SlideshowSorter &&
+            typeof SlideshowSorter.organize === "function"
+                ? SlideshowSorter.organize({ slideshows: rawList, sort: "newest" })
+                : rawList;
         let recentItem = null;
         try {
             const ids = JSON.parse(localStorage.getItem("skyslideshow-recent") || "[]");
@@ -306,7 +311,22 @@ img.addEventListener("error", () => {
 s.className = "slideshow-landing-card-title";
 s.textContent = item.title;
 
-b.append(img, s);
+const cardChildren = [img, s];
+
+const dateText =
+    window.DateDisplay &&
+    typeof DateDisplay.format === "function"
+        ? DateDisplay.format(item.date)
+        : "";
+
+if (dateText) {
+    const dateEl = document.createElement("span");
+    dateEl.className = "slideshow-landing-card-date";
+    dateEl.textContent = dateText;
+    cardChildren.push(dateEl);
+}
+
+b.append(...cardChildren);
 
 /*
  * Add the favorite control to every landing card.

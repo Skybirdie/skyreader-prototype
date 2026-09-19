@@ -639,12 +639,26 @@ function renderLanding() {
     /*
     ---------------------------------------------------
      Library
+
+     Sorted newest-first by contract "date" regardless of
+     whatever sort the sidebar (.video-library) is currently
+     using - the landing's default is always newest, not
+     whatever the user picked for the sidebar.
     ---------------------------------------------------
     */
 
     if (libraryContainer) {
 
-        videos.forEach(
+        const landingVideos =
+            window.VideoSorter &&
+            typeof VideoSorter.organize === "function"
+                ? VideoSorter.organize({
+                    videos,
+                    sort: "newest"
+                })
+                : videos;
+
+        landingVideos.forEach(
             video => {
 
                 libraryContainer.appendChild(
@@ -916,6 +930,28 @@ function createLandingCircle(video) {
         video.title || "";
 
     button.appendChild(title);
+
+
+    const dateText =
+        window.DateDisplay &&
+        typeof DateDisplay.format === "function"
+            ? DateDisplay.format(video.date)
+            : "";
+
+    if (dateText) {
+
+        const date =
+            document.createElement("span");
+
+        date.className =
+            "video-landing-circle-date";
+
+        date.textContent =
+            dateText;
+
+        button.appendChild(date);
+
+    }
 
 
     const favorite =

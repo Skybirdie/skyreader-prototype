@@ -37,14 +37,14 @@ return this.open(book.id,page);
 
 
 getOrganization(panel="main"){
-    const defaults={sort:"alphabetical",filter:"all",category:""};
+    const defaults={sort:panel==="viewer"?"newest":"random",filter:"all",category:""};
     const org=SkyReader.ui.organization||(SkyReader.ui.organization={});
     return Object.assign(defaults,org[panel]||{});
 },
 
 setOrganization(panel="main",changes={}){
     const org=SkyReader.ui.organization||(SkyReader.ui.organization={});
-    org[panel]=Object.assign({sort:"alphabetical",filter:"all",category:"all"},org[panel]||{},changes);
+    org[panel]=Object.assign({sort:"random",filter:"all",category:"all"},org[panel]||{},changes);
     if(panel==="main"){
         this.applyOrganization();
         // State changes must always rebuild the visible library immediately.
