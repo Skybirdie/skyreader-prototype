@@ -1538,19 +1538,86 @@ window.__SKY_SHARE_KEY = ${JSON.stringify(
     return html;
   }
 
+  /*
+   * CRITICAL — /s/<section>/<id> document base URL.
+   *
+   * index.html loads every stylesheet and script with a
+   * DOCUMENT-RELATIVE path ("css/style.css", "js/app.js").
+   *
+   * At "/" (the legacy ?contractz= route) those resolve to
+   * "/js/app.js" and everything works.
+   *
+   * At "/s/slideshow/<id>" they resolve to
+   * "/s/slideshow/js/app.js", which re-enters the share route
+   * and is rejected, so NO application script ever executes and
+   * the raw index.html shell is what the visitor sees.
+   *
+   * Forcing the document base back to the site root makes the
+   * share document load exactly the same resources as "/".
+   *
+   * The <base> element must be the FIRST thing inside <head>,
+   * before any relative href/src, or the preload scanner will
+   * already have resolved them against the /s/ path.
+   */
+
+  const baseTag =
+    '<base href="/">';
+
+  const headMatch =
+    /<head[^>]*>/i.exec(
+      html
+    );
+
+  let withBase =
+    html;
+
+  if (
+    headMatch &&
+    !/<base\s/i.test(html)
+  ) {
+
+    const insertAt =
+      headMatch.index +
+      headMatch[0].length;
+
+    withBase =
+      html.slice(
+        0,
+        insertAt
+      ) +
+
+      baseTag +
+
+      html.slice(
+        insertAt
+      );
+  }
+
+  const headEnd =
+    withBase.indexOf(
+      marker
+    );
+
+  if (
+    headEnd < 0
+  ) {
+
+    return withBase;
+  }
+
   return (
 
-    html.slice(
+    withBase.slice(
       0,
-      index
+      headEnd
     ) +
 
     ogTags +
 
     script +
 
-    html.slice(
-      index
+    withBase.slice(
+      headEnd
     )
   );
 }
@@ -2654,6 +2721,100 @@ async function handleLegacyPrime(
        share:v1
 ========================================================= */
 
+/* =========================================================
+   /s/... sub-resource fallback
+
+   Defensive companion to the injected <base href="/">.
+
+   Any request under the share prefix that is plainly a static
+   asset ("/s/slideshow/js/app.js", "/s/<key>/css/style.css")
+   is served from the site root instead of being treated as a
+   share key, which previously produced a 400 for every script
+   and stylesheet on the page.
+========================================================= */
+
+async function serveShareSubresource(
+  request,
+  env
+) {
+
+  const url =
+    new URL(
+      request.url
+    );
+
+  const parts =
+    url.pathname
+      .slice(
+        SHARE_PATH_PREFIX.length
+      )
+      .split("/")
+      .filter(Boolean);
+
+  if (
+    parts.length < 2
+  ) {
+
+    return null;
+  }
+
+  const last =
+    parts[parts.length - 1];
+
+  if (
+    !/\.[A-Za-z0-9]{2,6}$/.test(
+      last
+    )
+  ) {
+
+    /* A real share target has no file extension. */
+
+    return null;
+  }
+
+  for (
+    let i = 0;
+    i < parts.length;
+    i++
+  ) {
+
+    const candidate =
+      new URL(
+        "/" +
+          parts
+            .slice(i)
+            .join("/"),
+        url
+      );
+
+    candidate.search =
+      url.search;
+
+    const assetResponse =
+      await env.ASSETS.fetch(
+        new Request(
+          candidate.toString(),
+          {
+            method:
+              "GET",
+
+            headers:
+              request.headers
+          }
+        )
+      );
+
+    if (
+      assetResponse.ok
+    ) {
+
+      return assetResponse;
+    }
+  }
+
+  return null;
+}
+
 async function handleDirectShare(
   request,
   env
@@ -3408,6 +3569,16 @@ export default {
         SHARE_PATH_PREFIX
       )
     ) {
+
+      const assetResponse =
+        await serveShareSubresource(
+          request,
+          env
+        );
+
+      if (assetResponse) {
+        return assetResponse;
+      }
 
       const directResponse =
         await handleDirectShare(
