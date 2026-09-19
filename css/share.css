@@ -1419,7 +1419,7 @@ body.sky-share-mode .app-switch-button {
 .sky-share-media-host .slideshow-toolbar-secondary {
     position: absolute !important;
 
-    top: 8px !important;
+    top: 1px !important;
     right: 12px !important;
 
     left: auto !important;
@@ -1460,19 +1460,11 @@ body.sky-share-mode .app-switch-button {
 
     padding: 0;
 
-    border: 1px solid color-mix(
-        in srgb,
-        var(--control-text) 22%,
-        transparent
-    );
+    border: none;
 
     border-radius: 50%;
 
-    background: color-mix(
-        in srgb,
-        var(--panel) 22%,
-        transparent
-    );
+    background: transparent;
 
     color: var(--control-text);
 
@@ -4579,4 +4571,8 @@ body.sky-share-mode.sky-share-book #pageJump {
     z-index: 2 !important;
 
     filter:saturate(.8) sepia(.6) hue-rotate(-10deg) brightness(1.3) blur(.2rem);
+}
+
+.sky-share-go-button .sky-share-go-gif hover{
+    filter:brightness(1.08);
 }
