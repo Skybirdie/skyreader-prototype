@@ -111,6 +111,15 @@ window.ShareViewer = (function () {
     let bookWindowResizeHandler = null;
     let bookVisualResizeHandler = null;
 
+    /*
+     * Closed-state Go button: tracks the real visible screen
+     * (via visualViewport) on mobile so it stays centered as
+     * the browser's address bar / toolbar show and hide.
+     */
+    let goButtonViewportBound = false;
+    let goButtonViewportHandler = null;
+    let goButtonViewportRaf = 0;
+
     const BOOK_TOUCH_THRESHOLD = 48;
 
     const GLIDE_MEDIA_URL =
@@ -555,6 +564,44 @@ function stopShareLoading() {
                 "important"
             );
 
+
+            /* =============================================
+               TRUE VISUAL CENTER ON MOBILE
+               ---------------------------------------------
+               "top:50%" resolves against the layout viewport,
+               which mobile browsers size as if the address
+               bar / bottom toolbar were hidden. That leaves
+               the button sitting lower than the actual center
+               once that browser chrome is on screen.
+
+               window.visualViewport tracks the real visible
+               area (height + top offset), so use it to compute
+               the true vertical center in px. Where it isn't
+               available, fall back to the "dvh" unit, which
+               tracks the same thing natively in browsers that
+               support it.
+            ============================================= */
+            if (window.visualViewport) {
+
+                const centerY =
+                    window.visualViewport.height / 2 +
+                    window.visualViewport.offsetTop;
+
+                button.style.setProperty(
+                    "top",
+                    centerY + "px",
+                    "important"
+                );
+            }
+            else {
+
+                button.style.setProperty(
+                    "top",
+                    "50dvh",
+                    "important"
+                );
+            }
+
         }
         else {
 
@@ -575,7 +622,97 @@ function stopShareLoading() {
                 "84vh",
                 "important"
             );
+
+            /* Reset back to the plain centered value in case
+               a mobile px "top" was left over from a narrower
+               viewport (e.g. rotating a tablet across the
+               700px breakpoint). */
+            button.style.setProperty(
+                "top",
+                "50%",
+                "important"
+            );
         }
+    }
+
+
+    /* =====================================================
+       GO BUTTON VIEWPORT TRACKING (MOBILE)
+       -----------------------------------------------------
+       Keeps the go button centered on the real visible screen
+       as the browser's chrome shows/hides (address bar,
+       bottom toolbar, keyboard, pinch-zoom, etc.), by re-
+       running updateClosedGoButtonLayout() whenever the
+       visual viewport - or, failing that, the window - resizes.
+       Bound once; harmless to keep running even while the
+       closed panel/button are hidden.
+    ===================================================== */
+
+    function bindGoButtonViewportTracking() {
+
+        if (goButtonViewportBound) {
+            return;
+        }
+
+        goButtonViewportBound =
+            true;
+
+
+        goButtonViewportHandler =
+            function () {
+
+                if (goButtonViewportRaf) {
+                    return;
+                }
+
+                goButtonViewportRaf =
+                    requestAnimationFrame(
+                        function () {
+
+                            goButtonViewportRaf =
+                                0;
+
+                            updateClosedGoButtonLayout();
+                        }
+                    );
+            };
+
+
+        if (window.visualViewport) {
+
+            window.visualViewport.addEventListener(
+                "resize",
+                goButtonViewportHandler,
+                {
+                    passive: true
+                }
+            );
+
+            window.visualViewport.addEventListener(
+                "scroll",
+                goButtonViewportHandler,
+                {
+                    passive: true
+                }
+            );
+        }
+
+
+        window.addEventListener(
+            "resize",
+            goButtonViewportHandler,
+            {
+                passive: true
+            }
+        );
+
+        window.addEventListener(
+            "orientationchange",
+            goButtonViewportHandler,
+            {
+                passive: true
+            }
+        );
     }
 
 
@@ -1051,7 +1188,7 @@ function stopShareLoading() {
 
     gif.style.setProperty(
         "border-radius",
-        "50%",
+        "0",
         "important"
     );
 
@@ -1095,6 +1232,8 @@ function stopShareLoading() {
 
 
     updateClosedGoButtonLayout();
+
+    bindGoButtonViewportTracking();
 
     playGoButtonEntrance(
         button
@@ -3846,6 +3985,118 @@ async function waitForSharedSlideshowReady() {
 
 
     /* =====================================================
+       CLOSED STATE: MOBILE CHROME (LOGO / OPEN BUTTON)
+       -----------------------------------------------------
+       On mobile, once the go-button-mobile artwork is showing,
+       hide the workspace primary logo and the small persistent
+       .sky-share-open-button so they don't compete with it.
+       Both normally carry "!important" visibility rules in
+       share.css, so they're overridden here the same way -
+       with a higher-priority inline "!important".
+    ===================================================== */
+
+    function hideClosedStateMobileChrome() {
+
+        const mobile =
+            window.matchMedia(
+                "(max-width: 700px)"
+            ).matches;
+
+
+        if (!mobile) {
+            return;
+        }
+
+
+        const primaryLogo =
+            document.getElementById(
+                "workspacePrimaryLogo"
+            );
+
+
+        if (primaryLogo) {
+
+            primaryLogo.style.setProperty(
+                "display",
+                "none",
+                "important"
+            );
+
+            primaryLogo.style.setProperty(
+                "visibility",
+                "hidden",
+                "important"
+            );
+        }
+
+
+        const openButton =
+            shell ?
+                shell.querySelector(
+                    ".sky-share-open-button"
+                ) :
+                null;
+
+
+        if (openButton) {
+
+            openButton.style.setProperty(
+                "display",
+                "none",
+                "important"
+            );
+
+            openButton.style.setProperty(
+                "visibility",
+                "hidden",
+                "important"
+            );
+        }
+    }
+
+
+    function restoreClosedStateMobileChrome() {
+
+        const primaryLogo =
+            document.getElementById(
+                "workspacePrimaryLogo"
+            );
+
+
+        if (primaryLogo) {
+
+            primaryLogo.style.removeProperty(
+                "display"
+            );
+
+            primaryLogo.style.removeProperty(
+                "visibility"
+            );
+        }
+
+
+        const openButton =
+            shell ?
+                shell.querySelector(
+                    ".sky-share-open-button"
+                ) :
+                null;
+
+
+        if (openButton) {
+
+            openButton.style.removeProperty(
+                "display"
+            );
+
+            openButton.style.removeProperty(
+                "visibility"
+            );
+        }
+    }
+
+
+    /* =====================================================
        CLOSED STATE
     ===================================================== */
 
@@ -3989,6 +4240,8 @@ async function waitForSharedSlideshowReady() {
 
 
         createClosedGoButton();
+
+        hideClosedStateMobileChrome();
     }
 
 
@@ -5880,6 +6133,8 @@ async function prepareVideo(item) {
 
 
         restoreShareHeader();
+
+        restoreClosedStateMobileChrome();
 
 
         titleElement.textContent =
