@@ -110,19 +110,19 @@ window.dispatchEvent(new Event("skyreader-pdfjs-ready"));
    ========================================================= */
 
 body.sky-share-mode #workspacePrimaryLogo {
-    position: fixed !important;
-    top: 40px !important;
-    left: 20px !important;
-    right: auto !important;
+    position: fixed;
+    top: 40px;
+    left: 20px;
+    right: auto;
 
-    width: 120px !important;
-    max-width: 120px !important;
-    height: auto !important;
+    width: 120px;
+    max-width: 120px;
+    height: auto;
 
-    display: block !important;
+    display: block;
 
-    z-index: 1000001 !important;
-    pointer-events: none !important;
+    z-index: 1000001;
+    pointer-events: none;
 }
 </style>
 
@@ -133,6 +133,7 @@ body.sky-share-mode #workspacePrimaryLogo {
 <div id="reloadScreen" role="status" aria-live="polite">
 <img src="assets/reload.gif" alt="Loading Meditation Mornings" onerror="this.style.display='none';this.nextElementSibling.hidden=false;">
 <div class="reloadFallback" hidden>
+  <div style="font-weight: bold;">John Chapter 1</div>
   <div>1 In the beginning was the Word, and the Word was with God, and the Word was God.</div>
   <div>2 The same was in the beginning with God.</div>
   <div>3 All things were made by him; and without him was not any thing made that was made.</div>
@@ -815,7 +816,7 @@ if (window.AppSwitcher) {
 
     /*
      * ---------------------------------------------------------
-     * NORMAL SKyMEDIA STARTUP
+     * NORMAL SKYMEDIA STARTUP
      * ---------------------------------------------------------
      *
      * Everything below this point is normal SkyMedia startup.
@@ -1521,7 +1522,6 @@ SlideshowLibrary.load(manifestSlideshows);
     aria-live="polite"
 ></div>
 
-<div id="slideshowPlaybackStatus" class="slideshow-playback-status"></div>
         <nav class="slideshow-toolbar slideshow-toolbar-main" aria-label="Slide show navigation">
             <button id="slideshowPrevious" class="slideshow-control" type="button" title="Previous slide" aria-label="Previous slide"><svg class="icon"><use href="#icon-previous"></use></svg></button>
 
