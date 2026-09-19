@@ -145,6 +145,9 @@ let shareLoadingText = null;
 let shareLoadingTimer = null;
 let shareLoadingIndex = 0;
 
+let shareCopiedCue = null;
+let shareCopiedCueTimer = null;
+
     /* =====================================================
        BASIC HELPERS
     ===================================================== */
@@ -214,6 +217,85 @@ let shareLoadingIndex = 0;
             section === "slideshow" ||
             section === "slides"
         );
+    }
+
+
+    function isBookOnLastPage() {
+
+        if (!isBookShare()) return false;
+
+        if (!window.Reader ||
+            typeof Reader.currentPage !== "function" ||
+            typeof Reader.pages !== "function") return false;
+
+        const page = Number(Reader.currentPage()) || 1;
+        const pages = Number(Reader.pages()) || 0;
+
+        return pages > 0 && page >= pages;
+    }
+
+
+    function protectLastPageInteraction(event) {
+
+        if (!isBookOnLastPage()) return;
+
+        const target = event.target;
+
+        if (target && target.closest && target.closest(
+            "#toolbar, #previousButton, #nextButton, #pageJump, #pageIndicator, #muteButton, #readerShareButton, #viewerFullscreenButton, #readerCloseButton, .sky-share-actions"
+        )) return;
+
+        if (event.type === "wheel") {
+            const forward = Number(event.deltaY) > 0 || Number(event.deltaX) > 0;
+            if (!forward) return;
+        }
+
+        event.preventDefault();
+        event.stopImmediatePropagation();
+    }
+
+
+    function showShareCopiedCue() {
+
+        if (!document.body) return;
+
+        if (shareCopiedCueTimer) {
+            clearTimeout(shareCopiedCueTimer);
+            shareCopiedCueTimer = null;
+        }
+
+        if (shareCopiedCue) {
+            shareCopiedCue.remove();
+            shareCopiedCue = null;
+        }
+
+        const cue = document.createElement("img");
+        cue.src = new URL("/assets/link-copied.gif", window.location.origin).href;
+        cue.alt = "";
+        cue.setAttribute("aria-hidden", "true");
+        cue.draggable = false;
+        cue.style.setProperty("position", "fixed", "important");
+        cue.style.setProperty("left", "50%", "important");
+        cue.style.setProperty("top", "50%", "important");
+        cue.style.setProperty("transform", "translate(-50%, -50%)", "important");
+        cue.style.setProperty("width", "45px", "important");
+        cue.style.setProperty("height", "45px", "important");
+        cue.style.setProperty("object-fit", "contain", "important");
+        cue.style.setProperty("pointer-events", "none", "important");
+        cue.style.setProperty("user-select", "none", "important");
+        cue.style.setProperty("-webkit-user-drag", "none", "important");
+        cue.style.setProperty("z-index", "2147483647", "important");
+
+        document.body.appendChild(cue);
+        shareCopiedCue = cue;
+
+        shareCopiedCueTimer = setTimeout(() => {
+            if (shareCopiedCue === cue) {
+                cue.remove();
+                shareCopiedCue = null;
+            }
+            shareCopiedCueTimer = null;
+        }, 1400);
     }
 
 
@@ -1902,6 +1984,8 @@ function stopShareLoading() {
                         "reader",
                         book
                     );
+
+                    showShareCopiedCue();
                 }
             }
         );
@@ -2878,6 +2962,12 @@ async function waitForSharedSlideshowReady() {
                 onBookTouchClickCapture,
                 true
             );
+
+            bookTouchTarget.addEventListener(
+                "click",
+                protectLastPageInteraction,
+                true
+            );
         }
 
 
@@ -2936,6 +3026,12 @@ async function waitForSharedSlideshowReady() {
             bookTouchTarget.removeEventListener(
                 "click",
                 onBookTouchClickCapture,
+                true
+            );
+
+            bookTouchTarget.removeEventListener(
+                "click",
+                protectLastPageInteraction,
                 true
             );
         }
@@ -3453,6 +3549,16 @@ async function waitForSharedSlideshowReady() {
 
         stopShareLoading();
 
+        if (shareCopiedCueTimer) {
+            clearTimeout(shareCopiedCueTimer);
+            shareCopiedCueTimer = null;
+        }
+
+        if (shareCopiedCue) {
+            shareCopiedCue.remove();
+            shareCopiedCue = null;
+        }
+
         if (shareClosing) {
             return;
         }
@@ -3869,11 +3975,15 @@ async function waitForSharedSlideshowReady() {
 
 
                 if (
-                    shell &&
+                    isBookShare() &&
                     !shell.classList.contains(
                         "sky-share-document-closed"
                     )
                 ) {
+
+                    if (isBookOnLastPage()) {
+                        return;
+                    }
 
                     close();
                 }
