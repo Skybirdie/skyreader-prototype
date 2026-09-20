@@ -184,9 +184,11 @@ window.ShareManager = (function () {
     /* =====================================================
        PRIME WORKER
 
-       The browser sends the SR2 contract.
-
-       Worker calculates the key and returns:
+       The browser sends     
+       section,
+       id,
+       item
+       and returns:
 
            /s/<key>
     ===================================================== */
