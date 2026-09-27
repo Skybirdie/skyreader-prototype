@@ -1414,40 +1414,89 @@ html:fullscreen #topBar{
 
 #app.viewerFocus #libraryPanel{display:none!important;}
 
-/* ---------- Top-bar search ---------- */
+ /* ---------- Standard expandable top-bar search ---------- */
 
 #topSearchGroup{
   grid-column:1;
   justify-self:start;
+
   display:flex;
   align-items:center;
   gap:7px;
-  width:calc(360px - 30px);
+
+  width:330px;
+  max-width:100%;
+  min-width:0;
+
+  box-sizing:border-box;
 }
 
 #topSearchGroup #searchBox{
   display:none!important;
+
   flex:1 1 auto;
+  min-width:0;
   width:auto;
+
   height:34px;
+
   padding:0 11px;
+
   opacity:1;
   pointer-events:auto;
-  border:1px solid color-mix(in srgb,var(--control-text) 18%,transparent);
+
+  border:1px solid color-mix(
+    in srgb,
+    var(--control-text) 18%,
+    transparent
+  );
+
   border-radius:10px;
+
   background:var(--control-bg);
   color:var(--control-text);
+
   font-size:14px;
   outline:none;
+
   box-sizing:border-box;
+
   backdrop-filter:blur(10px);
 }
 
-#topSearchGroup #searchBox::placeholder{color:color-mix(in srgb,var(--control-text) 72%,transparent);}
-#topSearchGroup #searchBox:focus{box-shadow:0 0 0 2px color-mix(in srgb,var(--control-text) 18%,transparent);}
-#topSearchGroup.searchOpen #searchBox{display:block!important;}
-#topSearchGroup .iconButton{flex:0 0 auto;}
-#searchWrapper,#searchToggleButton{display:none!important;}
+#topSearchGroup #searchBox::placeholder{
+  color:color-mix(
+    in srgb,
+    var(--control-text) 72%,
+    transparent
+  );
+}
+
+#topSearchGroup #searchBox:focus{
+  box-shadow:0 0 0 2px color-mix(
+    in srgb,
+    var(--control-text) 18%,
+    transparent
+  );
+}
+
+#topSearchGroup.searchOpen #searchBox{
+  display:block!important;
+}
+
+#topSearchGroup .iconButton{
+  flex:0 0 auto;
+}
+
+#searchWrapper,
+#searchToggleButton{
+  display:none!important;
+}
+
+html[data-theme="dark"] #topBar .icon,
+html[data-theme="dark"] #topBar .iconButton{
+  color:#eef2f5!important;
+}
 
 html[data-theme="dark"] #topBar .icon,
 html[data-theme="dark"] #topBar .iconButton{
@@ -2104,8 +2153,8 @@ html[data-theme="dark"] #readerPanel #toolbar .iconButton{
   margin-left:auto;
 }
 #libraryOrganizationControls select{
+  width:100%;
   min-width:0;
-  max-width:112px;
   height:28px;
   padding:0 24px 0 8px;
   border:1px solid color-mix(in srgb,var(--control-text) 18%,transparent);
@@ -2117,10 +2166,10 @@ html[data-theme="dark"] #readerPanel #toolbar .iconButton{
 }
 @media (max-width:999px){
   #libraryOrganizationControls{gap:4px;}
-  #libraryOrganizationControls select{max-width:92px;font-size:11px;}
+  #libraryOrganizationControls select{font-size:11px;}
 }
 @media (max-width:600px){
-  #libraryOrganizationControls select{max-width:78px;height:26px;padding-left:6px;}
+  #libraryOrganizationControls select{height:26px;padding-left:6px;}
 }
 
 
@@ -2128,6 +2177,12 @@ html[data-theme="dark"] #readerPanel #toolbar .iconButton{
 #libraryOrganizationControls{position:relative;display:flex;align-items:center;gap:3px;flex:0 0 auto;margin-left:auto;}
 .libraryOrgButton{position:relative;width:25px;height:25px;min-width:25px;padding:0;border:0;border-radius:7px;background:transparent;color:var(--text);font:700 17px/1 Inter,Arial,sans-serif;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;}
 .libraryOrgButton:hover{background:color-mix(in srgb,var(--text) 8%,transparent);}
+/* Larger glyph on mobile so it fills more of the 25px button, matching
+   the same mobile increase given to .video-library-org-button and
+   .slideshow-org-button (video.css / slideshow.css). */
+@media (max-width:999px){
+  .libraryOrgButton{font-size:22px;}
+}
 .libraryFilterIcon{font-size:18px;line-height:1;transform:rotate(180deg);}
 .libraryFilterActive{display:none;position:absolute;right:2px;top:2px;width:6px;height:6px;border-radius:50%;background:#d72626;box-shadow:0 0 0 1px var(--panel);}
 .libraryOrgButton.isFiltered .libraryFilterActive{display:block;}
@@ -2494,6 +2549,36 @@ max-width:35vw;
     border-radius:10px;
   }
 }
+
+ /* =======================================================
+    STANDARD TOP-BAR SEARCH — MOBILE
+    The search field occupies only the space available
+    between the left and right header controls.
+ ======================================================= */
+
+@media (max-width:700px){
+
+  #topSearchGroup,
+  .video-search-group,
+  .slideshow-search-group{
+    width:auto;
+    max-width:none;
+    min-width:0;
+
+    flex:1 1 auto;
+  }
+
+  #topSearchGroup.searchOpen #searchBox,
+  .video-search-group.searchOpen #videoSearchBox,
+  .slideshow-search-group.searchOpen input{
+    width:auto;
+    min-width:0;
+    max-width:100%;
+    flex:1 1 auto;
+  }
+
+}
+
 
 /* ---------------------------------------------------------
    Narrow Reader top bar — left cluster / right cluster
@@ -2937,4 +3022,70 @@ body:not(.sky-share-mode):has(#videoSection.videoFocus) #workspacePrimaryLogo:no
     #workspacePrimaryLogo {
         width: 72px;
     }
+}
+
+/* =========================================================
+   SkyMedia Status / Welcome Bar Alignment
+   Keep all viewer status bars and Welcome bars identical.
+   ========================================================= */
+
+#statusBar,
+#videoStatusBar,
+.slideshow-status-bar,
+.sr-welcome-banner {
+    box-sizing: border-box;
+    height: 28px;
+    min-height: 28px;
+    max-height: 28px;
+    font-size: 13px;
+    line-height: 20px;
+}
+
+/* Keep the actual status/welcome text at the same size. */
+#statusBar *,
+#videoStatusBar *,
+.slideshow-status-bar *,
+.sr-welcome-banner * {
+    font-size: 13px !important;
+}
+
+/* Consistent vertical centering. */
+#statusBar > center,
+#videoStatusBar > center,
+.slideshow-status-bar > center,
+.sr-welcome-banner > center {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* Matches the 14px gap video.css/slideshow.css already set on their
+       own status bars (.video-status-bar center, .slideshow-status-bar
+       center) - #statusBar had no equivalent of its own, so the Reader's
+       title and page indicator sat with no space between them. */
+    gap: 14px;
+}
+
+/* Preserve the Reader status bar's compact horizontal spacing. */
+#statusBar {
+    padding: 4px 8px;
+}
+
+/* Keep the other status bars from introducing a different height
+   through their own padding. */
+#videoStatusBar,
+.slideshow-status-bar,
+.sr-welcome-banner {
+    padding-top: 4px;
+    padding-bottom: 4px;
+margin:0 !important;
+}
+
+/* Reader status bar: slightly more compact to match the
+   visual height of the other viewer bars. */
+#statusBar {
+    height: 24px;
+    min-height: 24px;
+    max-height: 24px;
+    padding: 2px 8px;
+    line-height: 20px;
 }

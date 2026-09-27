@@ -283,6 +283,14 @@ AppSwitcher marks the active section.
 
 .video-library-org-button:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(0,0,0,.18)}
 
+/* Larger glyph on mobile so it fills more of the 32px button - the
+   clamp() above bottoms out at 15px on narrow screens, matching the
+   same mobile increase given to .libraryOrgButton (reader) and
+   .slideshow-org-button (slideshow.css). */
+@media (max-width:999px){
+    .video-library-org-button{font-size:27px;}
+}
+
 .video-library-org-button .icon{
     width:20px;
     height:20px;
@@ -814,7 +822,7 @@ AppSwitcher marks the active section.
 
     overflow:hidden;
 
-    padding:0 30px;
+    padding:0 30px 0 0;
 
     background:transparent;
 }
@@ -1227,29 +1235,26 @@ html[data-theme="dark"] .video-narrow-library-toggle{
     user-select:none;
 }
 
-
-/* =======================================================
-   SEARCH
-======================================================= */
+ /* =======================================================
+    STANDARD TOP-BAR SEARCH
+ ======================================================= */
 
 .video-search-group{
     grid-column:1;
     justify-self:start;
 
     position:relative;
-
     z-index:1;
 
     display:flex;
-
     align-items:center;
-
     gap:7px;
 
-    width:auto;
+    width:330px;
     max-width:100%;
-
     min-width:0;
+
+    box-sizing:border-box;
 }
 
 
@@ -1300,18 +1305,17 @@ html[data-theme="dark"] .video-narrow-library-toggle{
 
 
 .video-icon-button .icon{
-    width:var(--icon-size,22px);
-    height:var(--icon-size,22px);
+    width:22px;
+    height:22px;
 }
 
 
 .video-search-group #videoSearchBox{
     display:none;
 
-    flex:0 1 auto;
+    flex:1 1 auto;
 
-    width:min(240px,40vw);
-
+    width:auto;
     min-width:0;
 
     height:34px;
@@ -1332,6 +1336,12 @@ html[data-theme="dark"] .video-narrow-library-toggle{
     color:var(--control-text);
 
     font-size:14px;
+
+    outline:none;
+
+    box-sizing:border-box;
+
+    backdrop-filter:blur(10px);
 }
 
 
@@ -1341,6 +1351,18 @@ html[data-theme="dark"] .video-narrow-library-toggle{
         color-mix(
             in srgb,
             var(--control-text) 72%,
+            transparent
+        );
+}
+
+
+.video-search-group
+#videoSearchBox:focus{
+    box-shadow:
+        0 0 0 2px
+        color-mix(
+            in srgb,
+            var(--control-text) 18%,
             transparent
         );
 }

@@ -83,8 +83,8 @@ ui:{
 libraryOpen:true,
 shelfView:true,
 organization:{
-main:{sort:"alphabetical",filter:"all",category:""},
-viewer:{sort:"alphabetical",filter:"all",category:""}
+main:{sort:"random",filter:"all",category:""},
+viewer:{sort:"newest",filter:"all",category:""}
 },
 loading:false,
 loadingProgress:0,
@@ -301,6 +301,11 @@ landing.classList.remove("isReturning");
 if(animate){
     void landing.offsetWidth;
     landing.classList.add("isReturning");
+    landing.addEventListener(
+        "animationend",
+        ()=>landing.classList.remove("isReturning"),
+        {once:true}
+    );
 }
 
 if(typeof Library!=="undefined" && typeof Library.buildViewerLibrary==="function"){

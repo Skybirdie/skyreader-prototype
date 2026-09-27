@@ -767,6 +767,10 @@ async function renderSlideshow(item,token){
 
             if(!playing || !pdf) return;
 
+            /* A one-page PDF slideshow is static while its associated
+             * audio plays; do not redraw/fade the same page in a loop. */
+            if(pdf.numPages === 1) return;
+
             timer=setTimeout(()=>{
                 if(index < pdf.numPages){
                     index++;
@@ -825,8 +829,9 @@ async function renderSlideshow(item,token){
                 canvas.width=Math.ceil(viewport.width);
                 canvas.height=Math.ceil(viewport.height);
 
+                const singlePage=(pdf.numPages === 1);
                 canvas.classList.remove("is-entering");
-                void canvas.offsetWidth;
+                if(!singlePage) void canvas.offsetWidth;
 
                 await page.render({
                     canvasContext:canvas.getContext(
@@ -837,7 +842,7 @@ async function renderSlideshow(item,token){
                 }).promise;
 
                 if(token===generation){
-                    canvas.classList.add("is-entering");
+                    if(pdf.numPages !== 1) canvas.classList.add("is-entering");
                     update();
                 }
             }finally{
@@ -889,8 +894,18 @@ async function renderSlideshow(item,token){
                 throw new Error("PDF.js unavailable");
             }
 
+            /* Route through the same cross-origin-safe URL resolution
+               renderer.js uses for the book reader, so a large front-page
+               PDF (e.g. one with embedded video) streams instead of
+               fully downloading before this preview can appear. Falls
+               back to the raw URL if Renderer isn't available for some
+               reason, matching the previous behavior exactly. */
+            const resolvedUrl=window.Renderer && typeof Renderer.resolvePdfUrl==="function"
+                ?await Renderer.resolvePdfUrl(item.raw.pdfUrl)
+                :item.raw.pdfUrl;
+
             pdf=await pdfjsLib.getDocument({
-                url:item.raw.pdfUrl
+                url:resolvedUrl
             }).promise;
 
             if(token!==generation) return;
@@ -987,8 +1002,10 @@ cleanupFn=()=>{
 
         if(!s) return;
 
+        const singleSlide=(slides.length === 1);
+
         img.classList.remove("is-entering");
-        void img.offsetWidth;
+        if(!singleSlide) void img.offsetWidth;
 
         img.src=s.image||"";
         img.alt=s.title||item.title||"";
@@ -997,7 +1014,7 @@ cleanupFn=()=>{
         ui.status.textContent=
             `${index+1} / ${slides.length}`;
 
-        if(playing){
+        if(playing && slides.length > 1){
             timer=setTimeout(
                 next,
                 Math.max(
@@ -1229,7 +1246,14 @@ cleanupFn=()=>{
         try{
             if(!window.pdfjsLib)throw new Error("PDF.js unavailable");
             const url=item.raw.pdf||item.raw.media||item.raw.url||item.raw.PDF||""; if(!url)throw new Error("PDF URL missing");
-            pdf=await pdfjsLib.getDocument({url}).promise;
+
+            /* See the other pdfjsLib.getDocument() call above in this
+               file for why this matters. */
+            const resolvedUrl=window.Renderer && typeof Renderer.resolvePdfUrl==="function"
+                ?await Renderer.resolvePdfUrl(url)
+                :url;
+
+            pdf=await pdfjsLib.getDocument({url:resolvedUrl}).promise;
 
 if(token!==generation)return;
 

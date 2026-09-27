@@ -31,8 +31,22 @@ window.SlideshowViewer = (function () {
     }
 
     function setPlaybackChrome(active){
-        document.querySelectorAll(".slideshow-toolbar,.slideshow-status-bar,.slideshow-playback-status,.slideshow-viewer-title").forEach(el=>{el.hidden=!active;});
+    document.querySelectorAll(
+        ".slideshow-toolbar,.slideshow-playback-status,.slideshow-viewer-title"
+    ).forEach(el => {
+        el.hidden = !active;
+    });
+
+    /*
+     * The status bar is persistent. It remains visible when no
+     * slideshow is open so that the idle state can display MMicj.
+     */
+    const statusBar = document.querySelector(".slideshow-status-bar");
+
+    if(statusBar){
+        statusBar.hidden = false;
     }
+}
 
 
 
@@ -84,48 +98,18 @@ window.SlideshowViewer = (function () {
         });
         window.addEventListener("resize", refreshLayout);
 
-        if (!window.__skySlideshowAppSwitchListenerBound) {
-
-            window.__skySlideshowAppSwitchListenerBound = true;
-
-            /*
-             * Reader already floats #viewerLibrary back in when the
-             * user switches to it via the app-switcher menu (its
-             * "isReturning" keyframe animation naturally replays
-             * once #app stops being display:none). .slideshow-landing
-             * instead relies on a plain CSS transition tied to the
-             * "hidden" class, which does NOT replay just from an
-             * ancestor's display toggling - so without this listener,
-             * switching to Slideshow showed the landing with no
-             * float-in at all. Re-running the same add/remove
-             * "hidden" sequence used in close() (with a forced
-             * reflow in between, since here the landing starts out
-             * visible rather than already hidden) reproduces that
-             * same float-in on tab switch.
-             */
-            window.addEventListener("app:switched", event => {
-
-                if (
-                    !event.detail ||
-                    event.detail.id !== "slideshow" ||
-                    current ||
-                    !landing
-                ) {
-                    return;
-                }
-
-                landing.classList.add("hidden");
-                void landing.offsetWidth;
-                landing.classList.remove("hidden");
-
-            });
-
-        }
-
         renderLanding();
-        loadMusicLibrary();
-        setAudioMode(current?.audio ? "original" : "effects");
-        return true;
+loadMusicLibrary();
+setAudioMode(current?.audio ? "original" : "effects");
+
+/*
+ * Initialize the persistent status bar while the Slideshow
+ * viewer is idle. With no current slideshow, updateStatus()
+ * displays "MMicj" and clears the slide indicator.
+ */
+updateStatus();
+
+return true;
     }
 
 
@@ -361,18 +345,23 @@ container.appendChild(b);
     }
 
     function updateStatus(){
-        const indicator = document.getElementById("slideshowIndicator");
-        const total = slideCount();
+    const indicator = document.getElementById("slideshowIndicator");
+    const total = slideCount();
 
-        if(status) {
-            status.textContent = current ? (current.title || "") : "";
-        }
-
-        if(indicator) {
-            indicator.textContent =
-                current && total ? `${index+1} / ${total}` : "";
-        }
+    if(status) {
+        status.textContent =
+            current
+                ? (current.title || "")
+                : "MMicj";
     }
+
+    if(indicator) {
+        indicator.textContent =
+            current && total
+                ? `${index+1} / ${total}`
+                : "";
+    }
+}
     function setStatus(message){
     const el = document.getElementById("slideshowPlaybackStatus");
 
@@ -771,6 +760,22 @@ function updateAudioCue() { const cue = document.getElementById("slideshowAudioC
 
         const startTransition=()=>{
             if(generation!==transitionGeneration || !current)return;
+
+            /*
+             * A one-slide slideshow has nothing to transition to.
+             * Display the slide directly instead of fading the same
+             * slide in again when its playback interval is reached.
+             * Multi-slide shows continue through the existing
+             * SlideshowTransitions path unchanged.
+             */
+            if(total === 1){
+                stage.innerHTML="";
+                stage.appendChild(fresh);
+                transitionBusy=false;
+                if(playing) schedule();
+                return;
+            }
+
             stage.appendChild(fresh);
             transitionBusy=true;
 
@@ -815,6 +820,27 @@ function updateAudioCue() { const cue = document.getElementById("slideshowAudioC
         if(!fromTimer) stopTimer();
         const total=slideCount();
         if(!total)return;
+
+        /*
+         * SINGLE-SLIDE SPECIAL CASE
+         *
+         * Never transition from the only slide back to itself.
+         * When original/music audio is driving playback, leave the
+         * slide displayed until that audio ends; its existing ended
+         * handler will call finish(). Without continuous audio, the
+         * normal slide interval simply completes the slideshow.
+         */
+        if(total === 1){
+            if(
+                (audioMode === "original" || audioMode === "music") &&
+                !audioCompleted
+            ){
+                return;
+            }
+
+            if(playing) finish();
+            return;
+        }
 
         if(index<total-1){
             if(audioMode==="effects") playSound(EFFECT_URL);
@@ -999,9 +1025,17 @@ if (
 }
 
     current = item;
-    index = 0;
-    playing = true;
-    stopTimer();
+index = 0;
+playing = true;
+stopTimer();
+
+/* Selecting a slideshow automatically closes the mobile library drawer. */
+if (
+    window.SlideshowUI &&
+    typeof SlideshowUI.closeDrawer === "function"
+) {
+    SlideshowUI.closeDrawer();
+}
 
     // existing PDF/image opening code continues...
 
@@ -1052,6 +1086,7 @@ if (
 
         root.classList.add("has-slideshow");
         setPlaybackChrome(true);
+        setStatus("");
         landing?.classList.add("hidden");
 
         stage.innerHTML="";

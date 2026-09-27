@@ -21,13 +21,13 @@
 <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
 <link rel="icon" href="/favicon.ico" type="image/x-icon">
 <link rel="stylesheet" href="css/style.css">
-<link rel="stylesheet" href="css/reader.css">
+<link rel="stylesheet" href="css/reader.css?v=1.1.0">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.3.289/pdf_viewer.css">
 
 <link rel="stylesheet" href="css/library.css">
 <link rel="stylesheet" href="css/video.css">
 <link rel="stylesheet" href="css/slideshow.css?v=1.1.0">
-<link rel="stylesheet" href="css/front-page.css?v=wave3">
+<link rel="stylesheet" href="css/front-page.css?v=release-notification-1">
 <link rel="stylesheet" href="css/share.css">
 
 <script>
@@ -163,6 +163,22 @@ body.sky-share-mode #workspacePrimaryLogo {
     <button id="frontMenuButton" type="button" aria-label="Open media navigation" aria-expanded="false">
         <svg class="icon" aria-hidden="true"><use href="#icon-menu"></use></svg>
     </button>
+
+    <!--
+         Special-release notification.
+         This is an in-page control only; it never invokes
+         browser/system notifications.
+    -->
+    <button id="frontReleaseNotification"
+            type="button"
+            aria-label="Open special release"
+            hidden>
+        <img id="frontReleaseNotificationImage"
+             src=""
+             alt=""
+             draggable="false">
+    </button>
+
     <nav id="frontMenuPanel" aria-label="Media section navigation">
         <button type="button" class="front-menu-switch" data-app-target="reader" aria-pressed="false">
             <svg class="icon" aria-hidden="true"><use href="#icon-open-book"></use></svg><span>Books</span>
@@ -223,13 +239,13 @@ body.sky-share-mode #workspacePrimaryLogo {
 </button>
 
 <nav class="responsive-app-menu" aria-label="Media section menu">
-    <button type="button" data-app-target="front">Home</button>
+    <button type="button" data-app-target="front">The 7 Arms</button>
     <button type="button" data-app-target="reader">Books</button>
     <button type="button" data-app-target="video">Videos</button>
     <button type="button" data-app-target="slideshow">Images/Graphics</button>
 </nav>
 <div class="app-switcher" role="tablist" aria-label="Switch media section">
-<button type="button" class="app-switch-button" data-app-target="front" aria-pressed="false" role="tab">Home</button>
+<button type="button" class="app-switch-button" data-app-target="front" aria-pressed="false" role="tab">The 7 Arms</button>
 <button type="button" class="app-switch-button" data-app-target="reader" aria-pressed="false" role="tab">Books</button>
 <button type="button" class="app-switch-button" data-app-target="video" aria-pressed="false" role="tab">Videos</button>
 <button type="button" class="app-switch-button" data-app-target="slideshow" aria-pressed="false" role="tab">Images/Graphics</button>
@@ -254,7 +270,7 @@ body.sky-share-mode #workspacePrimaryLogo {
 
 <div class="sectionHeader">
 
-<h2>Rooting</h2>
+<h2>Seek icj</h2>
 
 <div id="libraryOrganizationControls" aria-label="Library organization">
 <button id="librarySortButton" class="libraryOrgButton" type="button" title="Sort Library" aria-label="Sort Library">⇅</button>
@@ -629,7 +645,7 @@ stroke-linecap="round"/>
 <script src="js/pdfengine.js"></script>
 <script src="js/sky180flipengine.js"></script>
 <script src="js/loadingSequence.js"></script>
-<script src="js/renderer.js?v=3.2.1"></script>
+<script src="js/renderer.js?v=3.2.6"></script>
 <script src="js/reader.js"></script>
 <script src="js/navigation.js"></script>
 <script src="js/bookmarkPanel.js"></script>
@@ -656,6 +672,7 @@ stroke-linecap="round"/>
 <script src="js/slideshowUI.js"></script>
 <script src="js/frontMediaRenderer.js?v=4.2.1"></script>
 <script src="js/frontPage.js?v=4.3.1"></script>
+<script src="js/releaseNotification.js?v=1.1.0"></script>
 <script src="js/appSwitcher.js?v=1.1.0"></script>
 <script src="js/responsiveAppMenu.js"></script>
 
@@ -1184,7 +1201,10 @@ if (window.AppSwitcher) {
 <header id="videoTopBar" class="video-top-bar">
 
 <button id="videoNarrowLibraryToggle" class="video-narrow-library-toggle" type="button" title="Open Video Library" aria-label="Open Video Library" aria-expanded="false">
-<svg class="icon"><use href="#icon-screen"></use></svg>
+    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="3" y="5" width="18" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="2"></rect>
+        <path d="M10 9l5 3-5 3V9z" fill="currentColor"></path>
+    </svg>
 </button>
 
 <div id="videoSearchGroup" class="video-search-group">
@@ -1223,13 +1243,13 @@ if (window.AppSwitcher) {
 
 </button>
 <nav class="responsive-app-menu" aria-label="Media section menu">
-<button type="button" data-app-target="front">Home</button>
+<button type="button" data-app-target="front">The 7 Arms</button>
 <button type="button" data-app-target="reader">Books</button>
 <button type="button" data-app-target="video">Videos</button>
 <button type="button" data-app-target="slideshow">Images/Graphics</button>
 </nav>
 <div class="app-switcher" role="tablist" aria-label="Switch media section">
-<button type="button" class="app-switch-button" data-app-target="front" aria-pressed="false" role="tab">Home</button>
+<button type="button" class="app-switch-button" data-app-target="front" aria-pressed="false" role="tab">The 7 Arms</button>
 <button type="button" class="app-switch-button" data-app-target="reader" aria-pressed="false" role="tab">Books</button>
 <button type="button" class="app-switch-button" data-app-target="video" aria-pressed="false" role="tab">Videos</button>
 <button type="button" class="app-switch-button" data-app-target="slideshow" aria-pressed="false" role="tab">Images/Graphics</button>
@@ -1261,7 +1281,7 @@ if (window.AppSwitcher) {
     <h2
         class="video-library-title"
     >
-        Rooting
+        Seek icj
     </h2>
 
 
@@ -1422,10 +1442,14 @@ if (window.AppSwitcher) {
 <header class="slideshow-top-bar">
     <div class="slideshow-top-bar-left">
         <button id="slideshowNarrowLibraryToggle" class="slideshow-narrow-library-toggle" type="button" title="Open Slide Show Library" aria-label="Open Slide Show Library" aria-expanded="false">
-            <svg class="icon"><use href="#icon-screen"></use></svg>
-        </button>
+    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="3" y="4" width="18" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="2"></rect>
+        <circle cx="8.5" cy="9" r="1.5" fill="currentColor"></circle>
+        <path d="M4.5 17l4.5-4.5 3.2 3.2 2.3-2.3L19.5 17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+    </svg>
+</button>
         <div id="slideshowSearchGroup" class="slideshow-search-group">
-            <button id="slideshowSearchButton" class="slideshow-icon-button" type="button" title="Search slide shows" aria-label="Search slide shows">
+            <button id="slideshowSearchButton" class="slideshow-icon-button" type="button" title="Search images/graphics..." aria-label="Search slide shows">
                 <svg class="icon"><use href="#icon-search"></use></svg>
             </button>
             <input id="slideshowSearchBox" type="search" placeholder="Search slide shows..." aria-label="Search slide shows">
@@ -1459,13 +1483,13 @@ if (window.AppSwitcher) {
 
 </button>
         <nav class="responsive-app-menu" aria-label="Media section menu">
-            <button type="button" data-app-target="front">Home</button>
+            <button type="button" data-app-target="front">The 7 Arms</button>
             <button type="button" data-app-target="reader">Books</button>
             <button type="button" data-app-target="video">Videos</button>
             <button type="button" data-app-target="slideshow">Images/Graphics</button>
         </nav>
         <div class="app-switcher" role="tablist" aria-label="Switch media section">
-            <button type="button" class="app-switch-button" data-app-target="front" aria-pressed="false" role="tab">Home</button>
+            <button type="button" class="app-switch-button" data-app-target="front" aria-pressed="false" role="tab">The 7 Arms</button>
             <button type="button" class="app-switch-button" data-app-target="reader" aria-pressed="false" role="tab">Books</button>
             <button type="button" class="app-switch-button" data-app-target="video" aria-pressed="false" role="tab">Videos</button>
             <button type="button" class="app-switch-button" data-app-target="slideshow" aria-pressed="false" role="tab">Images/Graphics</button>
@@ -1479,7 +1503,7 @@ if (window.AppSwitcher) {
 <div class="slideshow-workspace">
     <aside id="slideshowLibrary" class="slideshow-library">
         <header class="slideshow-library-header">
-            <h2>Rooting</h2>
+            <h2>Seek icj</h2>
             <div class="slideshow-library-header-controls">
                 <div class="slideshow-organization-controls">
                     <button id="slideshowSortButton" class="slideshow-org-button" type="button" title="Sort Slide Shows" aria-label="Sort Slide Shows">⇅</button>
@@ -1579,5 +1603,24 @@ if (window.AppSwitcher) {
 </div>
 </section>
 
+
+<script>
+document.addEventListener("DOMContentLoaded", function(){
+    if (
+        window.ShareManager &&
+        typeof ShareManager.isShareMode === "function" &&
+        ShareManager.isShareMode()
+    ) {
+        return;
+    }
+
+    if (
+        window.SkyReleaseNotification &&
+        typeof SkyReleaseNotification.init === "function"
+    ) {
+        SkyReleaseNotification.init();
+    }
+});
+</script>
 </body>
 </html>

@@ -9,23 +9,6 @@ window.ShareManager = (function () {
     const SHARE_PRIME_PATH =
         "/__sky_share_prime";
 
-    /*
-       The public short-link catalog lives on the Cloudflare Worker.
-       The app itself may be embedded inside Glide, so never derive this
-       from window.location.origin.
-    */
-    const SKYMEDIA_BASE_URL =
-        "https://skyreader-prototype.sliburd81.workers.dev";
-
-    function getWorkerBaseUrl() {
-        const configured =
-            window.__SKY_WORKER_BASE_URL;
-
-        return String(
-            configured || SKYMEDIA_BASE_URL
-        ).replace(/\/$/, "");
-    }
-
 
     /* =====================================================
        SECTION NORMALIZATION
@@ -201,9 +184,12 @@ window.ShareManager = (function () {
     /* =====================================================
        PRIME WORKER
 
-       The browser sends the SR2 contract.
 
-       Worker calculates the key and returns:
+       The browser sends     
+       section,
+       id,
+       item
+       and returns:
 
            /s/<key>
     ===================================================== */
@@ -217,7 +203,7 @@ window.ShareManager = (function () {
         const endpoint =
             new URL(
                 SHARE_PRIME_PATH,
-                getWorkerBaseUrl()
+                window.location.origin
             );
 
         const minimalItem =
@@ -295,48 +281,57 @@ window.ShareManager = (function () {
     ===================================================== */
 
     async function buildUrl(
-        section,
-        id,
-        item
-    ) {
+    section,
+    id,
+    item
+) {
 
-        const normalizedSection =
-            normalizeSection(
-                section
-            );
+    const normalizedSection =
+        normalizeSection(
+            section
+        );
 
-        const normalizedId =
-            cleanString(id);
+    const normalizedId =
+        cleanString(id);
 
-        if (!normalizedSection) {
+    if (!normalizedSection) {
 
-            throw new Error(
-                "Cannot create share link: section is missing."
-            );
-        }
-
-        if (!normalizedId) {
-
-            throw new Error(
-                "Cannot create share link: item id is missing."
-            );
-        }
-
-        /*
-           The catalog is already published for the app's dataset, so the
-           share button no longer needs to POST/prime a new KV record.
-           Build the canonical direct-ID URL immediately. This also means
-           sharing works when SkyMedia is embedded in Glide because the
-           resulting URL always points to the Worker, not Glide.
-        */
-        return (
-            getWorkerBaseUrl() +
-            "/s/" +
-            encodeURIComponent(normalizedSection) +
-            "/" +
-            encodeURIComponent(normalizedId)
+        throw new Error(
+            "Cannot create share link: section is missing."
         );
     }
+
+    if (!normalizedId) {
+
+        throw new Error(
+            "Cannot create share link: item id is missing."
+        );
+    }
+
+    /*
+     * IMPORTANT:
+     *
+     * The Share button no longer sends anything to
+     * /__sky_share_prime and therefore performs NO KV write.
+     *
+     * The Worker receives the section and item ID directly
+     * in the permanent short URL.
+     */
+    const baseUrl =
+        window.location.origin;
+
+    return (
+        baseUrl +
+        "/s/" +
+        encodeURIComponent(
+            normalizedSection
+        ) +
+        "/" +
+        encodeURIComponent(
+            normalizedId
+        )
+    );
+}
 
 
     /* =====================================================

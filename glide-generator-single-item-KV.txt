@@ -1,0 +1,348 @@
+/*
+=========================================================
+ SkyMedia Catalog Publish Generator
+ STAGE 1 preview / Stage 2 publish
+
+ INPUTS
+
+ p1 = Catalog Source
+      (grouped comma-separated JSON objects, or one object)
+
+ p2 = Worker base URL
+
+ p3 = publish mode
+      omitted / anything else -> preview (no KV writes)
+      "publish"                -> real publish
+
+ IMPORTANT
+
+ Stage 1 sends the Catalog Source to:
+
+     /__sky_catalog_publish
+
+ with:
+
+     preview: true
+
+ The Worker cleans the media URLs and returns the
+ cleaned catalog. NO KV RECORDS ARE WRITTEN.
+
+ Stage 2 (p3 = "publish") sends preview:false and the
+ Worker writes only the items that changed.
+=========================================================
+*/
+
+"use strict";
+
+/* =========================================================
+   CONFIGURATION
+========================================================= */
+
+const DEFAULT_BASE_URL =
+  "https://mmicj.meditation-mornings-icj.workers.dev";
+
+const CATALOG_PATH =
+  "/__sky_catalog_publish";
+
+const CATALOG_TEST_TOKEN =
+  "SMCAT-TEST-9f7b2d4c-20260918";
+
+/* =========================================================
+   BASIC CLEANUP
+========================================================= */
+
+function cleanText(value) {
+  if (
+    value === null ||
+    value === undefined
+  ) {
+    return "";
+  }
+
+  return String(value).trim();
+}
+
+/*
+ * -----------------------------------------------------
+ * Strip raw control characters that Glide occasionally
+ * embeds directly in a text field (a literal line break
+ * typed into a Subtitle, for instance) instead of a
+ * properly escaped \n.
+ *
+ * JSON.parse rejects those outright with "Bad control
+ * character in string literal" - this is what was
+ * failing.
+ *
+ * We only touch C0 control characters (0x00-0x1F) other
+ * than the ones JSON already permits unescaped nowhere
+ * (none - all of them are illegal raw inside a JSON
+ * string), and we collapse them to a space rather than
+ * deleting them outright, so "line one<CR><LF>line two"
+ * degrades to "line one line two" instead of
+ * "line oneline two".
+ * -----------------------------------------------------
+ */
+function stripControlCharacters(text) {
+  return text.replace(
+    /[\u0000-\u001F\u007F]/g,
+    " "
+  );
+}
+
+/* =========================================================
+   PARSE CATALOG SOURCE
+========================================================= */
+
+function parseCatalogSource(raw) {
+  let text =
+    cleanText(raw);
+
+  if (!text) {
+    throw new Error(
+      "Catalog Source is empty."
+    );
+  }
+
+  text =
+    stripControlCharacters(text);
+
+  /*
+   * First try the entire value as JSON.
+   *
+   * This handles:
+   *
+   * [
+   *   {...},
+   *   {...}
+   * ]
+   *
+   * and also a single object.
+   */
+  try {
+    const parsed =
+      JSON.parse(text);
+
+    if (Array.isArray(parsed)) {
+      return parsed;
+    }
+
+    if (
+      parsed &&
+      typeof parsed === "object"
+    ) {
+      return [parsed];
+    }
+  } catch (_) {
+    /*
+     * Continue below.
+     */
+  }
+
+  /*
+   * The Catalog Publish table currently supplies
+   * multiple JSON objects without the outer array:
+   *
+   * {...},
+   * {...},
+   * {...}
+   *
+   * Wrap the complete value in [ ] and try again.
+   */
+  try {
+    const parsed =
+      JSON.parse(
+        "[" +
+        text +
+        "]"
+      );
+
+    if (Array.isArray(parsed)) {
+      return parsed;
+    }
+  } catch (error) {
+    throw new Error(
+      "Catalog Source could not be parsed as JSON: " +
+      (
+        error instanceof Error
+          ? error.message
+          : String(error)
+      )
+    );
+  }
+
+  throw new Error(
+    "Catalog Source did not contain valid catalog objects."
+  );
+}
+
+/* =========================================================
+   NORMALIZE WORKER URL
+========================================================= */
+
+function cleanBaseUrl(value) {
+  let base =
+    cleanText(value);
+
+  if (!base) {
+    base =
+      DEFAULT_BASE_URL;
+  }
+
+  base =
+    base.replace(
+      /\/+$/,
+      ""
+    );
+
+  return base;
+}
+
+/* =========================================================
+   MAIN
+========================================================= */
+
+async function main() {
+  try {
+    const contract =
+      parseCatalogSource(
+        p1
+      );
+
+    if (!contract.length) {
+      throw new Error(
+        "Catalog Source contains no items."
+      );
+    }
+
+    const invalidIndexes = [];
+
+    for (
+      let i = 0;
+      i < contract.length;
+      i++
+    ) {
+      const item =
+        contract[i];
+
+      if (
+        !item ||
+        typeof item !== "object" ||
+        !cleanText(item.id) ||
+        !cleanText(item.type)
+      ) {
+        invalidIndexes.push(
+          i + 1
+        );
+      }
+    }
+
+    if (
+      invalidIndexes.length
+    ) {
+      throw new Error(
+        "Catalog Source contains invalid item(s) at position(s): " +
+        invalidIndexes.join(", ")
+      );
+    }
+
+    const baseUrl =
+      cleanBaseUrl(
+        p2
+      );
+
+    const endpoint =
+      baseUrl +
+      CATALOG_PATH;
+
+    /*
+     * p3 = publish mode
+     *
+     *   omitted / anything else -> preview (no KV writes)
+     *   "publish"               -> real publish (writes only what changed)
+     */
+    const mode =
+      String(p3 ?? "").trim().toLowerCase();
+
+    const isPublish =
+      mode === "publish";
+
+    const response =
+      await fetch(
+        endpoint,
+        {
+          method:
+            "POST",
+
+          headers: {
+            "Content-Type":
+              "application/json",
+
+            "X-Sky-Catalog-Test-Token":
+              CATALOG_TEST_TOKEN
+          },
+
+          body:
+            JSON.stringify({
+              test:
+                true,
+
+              preview:
+                !isPublish,
+
+              source:
+                "Glide Catalog Source",
+
+              contract
+            })
+        }
+      );
+
+    const responseText =
+      await response.text();
+
+    let result;
+
+    try {
+      result =
+        JSON.parse(
+          responseText
+        );
+    } catch (_) {
+      throw new Error(
+        "Worker returned a non-JSON response: " +
+        responseText
+      );
+    }
+
+    if (!response.ok) {
+      throw new Error(
+        result?.error ||
+        (
+          "Worker returned HTTP " +
+          response.status
+        )
+      );
+    }
+
+    return JSON.stringify(
+      result
+    );
+
+  } catch (error) {
+    return JSON.stringify({
+      status:
+        "ERROR",
+
+      message:
+        error instanceof Error
+          ? error.message
+          : String(error)
+    });
+  }
+}
+
+/* =========================================================
+   RUN
+========================================================= */
+
+return await main();

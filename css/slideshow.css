@@ -64,12 +64,105 @@ transform:translateY(-2px)
 }
 
 
-/* Search */
-.slideshow-search-group{display:flex;align-items:center;gap:0;min-width:38px;max-width:min(240px,40vw);color:var(--text);position:relative}
-.slideshow-search-group input{width:0;opacity:0;height:34px;padding:0;box-sizing:border-box;border:1px solid color-mix(in srgb,var(--control-text) 18%,transparent);outline:0;background:var(--control-bg);color:var(--control-text);font-size:14px;border-radius:10px;backdrop-filter:blur(10px);transition:width .22s ease,opacity .18s ease,padding .22s ease}
-.slideshow-search-group input::placeholder{color:color-mix(in srgb,var(--control-text) 72%,transparent)}
-.slideshow-search-group.searchOpen{gap:7px}
-.slideshow-search-group.searchOpen input{width:min(240px,40vw);opacity:1;padding:0 11px}
+ /* =======================================================
+    STANDARD TOP-BAR SEARCH
+ ======================================================= */
+
+.slideshow-search-group{
+    display:flex;
+    align-items:center;
+
+    gap:0;
+
+    width:330px;
+    max-width:100%;
+    min-width:0;
+
+    color:var(--text);
+
+    position:relative;
+    box-sizing:border-box;
+}
+
+
+.slideshow-search-group input{
+    display:block;
+
+    flex:1 1 auto;
+
+    width:0;
+    min-width:0;
+
+    opacity:0;
+
+    height:34px;
+
+    padding:0;
+
+    box-sizing:border-box;
+
+    border:
+        1px solid
+        color-mix(
+            in srgb,
+            var(--control-text) 18%,
+            transparent
+        );
+
+    outline:0;
+
+    background:var(--control-bg);
+    color:var(--control-text);
+
+    font-size:14px;
+
+    border-radius:10px;
+
+    backdrop-filter:blur(10px);
+
+    transition:
+        width .22s ease,
+        opacity .18s ease,
+        padding .22s ease;
+}
+
+
+.slideshow-search-group input::placeholder{
+    color:
+        color-mix(
+            in srgb,
+            var(--control-text) 72%,
+            transparent
+        );
+}
+
+
+.slideshow-search-group input:focus{
+    box-shadow:
+        0 0 0 2px
+        color-mix(
+            in srgb,
+            var(--control-text) 18%,
+            transparent
+        );
+}
+
+
+.slideshow-search-group.searchOpen{
+    gap:7px;
+}
+
+
+.slideshow-search-group.searchOpen input{
+    width:auto;
+    opacity:1;
+    padding:0 11px;
+}
+
+
+.slideshow-search-group .slideshow-icon-button{
+    flex:0 0 auto;
+}
 
 /* ---------- Workspace / library ---------- */
 .slideshow-workspace{
@@ -105,10 +198,19 @@ transform:translateY(-2px)
 .slideshow-organization-controls,.slideshow-library-view-controls{display:flex;align-items:center;gap:2px;position:relative;}
 .slideshow-org-button,.slideshow-view-button,.slideshow-library-drawer-close{
     width:30px;height:30px;flex:0 0 30px;display:inline-flex;align-items:center;justify-content:center;
-    padding:0;border:0;border-radius:8px;background:transparent;color:#fff;cursor:pointer; font-size:clamp(10px, 2.0vw,20px);text-shadow: 0 2px 3px rgba(0, 0, 0, .55);
+    padding:0;border:0;border-radius:8px;background:transparent;color:#fff;cursor:pointer; font-size:clamp(16px, 2.0vw,20px);text-shadow: 0 2px 3px rgba(0, 0, 0, .55);
 }
 .slideshow-org-button:hover,.slideshow-view-button:hover,.slideshow-view-button.active,.slideshow-library-drawer-close:hover{transform:translateY(-2px);border:1px solid rgba(255,255,255,.18);border-radius:10px;
     box-shadow:0 10px 30px rgba(0,0,0,.3);backdrop-filter:blur(12px)}
+
+/* Larger glyph on mobile so it fills more of the 30px button - the
+   clamp() above bottoms out at 16px on narrow screens, matching the
+   same mobile increase given to .libraryOrgButton (reader) and
+   .video-library-org-button (video.css). Scoped to the sort button
+   only, not the view/drawer-close buttons that share the base rule. */
+@media (max-width:999px){
+    .slideshow-org-button{font-size:26px;}
+}
 .slideshow-org-button .icon,.slideshow-view-button .icon,.slideshow-library-drawer-close .icon{width:18px;height:18px;filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .55));}
 .slideshow-library-drawer-close{display:none}
 .slideshow-org-menu{
@@ -701,6 +803,17 @@ position:relative;    height: fit-content;
     .slideshow-workspace{display:block;padding:0}
     .slideshow-library{position:absolute;left:0;top:0;bottom:0;width:min(88vw,360px);z-index:30;transform:translateX(-105%);transition:transform .28s ease;box-shadow:8px 0 25px rgba(0,0,0,.3)}
     .slideshow-section.slideshow-drawer-open .slideshow-library{transform:translateX(0)}
+
+/* Hide the narrow-library toggle while the slideshow drawer is open. */
+@media (max-width:700px){
+    .slideshow-section.slideshow-drawer-open
+    .slideshow-top-bar .slideshow-narrow-library-toggle{
+        opacity:0 !important;
+        visibility:hidden !important;
+        pointer-events:none !important;
+    }
+}
+
     .slideshow-library-drawer-close{display:inline-flex}
     .slideshow-viewer{width:100%;padding:14px 8px 58px}
     /* width:100% matches #viewerLibrary (style.css, 999px breakpoint) and
@@ -741,13 +854,28 @@ position:relative;    height: fit-content;
    ========================================================= */
 @media (max-width:700px){
     .slideshow-top-bar{grid-template-columns:auto minmax(0,1fr) auto;gap:5px;padding-inline:5px;overflow:visible}
-    .slideshow-top-bar-left{min-width:0;gap:3px}
+    .slideshow-top-bar-left{
+    min-width:0;
+    flex:1 1 auto;
+    display:flex;
+    align-items:center;
+    gap:3px;
+}
     .slideshow-top-bar-right{min-width:0;max-width:44vw;gap:4px;position:relative}
     .slideshow-top-bar-right .app-switcher{display:none}
     .slideshow-top-bar-right .responsive-app-menu-button{display:inline-flex}
     .slideshow-narrow-library-toggle{display:flex;position:relative;left:auto;top:auto;width:34px;height:34px;flex:0 0 34px}
-    .slideshow-search-group{min-width:34px;max-width:48vw}
-    .slideshow-search-group.searchOpen input{width:min(170px,42vw)}
+        .slideshow-search-group{
+        min-width:34px;
+        max-width:none;
+        flex:1 1 auto;
+    }
+
+    .slideshow-search-group.searchOpen input{
+        width:auto;
+        max-width:100%;
+        flex:1 1 auto;
+    }
 }
 @media (max-width:480px){
     .slideshow-top-bar{gap:3px;padding-inline:3px}
@@ -1233,6 +1361,14 @@ position:relative;    height: fit-content;
     opacity:.7;
     min-width:50px;
     text-align:center;
+
+    /* Matches #pageIndicator (reader.css) and .video-status-indicator
+       (video.css) - same light outline/pill treatment for consistency
+       across all three sections. */
+    border:1px solid color-mix(in srgb,var(--muted) 28%,transparent);
+    background:color-mix(in srgb,var(--panel) 72%,transparent);
+    padding:2px 8px;
+    border-radius:7px;
 }
 
 /* When there's no index/count to show, the indicator is left with an

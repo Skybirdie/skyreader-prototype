@@ -273,6 +273,29 @@ ui.clearError=function(){ clearProductionError(); };
 
 function connectReader(){
 
+/*
+ * Keep the Reader loading text synchronized with the shared
+ * SkyMedia loading sequence. The sequence advances on its own
+ * timer, so Reader progress events alone cannot update the visible
+ * message between progress calls.
+ */
+document.addEventListener(
+    "skymedia:loading-message",
+    (event)=>{
+
+        if(
+            !event ||
+            !event.detail ||
+            !dom.loadingText
+        ){
+            return;
+        }
+
+        dom.loadingText.textContent =
+            event.detail.text || "Loading...";
+    }
+);
+
 Reader.on(
 
 "progress",
@@ -332,6 +355,7 @@ dom.progress.value=0;
 
 let bookmarkPositionFrame=null;
 let bookmarkPositionAttempts=0;
+let bookmarkStateEpoch=0;
 
 /*
  * Bookmark storage is always logical-page based.  Display mode is only a
@@ -367,6 +391,18 @@ function clearExtraBookmarkFlags(){
 }
 
 function makeBookmarkFlag(bookmark,index){
+    /* A bookmark flag may only be created/reused while the Reader is open.
+     * Reader.close() can leave queued UI work behind for a few frames; do
+     * not let that stale work resurrect the landing-page flag.
+     */
+    if(
+        typeof Reader!=="undefined" &&
+        typeof Reader.isOpen==="function" &&
+        !Reader.isOpen()
+    ){
+        return null;
+    }
+
     let flag=index===0 ? dom.bookmarkFlag : null;
 
     if(!flag){
@@ -375,6 +411,15 @@ function makeBookmarkFlag(bookmark,index){
         flag.setAttribute('aria-label','Remove bookmark');
         document.body.appendChild(flag);
     }
+
+    /*
+     * clearBookmarkOverlay() uses display:none as a hard close barrier.
+     * A later refresh may legitimately reuse this same DOM node when a
+     * new book opens, so remove that barrier only when a bookmark is being
+     * actively rendered for an open Reader document.
+     */
+    flag.hidden=false;
+    flag.style.removeProperty('display');
 
     /*
      * Use the custom PNG for the page overlay.
@@ -419,6 +464,8 @@ function makeBookmarkFlag(bookmark,index){
 
 function positionBookmarkFlagsWhenReady(items,onReady){
 
+    const epoch=bookmarkStateEpoch;
+
     if(bookmarkPositionFrame){
         cancelAnimationFrame(bookmarkPositionFrame);
         bookmarkPositionFrame=null;
@@ -427,6 +474,16 @@ function positionBookmarkFlagsWhenReady(items,onReady){
     bookmarkPositionAttempts=0;
 
     const check=()=>{
+
+        if(
+            epoch!==bookmarkStateEpoch ||
+            (typeof Reader!=="undefined" &&
+             typeof Reader.isOpen==="function" &&
+             !Reader.isOpen())
+        ){
+            bookmarkPositionFrame=null;
+            return;
+        }
 
         bookmarkPositionAttempts++;
 
@@ -535,6 +592,8 @@ function positionBookmarkFlagsWhenReady(items,onReady){
 
 function scheduleBookmarkFlagReposition(){
 
+    const epoch=++bookmarkStateEpoch;
+
     /*
      * Hide the bookmark while StPageFlip settles the physical page.
      * The final refresh will calculate its position and reveal it once.
@@ -544,6 +603,15 @@ function scheduleBookmarkFlagReposition(){
     });
 
     const refresh=()=>{
+        if(
+            epoch!==bookmarkStateEpoch ||
+            (typeof Reader!=="undefined" &&
+             typeof Reader.isOpen==="function" &&
+             !Reader.isOpen())
+        ){
+            return;
+        }
+
         if(typeof refreshBookmarkState==="function"){
             refreshBookmarkState();
         }
@@ -569,13 +637,42 @@ function hideBookmarkFlag(){
         flag.dataset.bookmarkBook='';
         flag.dataset.bookmarkPage='';
         flag.dataset.bookmarkId='';
+
+        /*
+         * Do not rely only on opacity here. During Reader.close(), a
+         * queued render/animation callback can otherwise briefly reuse the
+         * same #bookmarkFlag element after its active class was removed.
+         * display:none makes the closed-reader state unconditional.
+         */
+        flag.hidden=true;
+        flag.style.setProperty('display','none','important');
     });
     clearExtraBookmarkFlags();
 }
 
+/*
+ * hideBookmarkFlag/clearBookmarkOverlay are declared inside this module's
+ * IIFE, but Reader.close() (reader.js) and clearReaderBookmarkOverlay()
+ * (navigation.js) call them by bare name from their own separate closures.
+ * Without exposing them on window, those `typeof X==="function"` guards
+ * always resolve to false there, so this cleanup silently never ran on
+ * close — the pending bookmark-position rAF loop was never cancelled and
+ * the flag was never hidden, regardless of how this function's own body
+ * was edited. Exposing them here is what actually wires the close path up.
+ */
+window.hideBookmarkFlag=hideBookmarkFlag;
+window.clearBookmarkOverlay=clearBookmarkOverlay;
+
 
 
 function clearBookmarkOverlay(){
+
+    bookmarkStateEpoch++;
+
+    if(bookmarkPositionFrame){
+        cancelAnimationFrame(bookmarkPositionFrame);
+        bookmarkPositionFrame=null;
+    }
 
     hideBookmarkFlag();
 
@@ -612,6 +709,22 @@ function clearBookmarkOverlay(){
 -------------------------------------------------------*/
 
 function refreshBookmarkState(){
+    /*
+     * A bookmark flag belongs to an open Reader document only.
+     * During Reader.close(), StPageFlip/SRNavigation can still report
+     * the previous page briefly while the landing view is being restored.
+     * Do not allow a queued bookmark refresh to recreate the flag on the
+     * landing page after the book has closed.
+     */
+    if(
+        typeof Reader!=='undefined' &&
+        typeof Reader.isOpen==='function' &&
+        !Reader.isOpen()
+    ){
+        clearBookmarkOverlay();
+        return;
+    }
+
     if(!window.Bookmarks || typeof SRNavigation==='undefined' ||
        typeof SRNavigation.bookmark!=='function')return;
 
@@ -635,8 +748,17 @@ function refreshBookmarkState(){
     if(!bookmarked){ hideBookmarkFlag(); return; }
 
     clearExtraBookmarkFlags();
-    const items=visible.map((bookmark,index)=>({bookmark,flag:makeBookmarkFlag(bookmark,index)}));
+    const items=visible
+        .map((bookmark,index)=>({bookmark,flag:makeBookmarkFlag(bookmark,index)}))
+        .filter(item=>item.flag);
+
+    if(!items.length){
+        hideBookmarkFlag();
+        return;
+    }
+
     items.forEach(({flag,bookmark})=>{
+        flag.hidden=false;
         flag.dataset.bookmarkBook=String(pos.book.id||pos.book);
         flag.classList.remove('turning','active');
     });
@@ -2013,6 +2135,20 @@ Reader.on(
 ()=>{
 
 clearProductionError();
+
+/*
+ * Reader.close() sets #statusMessage to "MMicj" as the idle
+ * status-bar text (see reader.js). Nothing on the open path
+ * cleared it back out again, so it kept sitting next to the
+ * real title in #readerTitle once a book was open. #readerTitle
+ * already carries the actual title via updateReaderTitle()
+ * below, so #statusMessage has nothing left to say here.
+ */
+const statusMessage=document.getElementById("statusMessage");
+if(statusMessage){
+    statusMessage.textContent="";
+}
+
 updateReaderTitle();
 
 updatePageIndicator();

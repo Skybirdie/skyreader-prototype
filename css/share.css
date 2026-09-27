@@ -1311,7 +1311,7 @@ body.sky-share-mode .app-switch-button {
 
 .sky-share-media-host .slideshow-playback-status {
     position: absolute !important;
-
+    display:none;
     top: calc(
         var(--sky-share-upper-safe) - 8px
     ) !important;

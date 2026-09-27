@@ -3,7 +3,7 @@
 /*
 =========================================================
  SkyReader Renderer
- Version 3.0
+ Version 3.2.7
 
  PDF.js rendering engine + page-surface manager.
 
@@ -47,6 +47,9 @@ let initialized=false;
 /* Monotonic presentation token used to reject stale asynchronous opens. */
 let presentationToken=0;
 let openToken=0;
+
+/* Active PDF.js loading task. It is cancelled when a newer book replaces it. */
+let activeLoadingTask=null;
 
 const RENDER_WINDOW=6;
 
@@ -101,12 +104,37 @@ function progress(percent,text){
     );
 }
 
+/* Must match PDF_PROXY_PATH in worker.js. */
+const PDF_PROXY_PATH="/__sky_pdf_proxy";
+
 async function resolvePdfUrl(value){
     const raw=String(value||"").trim();
     if(!raw) throw new Error("Book is missing a PDF URL.");
 
-    /* Absolute/data/blob URLs are already complete and must be preserved. */
-    if(/^(?:https?:|data:|blob:)/i.test(raw)) return raw;
+    /* Absolute/data/blob URLs are already complete and must be preserved —
+       EXCEPT that a cross-origin http(s) PDF (e.g. Glide's GCS bucket) is
+       routed through this app's own /__sky_pdf_proxy instead of being
+       fetched directly. A direct cross-origin fetch hides the response
+       headers PDF.js needs (Accept-Ranges/Content-Length) unless the
+       remote host's CORS policy explicitly exposes them, which is not
+       something this app controls for a third-party bucket. Without that
+       visibility PDF.js silently downloads the entire file instead of
+       streaming it — harmless for a small PDF, a multi-minute stall for
+       one bloated by embedded video/audio. Routing through the Worker
+       makes the browser's request same-origin, where none of that
+       header-visibility restriction applies. */
+    if(/^(?:https?:)/i.test(raw)){
+        try{
+            const parsed=new URL(raw);
+            if(parsed.origin!==window.location.origin){
+                return window.location.origin+PDF_PROXY_PATH+"?src="+encodeURIComponent(raw);
+            }
+        }catch(error){
+            /* Malformed — fall through and let PDF.js report the real error. */
+        }
+        return raw;
+    }
+    if(/^(?:data:|blob:)/i.test(raw)) return raw;
 
     const primary=new URL(raw,window.location.href).href;
 
@@ -204,12 +232,56 @@ renderer.spread=function(){
  Page surfaces
 -------------------------------------------------------*/
 
-function createPageSurface(pageNumber){
+/*
+ * createPageSurface() used to build the FULL page DOM — canvas,
+ * 2d context, the media-annotation layer, and eight addEventListener
+ * calls — for every single page in the book, synchronously, before
+ * StPageFlip was even handed the page array. For a large book that is
+ * hundreds of canvases + contexts + listener attachments on the main
+ * thread before a single pixel is visible, which is the actual cause
+ * of the long blank wait on big items (see loadingSequence.js notes).
+ *
+ * StPageFlip's loadFromHTML() does need one real DOM node per page up
+ * front (it uses the array length/order to build its spread/page
+ * collection), but it does NOT need that node to already contain a
+ * canvas or listeners. So page creation is now split in two:
+ *
+ *   createPageShell()     - cheap. Runs for all N pages at open time.
+ *   hydratePageSurface()  - expensive. Runs once, lazily, only for a
+ *                            page that actually enters the render
+ *                            window (see getSurface()).
+ *
+ * The same DOM node is mutated in place (children appended to it
+ * later), so the reference StPageFlip already holds keeps working —
+ * nothing is swapped out from under it.
+ */
+function createPageShell(pageNumber){
     const surface=document.createElement("div");
     surface.className="sky180Page";
     surface.dataset.page=String(pageNumber);
     surface.dataset.density="soft";
     surface.setAttribute("aria-label","Page "+pageNumber);
+
+    pageSurfaces.set(pageNumber,{
+        element:surface,
+        canvas:null,
+        ctx:null,
+        annotationLayer:null,
+        annotationRenderer:null,
+        rendered:false,
+        rendering:false,
+        hydrated:false,
+        viewport:null
+    });
+
+    return surface;
+}
+
+function hydratePageSurface(pageNumber){
+    const item=pageSurfaces.get(pageNumber);
+    if(!item || item.hydrated) return item;
+
+    const surface=item.element;
 
     const canvas=document.createElement("canvas");
     canvas.className="pageCanvas";
@@ -262,18 +334,12 @@ function createPageSurface(pageNumber){
         document.dispatchEvent(new CustomEvent("skyreader:last-page-click"));
     },{passive:true});
 
-    pageSurfaces.set(pageNumber,{
-        element:surface,
-        canvas,
-        ctx,
-        annotationLayer,
-        annotationRenderer:null,
-        rendered:false,
-        rendering:false,
-        viewport:null
-    });
+    item.canvas=canvas;
+    item.ctx=ctx;
+    item.annotationLayer=annotationLayer;
+    item.hydrated=true;
 
-    return surface;
+    return item;
 }
 
 function createSyntheticPageSurface(position){
@@ -300,7 +366,7 @@ function createAllPageSurfaces(twoPageDocument=false){
 
     if(isSinglePageDevice()){
         for(let page=1;page<=pageCount;page++){
-            surfaces.push(createPageSurface(page));
+            surfaces.push(createPageShell(page));
         }
 
         /* StPageFlip is more reliable with at least two internal surfaces.
@@ -315,13 +381,13 @@ function createAllPageSurfaces(twoPageDocument=false){
            pair page 1 with the opening mask and page 2 with the closing mask,
            preventing the document from ever existing as a real 1–2 spread. */
         for(let page=1;page<=pageCount;page++){
-            surfaces.push(createPageSurface(page));
+            surfaces.push(createPageShell(page));
         }
     }else{
         surfaces.push(createSyntheticPageSurface("opening"));
 
         for(let page=1;page<=pageCount;page++){
-            surfaces.push(createPageSurface(page));
+            surfaces.push(createPageShell(page));
         }
 
         if(pageCount%2===0){
@@ -335,7 +401,15 @@ function createAllPageSurfaces(twoPageDocument=false){
 
 
 function getSurface(pageNumber){
-    return pageSurfaces.get(pageNumber)||null;
+    const item=pageSurfaces.get(pageNumber);
+    if(!item) return null;
+
+    /* Build the canvas/context/annotation-layer/listeners only now,
+       the first time this specific page is actually about to be
+       rendered — not for every page in the book at open time. */
+    if(!item.hydrated) hydratePageSurface(pageNumber);
+
+    return item;
 }
 
 /*-------------------------------------------------------
@@ -374,7 +448,16 @@ renderer.open=async function(book,options={}){
 ) {
 
     SkyMediaLoading.start({
-        percent: 5
+        percent: 5,
+        onMessage: function (text) {
+            const loadingText =
+                document.getElementById("loadingText");
+
+            if (loadingText) {
+                loadingText.textContent =
+                    text || "Loading...";
+            }
+        }
     });
 }
 
@@ -394,22 +477,63 @@ progress(
             useSystemFonts:true
         });
 
-        pdf=await task.promise;
+        activeLoadingTask=task;
+
+        /*
+         * This fetch/parse phase is timed on purpose. getDocument() only
+         * needs the document's structure (xref/trailer), not the full byte
+         * content of every embedded object — PDF.js streams the rest on
+         * demand PROVIDED the server advertises byte-range support
+         * (Accept-Ranges + a real Content-Length, no Content-Encoding on
+         * the response). If that support is missing or broken for this
+         * asset, PDF.js silently falls back to downloading the ENTIRE file
+         * before this promise resolves — and a book with large embedded
+         * video/audio attachments can turn that into a multi-minute stall
+         * that has nothing to do with page count. If fetchMs below comes
+         * back large, check the .pdf request in the Network tab: a 206
+         * response with Accept-Ranges: bytes means streaming worked; a
+         * single 200 response sized to the whole file means it didn't.
+         */
+        const fetchStartedAt=performance.now();
+
+        let resolvedPdf;
+        try{
+            resolvedPdf=await task.promise;
+        }finally{
+            if(activeLoadingTask===task){
+                activeLoadingTask=null;
+            }
+        }
+
+        const fetchMs=Math.round(performance.now()-fetchStartedAt);
+        if(fetchMs>2000){
+            console.warn(
+                "[Renderer] PDF fetch/parse for \""+pdfUrl+"\" took "+fetchMs+"ms. "+
+                "If this book has large embedded media, check whether the server "+
+                "returned 206 Partial Content (range requests working) or a single "+
+                "200 response (full-file download, no streaming)."
+            );
+        }
 
         if(
     token!==openToken ||
     presentation!==presentationToken
 ){
-
-    if (
-        window.SkyMediaLoading
-    ) {
-
-        SkyMediaLoading.stop();
-    }
-
+    /* A newer open owns the loading overlay. Do not stop its sequence. */
     return;
 }
+
+        /*
+         * Only commit to the shared `pdf` variable once this load is
+         * confirmed to still be the current one. Two overlapping loads
+         * (the user picking a different book while one is still
+         * loading) can have their pdfjsLib.getDocument() promises
+         * settle in either order - assigning `pdf` unconditionally
+         * here let a stale/superseded load clobber the correct one
+         * even though it was about to bail out on the very next line,
+         * breaking all further rendering for the book actually wanted.
+         */
+        pdf=resolvedPdf;
 
         pageCount=pdf.numPages;
 
@@ -457,11 +581,36 @@ progress(
          */
         const initialPages=(singlePage || pageCount===1) ? [1] : [1,2];
 
+        const paintStartedAt=performance.now();
+
+        /*
+         * A page carrying an embedded video can take a very long time to
+         * render. Once its media rectangle is detected and the holder is on
+         * screen the reader is released
+
+         * instead of keeping the global loading screen up until the page
+         * pixels arrive; the page keeps rendering in the background.
+         */
         await Promise.all(
-            initialPages.map(pageNumber=>renderPage(pageNumber,true,token))
+            initialPages.map(pageNumber=>{
+                const work=renderPage(pageNumber,true,token);
+                work.catch(()=>{});
+                const item=pageSurfaces.get(pageNumber);
+                return Promise.race([work,whenLoadingHolderShown(item)]);
+            })
         );
 
         if(token!==openToken) return;
+
+        const paintMs=Math.round(performance.now()-paintStartedAt);
+        if(paintMs>1500){
+            console.warn(
+                "[Renderer] Painting the initial page(s) ("+initialPages.join(",")+
+                ") took "+paintMs+"ms. Note: since annotation/media wiring is now "+
+                "backgrounded (see scheduleAnnotationWork), this number reflects "+
+                "pdf.js's own page.render() cost, not link/video setup."
+            );
+        }
 
         if (
     window.SkyMediaLoading
@@ -606,6 +755,132 @@ function scheduleWindow(center,token){
 }
 
 /*-------------------------------------------------------
+ Temporary embedded-video loading holder
+
+ WHY THE PREVIOUS VERSION NEVER APPEARED
+ 1. It was installed only AFTER `await page.getAnnotations()`. On a
+    page carrying an embedded video that call is the slow one (it is
+    queued behind / blocked by the same PDF.js worker work that
+    produces the page pixels), so the holder was created at about the
+    moment the page itself finished - i.e. never visible.
+ 2. page.render() was also gated behind that same await, so the
+    holder's arrival delayed the page instead of covering for it.
+ 3. It lived INSIDE the PDF.js annotation layer, and
+    renderMediaAnnotations() begins with layer.innerHTML="", which
+    deleted it the instant annotation wiring started.
+ 4. It was positioned in raw px of the renderScale viewport (2x). The
+    page element is CSS-scaled by StPageFlip, so the box landed at the
+    wrong place/size (usually clipped away by overflow:hidden).
+ 5. It forced surface.element.style.display="block". StPageFlip owns
+    that element's inline style (it rewrites style.cssText on every
+    drawFrame / clear), so the override was overwritten - and on a
+    page that is not in the open spread it is actively harmful.
+
+ THIS VERSION
+ - Own sibling layer directly in the page element (untouched by
+   PDF.js and by renderMediaAnnotations).
+ - Percent geometry, so it follows StPageFlip's scaling and resizes.
+ - Installed WITHOUT waiting for the worker: if the media rectangle
+   is known it is used; otherwise, if the page is still rendering
+   after PREPAINT_FALLBACK_DELAY_MS, a full-page holder is shown and
+   is narrowed to the media rectangle when annotations arrive (or
+   dropped if the page turns out to have no media).
+ - Removed only when the media control is really on the page (or the
+   render/wiring ends), never on a poll/observer.
+-------------------------------------------------------*/
+
+/* Show a generic full-page holder if a page is still rendering after this
+   many ms and its media rectangle is not known yet. 0 disables the fallback
+   (holder then appears only once a media annotation has been detected). */
+const PREPAINT_FALLBACK_DELAY_MS=1000;
+
+function removeEmbeddedVideoLoadingHolder(surface){
+    if(!surface) return;
+    if(surface._skyreaderHolderTimer){
+        clearTimeout(surface._skyreaderHolderTimer);
+        surface._skyreaderHolderTimer=null;
+    }
+    if(surface.element){
+        surface.element
+            .querySelectorAll('.skyreaderEmbeddedVideoLoadingHolder')
+            .forEach(el=>el.remove());
+    }
+}
+
+/* rect: PDF-space [x1,y1,x2,y2] or null for "whole page". */
+function showEmbeddedVideoLoadingHolder(surface,viewport,rect,reason){
+    if(!surface || !surface.element) return false;
+
+    let leftPct=0,topPct=0,widthPct=100,heightPct=100;
+
+    if(rect && viewport && typeof viewport.convertToViewportRectangle==='function'){
+        const r=viewport.convertToViewportRectangle(rect);
+        const left=Math.min(r[0],r[2]);
+        const top=Math.min(r[1],r[3]);
+        const width=Math.abs(r[2]-r[0]);
+        const height=Math.abs(r[3]-r[1]);
+        if(width>0 && height>0 && viewport.width>0 && viewport.height>0){
+            leftPct=left/viewport.width*100;
+            topPct=top/viewport.height*100;
+            widthPct=width/viewport.width*100;
+            heightPct=height/viewport.height*100;
+        }else{
+            rect=null;
+        }
+    }else{
+        rect=null;
+    }
+
+    let holder=surface.element.querySelector('.skyreaderEmbeddedVideoLoadingHolder');
+    if(!holder){
+        holder=document.createElement('div');
+        holder.className='skyreaderEmbeddedVideoLoadingHolder';
+        holder.setAttribute('aria-hidden','true');
+        Object.assign(holder.style,{
+            position:'absolute',
+            zIndex:'19',              /* above canvas, below annotation layer (20) */
+            pointerEvents:'none',
+            background:'rgba(0,0,0,.82)',
+            backgroundImage:'url(assets/pdf-vid-loading.gif)',
+            backgroundRepeat:'no-repeat',
+            backgroundPosition:'center center',
+            backgroundSize:'75% 75%',
+            boxSizing:'border-box'
+        });
+        surface.element.appendChild(holder);
+    }
+
+    holder.dataset.mode=rect?'media-rect':'page';
+    holder.style.left=leftPct+'%';
+    holder.style.top=topPct+'%';
+    holder.style.width=widthPct+'%';
+    holder.style.height=heightPct+'%';
+
+    /* A real media rectangle is known: anyone waiting to reveal the reader
+       can stop waiting now. (The generic slow-render fallback does not
+       release the reveal - an ordinary slow page keeps the normal loader.) */
+    if(rect && typeof surface._skyreaderHolderShown==='function'){
+        surface._skyreaderHolderShown();
+    }
+
+    console.info('[VideoDiag] Page '+surface.element.dataset.page+
+        ' loading holder shown ('+reason+', '+
+        (rect?'media rect':'full page')+')');
+    return true;
+}
+
+/* Resolves once a holder has been shown for this page (used by open()). */
+function whenLoadingHolderShown(surface){
+    if(!surface) return new Promise(()=>{});
+    if(!surface._skyreaderHolderWait){
+        surface._skyreaderHolderWait=new Promise(resolve=>{
+            surface._skyreaderHolderShown=resolve;
+        });
+    }
+    return surface._skyreaderHolderWait;
+}
+
+/*-------------------------------------------------------
  Render one page
 -------------------------------------------------------*/
 
@@ -616,6 +891,9 @@ async function renderPage(pageNumber,visible=false,token=openToken){
     if(!surface || surface.rendered || surface.rendering) return;
 
     surface.rendering=true;
+    whenLoadingHolderShown(surface);   /* make sure the hook exists */
+
+    let pageDone=false;
 
     try{
         if(visible){
@@ -632,6 +910,48 @@ async function renderPage(pageNumber,visible=false,token=openToken){
         const viewport=page.getViewport({scale:renderScale});
         surface.viewport=viewport;
 
+        /*
+         * Media detection runs IN PARALLEL with page.render(); it never
+         * gates it. When (if) it resolves with a media annotation before
+         * the page finishes, the holder is placed/narrowed to that
+         * rectangle. It resolves to [] on a page without media.
+         */
+        removeEmbeddedVideoLoadingHolder(surface);
+
+        if(PREPAINT_FALLBACK_DELAY_MS>0){
+            surface._skyreaderHolderTimer=setTimeout(()=>{
+                surface._skyreaderHolderTimer=null;
+                if(token!==openToken || pageDone) return;
+                if(!surface.element.querySelector('.skyreaderEmbeddedVideoLoadingHolder')){
+                    showEmbeddedVideoLoadingHolder(surface,viewport,null,'slow render fallback');
+                }
+            },PREPAINT_FALLBACK_DELAY_MS);
+        }
+
+        page.getAnnotations({intent:'display'})
+            .then(annotations=>{
+                if(token!==openToken || pageDone) return;
+                const media=annotations.filter(annotation=>
+                    annotation && (
+                        annotation.subtype==='Screen' ||
+                        annotation.subtype==='RichMedia' ||
+                        annotation.subtype==='Sound' ||
+                        annotation.subtype==='Movie'
+                    )
+                );
+                if(media.length){
+                    if(surface._skyreaderHolderTimer){
+                        clearTimeout(surface._skyreaderHolderTimer);
+                        surface._skyreaderHolderTimer=null;
+                    }
+                    showEmbeddedVideoLoadingHolder(surface,viewport,media[0].rect,'media annotation detected');
+                }else{
+                    /* No media: a fallback holder was a false alarm. */
+                    removeEmbeddedVideoLoadingHolder(surface);
+                }
+            })
+            .catch(()=>{});
+
         surface.canvas.width=viewport.width;
         surface.canvas.height=viewport.height;
 
@@ -645,23 +965,88 @@ async function renderPage(pageNumber,visible=false,token=openToken){
             viewport
         }).promise;
 
+        pageDone=true;
+
         if(token!==openToken) return;
 
         surface.rendered=true;
         renderedPages.add(pageNumber);
-
-        await renderLinks(surface,page,viewport);
-        await renderMediaAnnotations(surface,page,viewport);
 
         if(pageNumber===currentPage){
             currentViewport=viewport;
             renderer.resize();
         }
 
+        /*
+         * If a media holder is up, it deliberately STAYS after the canvas
+         * is painted: the page is now visible around it, and the holder
+         * marks the spot until the real PDF.js media control replaces it
+         * (renderMediaAnnotations removes it). A fallback (full-page)
+         * holder that never learned of any media is dropped here instead.
+         */
+        const holder=surface.element.querySelector('.skyreaderEmbeddedVideoLoadingHolder');
+        if(holder && holder.dataset.mode!=='media-rect'){
+            removeEmbeddedVideoLoadingHolder(surface);
+        }
+
+        /*
+         * Links and media annotations are wiring, not pixels. They run in
+         * the background (see scheduleAnnotationWork) so they never hold
+         * up first paint or the initial "ready" reveal.
+         */
+        scheduleAnnotationWork(pageNumber,surface,page,viewport,token);
+
+    }
+    catch(error){
+        removeEmbeddedVideoLoadingHolder(surface);
+        throw error;
     }
     finally{
+        pageDone=true;
         surface.rendering=false;
     }
+}
+
+/*-------------------------------------------------------
+ Deferred link/media-annotation wiring (see renderPage above)
+-------------------------------------------------------*/
+
+function scheduleAnnotationWork(pageNumber,surface,page,viewport,token){
+    (async()=>{
+        const linksStart=performance.now();
+        try{
+            await renderLinks(surface,page,viewport);
+            if(token!==openToken) return;
+
+            const mediaStart=performance.now();
+            await renderMediaAnnotations(surface,page,viewport);
+            if(token!==openToken) return;
+
+            const doneAt=performance.now();
+            const linksMs=Math.round(mediaStart-linksStart);
+            const mediaMs=Math.round(doneAt-mediaStart);
+
+            /*
+             * Loud on purpose. If a page's annotation/media wiring is slow
+             * enough for a person to notice, this line says so and says
+             * which half (hyperlinks vs. embedded media) is responsible,
+             * instead of leaving it to be re-discovered by guesswork.
+             */
+            if(linksMs+mediaMs>750){
+                console.warn(
+                    "[Renderer] Page "+pageNumber+" annotation wiring was slow — "+
+                    "links: "+linksMs+"ms, media: "+mediaMs+"ms."
+                );
+            }
+        }catch(error){
+            if(token===openToken){
+                console.warn("[Renderer] Annotation wiring failed for page",pageNumber,error);
+            }
+        }finally{
+            /* Never leave a loading holder behind, whatever happened. */
+            removeEmbeddedVideoLoadingHolder(surface);
+        }
+    })();
 }
 
 /*-------------------------------------------------------
@@ -673,7 +1058,16 @@ async function renderLinks(surface,page,viewport){
         .querySelectorAll(".pdfLink")
         .forEach(link=>link.remove());
 
+    const annotationStart=performance.now();
     const annotations=await page.getAnnotations();
+    const annotationMs=Math.round(performance.now()-annotationStart);
+
+    if(annotationMs>250){
+        console.info(
+            "[VideoDiag] Page "+page.pageNumber+" getAnnotations (links path): "+
+            annotationMs+"ms; annotation count: "+annotations.length
+        );
+    }
 
     for(const annotation of annotations){
         if(annotation.subtype!=="Link") continue;
@@ -728,7 +1122,10 @@ async function renderMediaAnnotations(surface,page,viewport){
     layer.innerHTML="";
     surface.annotationRenderer=null;
 
+    const annotationStart=performance.now();
     const annotations=await page.getAnnotations({intent:"display"});
+    const annotationMs=Math.round(performance.now()-annotationStart);
+
     const mediaAnnotations=annotations.filter(annotation=>
         annotation && (
             annotation.subtype==="Screen" ||
@@ -739,6 +1136,12 @@ async function renderMediaAnnotations(surface,page,viewport){
     );
 
     if(!mediaAnnotations.length) return;
+
+    console.info(
+        "[VideoDiag] Page "+page.pageNumber+" media detected — "+
+        "getAnnotations: "+annotationMs+"ms; "+
+        "media annotations: "+mediaAnnotations.length
+    );
 
     console.info("[SkyReader] PDF media annotations:", mediaAnnotations);
 
@@ -791,6 +1194,8 @@ async function renderMediaAnnotations(surface,page,viewport){
 
         surface.annotationRenderer=rendererLayer;
 
+        const mediaRenderStart=performance.now();
+
         await rendererLayer.render({
             viewport:pdfViewport,
             annotations:mediaAnnotations,
@@ -801,10 +1206,24 @@ async function renderMediaAnnotations(surface,page,viewport){
             enableScripting:false
         });
 
+        const mediaRenderMs=Math.round(performance.now()-mediaRenderStart);
+        console.info(
+            "[VideoDiag] Page "+page.pageNumber+" AnnotationLayer.render: "+
+            mediaRenderMs+"ms; getAnnotations: "+annotationMs+"ms; total media path: "+
+            Math.round(performance.now()-annotationStart)+"ms"
+        );
+
         const mediaContainer=layer.querySelector(".mediaAnnotation");
         const playButton=layer.querySelector(".mediaAnnotation .mediaPlayButton");
 
+        /* PDF.js has now built the real media control (or produced none):
+           the temporary loading holder has done its job either way. */
+        removeEmbeddedVideoLoadingHolder(surface);
+
         if(mediaContainer){
+            const removeMediaLoadingHolder=()=>
+                removeEmbeddedVideoLoadingHolder(surface);
+
             console.info("[SkyReader] PDF.js media annotation rendered:",mediaContainer);
             if(playButton){
                 playButton.title=playButton.title || "Play embedded video";
@@ -820,7 +1239,13 @@ async function renderMediaAnnotations(surface,page,viewport){
              */
             const installMediaControls=()=>{
                 const video=mediaContainer.querySelector("video.mediaContent");
-                if(!video || video.dataset.skyreaderControlsInstalled==="1") return;
+                if(!video) return;
+
+                /* The real PDF.js video now exists. Remove the temporary
+                   holder immediately so it can never remain over playback. */
+                removeMediaLoadingHolder();
+
+                if(video.dataset.skyreaderControlsInstalled==="1") return;
 
                 video.dataset.skyreaderControlsInstalled="1";
                 video.controls=false;
@@ -935,6 +1360,10 @@ async function renderMediaAnnotations(surface,page,viewport){
                     if(typeof request==="function") request.call(video);
                 });
 
+                ["loadstart","loadedmetadata","loadeddata","canplay","playing"].forEach(type=>{
+                    video.addEventListener(type,removeMediaLoadingHolder,{once:type==="playing"});
+                });
+
                 video.addEventListener("play",()=>{ update(); showControls(); });
                 video.addEventListener("pause",()=>{ update(); showControls(); });
                 video.addEventListener("ended",()=>{ update(); showControls(); });
@@ -1042,6 +1471,17 @@ renderer.statistics=function(){
 renderer.close=function(){
     openToken++;
     presentationToken++;
+
+    if(activeLoadingTask){
+        try{
+            activeLoadingTask.destroy();
+        }catch(error){}
+        activeLoadingTask=null;
+    }
+
+    if(window.SkyMediaLoading){
+        SkyMediaLoading.stop();
+    }
 
     if(typeof Sky180FlipEngine!=="undefined"){
         Sky180FlipEngine.close();
