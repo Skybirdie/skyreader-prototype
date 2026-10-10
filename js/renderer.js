@@ -107,26 +107,87 @@ function progress(percent,text){
 /* Must match PDF_PROXY_PATH in worker.js. */
 const PDF_PROXY_PATH="/__sky_pdf_proxy";
 
+/* Which cross-origin hosts have their PDFs streamed through the Worker's
+   /__sky_pdf_proxy. Everything else is fetched directly by the browser.
+
+   Why a list and not "every cross-origin PDF": the proxy exists for one
+   reason - a third-party host that does not expose Accept-Ranges /
+   Content-Length to this page (CORS) makes PDF.js download the WHOLE file
+   before the first page shows. Hosts you control (e.g. R2 with a CORS rule
+   exposing those headers) stream fine when fetched directly, and need no
+   Worker request at all.
+
+   Configure with window.SKY_PDF_PROXY_HOSTS, set BEFORE this script runs:
+       window.SKY_PDF_PROXY_HOSTS = ["storage.googleapis.com"];  // default
+       window.SKY_PDF_PROXY_HOSTS = [];   // never proxy (no Worker needed)
+   Entries are host names; "*.example.com" matches any sub-domain. */
+function pdfProxyHosts(){
+    const configured=window.SKY_PDF_PROXY_HOSTS;
+    if(Array.isArray(configured)){
+        return configured
+            .map(value=>String(value||"").trim().toLowerCase())
+            .filter(Boolean);
+    }
+    return ["storage.googleapis.com"];
+}
+
+function pdfHostIsProxied(hostname){
+    const host=String(hostname||"").toLowerCase();
+    return pdfProxyHosts().some(entry=>
+        entry.startsWith("*.")
+            ? host.endsWith(entry.slice(1))
+            : host===entry
+    );
+}
+
+/* If the proxy turns out to be unavailable (no Worker on this host, route
+   missing, host refused) the app falls back to a direct fetch and remembers
+   that for the rest of the browser session, so later books do not repeat
+   the failed attempt. */
+const PDF_PROXY_DOWN_KEY="sky.pdfProxyDown";
+
+function pdfProxyKnownDown(){
+    try{ return window.sessionStorage.getItem(PDF_PROXY_DOWN_KEY)==="1"; }
+    catch(error){ return false; }
+}
+
+function markPdfProxyDown(){
+    try{ window.sessionStorage.setItem(PDF_PROXY_DOWN_KEY,"1"); }
+    catch(error){ /* storage unavailable - the fallback still works per book */ }
+}
+
+function isPdfProxyUrl(url){
+    return typeof url==="string" &&
+        url.indexOf(window.location.origin+PDF_PROXY_PATH+"?")===0;
+}
+
+/* The plain cross-origin URL for a book PDF, or "" when there is none. */
+function directPdfUrl(value){
+    const raw=String(value||"").trim();
+    if(!/^https?:/i.test(raw)) return "";
+    try{
+        return new URL(raw).origin!==window.location.origin ? raw : "";
+    }catch(error){
+        return "";
+    }
+}
+
 async function resolvePdfUrl(value){
     const raw=String(value||"").trim();
     if(!raw) throw new Error("Book is missing a PDF URL.");
 
-    /* Absolute/data/blob URLs are already complete and must be preserved —
-       EXCEPT that a cross-origin http(s) PDF (e.g. Glide's GCS bucket) is
-       routed through this app's own /__sky_pdf_proxy instead of being
-       fetched directly. A direct cross-origin fetch hides the response
-       headers PDF.js needs (Accept-Ranges/Content-Length) unless the
-       remote host's CORS policy explicitly exposes them, which is not
-       something this app controls for a third-party bucket. Without that
-       visibility PDF.js silently downloads the entire file instead of
-       streaming it — harmless for a small PDF, a multi-minute stall for
-       one bloated by embedded video/audio. Routing through the Worker
-       makes the browser's request same-origin, where none of that
-       header-visibility restriction applies. */
+    /* Absolute http(s) URLs are preserved. A cross-origin one is routed
+       through this app's own /__sky_pdf_proxy only when its host is on the
+       proxy list (see pdfProxyHosts) and the proxy has not already failed
+       in this session. */
     if(/^(?:https?:)/i.test(raw)){
         try{
             const parsed=new URL(raw);
-            if(parsed.origin!==window.location.origin){
+            if(
+                parsed.origin!==window.location.origin &&
+                pdfHostIsProxied(parsed.hostname) &&
+                !pdfProxyKnownDown()
+            ){
                 return window.location.origin+PDF_PROXY_PATH+"?src="+encodeURIComponent(raw);
             }
         }catch(error){
@@ -497,10 +558,10 @@ progress(
             }
         }
 
-        const pdfUrl=await resolvePdfUrl(book.pdf);
+        let pdfUrl=await resolvePdfUrl(book.pdf);
         progress(8,"Loading PDF");
 
-        const task=pdfjsLib.getDocument({
+        const docOptions={
             url:pdfUrl,
             enableXfa:false,
             useSystemFonts:true,
@@ -517,7 +578,9 @@ progress(
              * Next step to try once this is proven: 1048576 (1 MiB).
              */
             rangeChunkSize:262144
-        });
+        };
+
+        let task=pdfjsLib.getDocument(docOptions);
 
         activeLoadingTask=task;
 
@@ -540,7 +603,30 @@ progress(
 
         let resolvedPdf;
         try{
-            resolvedPdf=await task.promise;
+            try{
+                resolvedPdf=await task.promise;
+            }catch(error){
+                /* A proxied load failed (no Worker here, route missing, host
+                   refused). Retry once straight from the source - the way
+                   books loaded before the proxy existed - unless a newer
+                   open has taken over in the meantime. */
+                const direct=directPdfUrl(book.pdf);
+                if(
+                    isPdfProxyUrl(pdfUrl) &&
+                    direct &&
+                    token===openToken &&
+                    presentation===presentationToken
+                ){
+                    console.warn("[Renderer] PDF proxy unavailable; loading directly.",error);
+                    markPdfProxyDown();
+                    pdfUrl=direct;
+                    task=pdfjsLib.getDocument({...docOptions,url:direct});
+                    activeLoadingTask=task;
+                    resolvedPdf=await task.promise;
+                }else{
+                    throw error;
+                }
+            }
         }finally{
             if(activeLoadingTask===task){
                 activeLoadingTask=null;
