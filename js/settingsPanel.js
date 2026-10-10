@@ -21,6 +21,7 @@ window.SettingsPanel=(function(){
               <label class="sr-setting-row"><span>Remember reading position</span><input id="srSettingRemember" type="checkbox"></label>
               <label class="sr-setting-row"><span>Remember zoom</span><input id="srSettingZoom" type="checkbox"></label>
               <label class="sr-setting-row"><span>Page-turn sound</span><input id="srSettingSound" type="checkbox"></label>
+              <label class="sr-setting-row"><span>Page edges (book thickness)</span><input id="srSettingBookStack" type="checkbox"></label>
 
 <label class="sr-setting-row">
   <span>Continue media playback in background</span>
@@ -58,6 +59,12 @@ window.SettingsPanel=(function(){
             StorageManager.setMuted(!enabled);
         };
 
+        root.querySelector("#srSettingBookStack").onchange=()=>{
+            if(window.BookStack){
+                BookStack.setEnabled(root.querySelector("#srSettingBookStack").checked);
+            }
+        };
+
         root.querySelector("#srSettingBackgroundMedia").onchange=()=>{
             if(window.MediaManager){
                 MediaManager.setBackgroundPlayback(
@@ -73,6 +80,12 @@ window.SettingsPanel=(function(){
         root.querySelector("#srFullscreenButton").onclick=async()=>{
             if(typeof UI!=="undefined" && UI.toggleFullscreen){
                 await UI.toggleFullscreen();
+                /* Video / Slideshow fullscreen a single viewer element,
+                   which cannot paint this body-level dialog. Close it so
+                   it does not reappear when fullscreen ends. */
+                if(document.fullscreenElement && document.fullscreenElement!==document.documentElement){
+                    api.hide();
+                }
                 api.sync();
             }
         };
@@ -88,6 +101,8 @@ window.SettingsPanel=(function(){
         el.querySelector("#srSettingZoom").checked=settings.rememberZoom!==false;
         el.querySelector("#srSettingSound").checked=window.AudioController?!AudioController.isMuted():state.muted!==true;
         el.querySelector("#srSettingVolume").value=window.AudioController?AudioController.volume():state.volume;
+
+el.querySelector("#srSettingBookStack").checked=window.BookStack?BookStack.isEnabled():false;
 
 el.querySelector("#srSettingBackgroundMedia").checked =
     window.MediaManager

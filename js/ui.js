@@ -330,21 +330,25 @@ if(dom.loadingText){
 
 });
 
-Reader.on(
-
-"closed",
-
-()=>{
-
-ui.hideToolbar();
-
-if(dom.progress){
-
-dom.progress.value=0;
-
-}
-
-});
+/*
+ * A second, more complete "closed" handler is registered further down
+ * this file (see "Reader Events" — it also calls exitViewerFocus(),
+ * updateReaderTitle(), updatePageIndicator() and updateProgress()).
+ * reader.events.closed is a single-slot callback, not a listener list,
+ * so whichever registration runs LAST wins. That other registration
+ * sits at this module's top level and therefore runs as soon as this
+ * script is parsed, while this function only runs later, when
+ * UI.initialize() is actually invoked (see app.js) — so a handler
+ * registered here would silently overwrite the more complete one and
+ * "closed" would fall back to only hiding the toolbar and resetting
+ * the progress bar. Concretely, that meant exitViewerFocus() never
+ * ran, so a book closed from the Front Page's fullscreen view left
+ * #app stuck in .viewerFocus with #libraryPanel and the rest of the
+ * chrome hidden. Do not re-add a "closed" registration here; add to
+ * the one near "Reader Events" instead. (updateProgress() already
+ * resets dom.progress to 0 when the Reader is closed, so no
+ * functionality was lost by removing the duplicate.)
+ */
 
 }
 
@@ -2136,6 +2140,10 @@ Reader.on(
 
 clearProductionError();
 
+/* A book opened while the page is already fullscreen joins the
+   Reader's fullscreen mode (Focus viewer). */
+syncReaderFocusToFullscreen();
+
 /*
  * Reader.close() sets #statusMessage to "MMicj" as the idle
  * status-bar text (see reader.js). Nothing on the open path
@@ -2296,6 +2304,25 @@ updateViewerFocusIcon(false);
 requestAnimationFrame(()=>window.dispatchEvent(new Event("resize")));
 }
 
+/*
+ * Explicit entry (mirrors exitViewerFocus). Lets a caller outside the
+ * Reader's own toolbar - e.g. the Front Page opening a book straight
+ * into its full view - put the Reader into exactly the same "Focus
+ * viewer" state as the viewerFullscreenButton does, rather than
+ * reaching for the unrelated browser Fullscreen API. Safe to call
+ * unconditionally: a no-op when focus mode is already active.
+ */
+function enterViewerFocus(){
+const app=document.getElementById("app");
+if(!app)return;
+if(app.classList.contains("viewerFocus"))return;
+app.classList.add("viewerFocus");
+updateViewerFocusIcon(true);
+requestAnimationFrame(()=>window.dispatchEvent(new Event("resize")));
+}
+
+ui.enterViewerFocus=enterViewerFocus;
+
 /*-------------------------------------------------------
   Responsive Layout
 -------------------------------------------------------*/
@@ -2336,19 +2363,67 @@ updateLayout
   Fullscreen
 -------------------------------------------------------*/
 
+/*
+ * The top-bar "Enter fullscreen" action only asks the browser to hide
+ * its own bars / the device bars. What the app looks like inside
+ * fullscreen is each section's OWN fullscreen mode, so the action
+ * enters that mode instead of inventing a separate layout:
+ *
+ *   Reader     browser fullscreen on the page + the Reader's
+ *              "Focus viewer" state (#app.viewerFocus) while a book
+ *              is open. With no book open the layout is unchanged.
+ *   Video      #videoViewer fullscreen (same as Front Page -> full viewer)
+ *   Slideshow  #slideshowViewer fullscreen (same as its Focus viewer button)
+ *   other      plain page fullscreen
+ *
+ * Leaving fullscreen by any route (this action, Esc, a viewer button)
+ * is handled by the fullscreenchange listener below.
+ */
+let readerFocusFromFullscreen=false;
+
+function currentSectionId(){
+    return (typeof AppSwitcher!=="undefined" && typeof AppSwitcher.current==="function")
+        ? AppSwitcher.current()
+        : "reader";
+}
+
+/* Put an open Reader book into Focus viewer while the page itself is
+   fullscreen (the Reader's fullscreen mode). Only ever adds the state
+   this action owns, so a Focus viewer the user already set is left alone. */
+function syncReaderFocusToFullscreen(){
+    if(document.fullscreenElement!==document.documentElement)return;
+    if(currentSectionId()!=="reader")return;
+    if(typeof Reader==="undefined"||typeof Reader.isOpen!=="function"||!Reader.isOpen())return;
+    const app=document.getElementById("app");
+    if(!app||app.classList.contains("viewerFocus"))return;
+    enterViewerFocus();
+    readerFocusFromFullscreen=true;
+}
+
 ui.toggleFullscreen=
 
 async function(){
 
 try{
 
-    if(!document.fullscreenElement){
+    if(document.fullscreenElement){
 
-        await document.documentElement.requestFullscreen();
+        await document.exitFullscreen();
 
     }else{
 
-        await document.exitFullscreen();
+        const section=currentSectionId();
+
+        const target=
+            section==="video"
+                ? document.getElementById("videoViewer")
+                : section==="slideshow"
+                    ? document.getElementById("slideshowViewer")
+                    : null;
+
+        await (target||document.documentElement).requestFullscreen();
+
+        if(!target)syncReaderFocusToFullscreen();
 
     }
 
@@ -2364,9 +2439,33 @@ try{
 
 };
 
+/* A video embedded in a PDF page has its own maximize button. That is the
+   video's fullscreen, not the app's fullscreen mode, so the handler below
+   must not react to it (it re-showed the toolbar and fired a synthetic
+   resize on both enter and exit, which made the book flicker). The exit
+   event arrives with no fullscreen element, so it is remembered. */
+let embeddedPdfVideoFullscreen=false;
+
+function isEmbeddedPdfVideo(element){
+    return !!(element &&
+              element.tagName==="VIDEO" &&
+              typeof element.closest==="function" &&
+              element.closest(".skyreaderMediaAnnotationLayer"));
+}
+
 document.addEventListener(
 "fullscreenchange",
 ()=>{
+
+    if(isEmbeddedPdfVideo(document.fullscreenElement)){
+        embeddedPdfVideoFullscreen=true;
+        return;
+    }
+
+    if(embeddedPdfVideoFullscreen){
+        embeddedPdfVideoFullscreen=false;
+        return;
+    }
 
     fullscreen=!!document.fullscreenElement;
 
@@ -2386,20 +2485,30 @@ document.addEventListener(
     );
 
     /*
-     * Keep the Reader toolbar and application top bar synchronized
-     * with fullscreen.
+     * Fullscreen no longer hides the Reader toolbar itself: the
+     * Reader's fullscreen mode (Focus viewer) keeps it available, and
+     * hiding it here left no way to leave the mode. Leaving fullscreen
+     * drops the Focus viewer state this action added.
      */
-    if(fullscreen){
+    if(!fullscreen){
 
-    ui.hideToolbar();
+        if(readerFocusFromFullscreen){
 
-}else if(typeof Reader!=="undefined" &&
-         typeof Reader.isOpen==="function" &&
-         Reader.isOpen()){
+            readerFocusFromFullscreen=false;
 
-    ui.showToolbar();
+            exitViewerFocus();
 
-}
+        }
+
+        if(typeof Reader!=="undefined" &&
+           typeof Reader.isOpen==="function" &&
+           Reader.isOpen()){
+
+            ui.showToolbar();
+
+        }
+
+    }
 
     requestAnimationFrame(()=>{
 

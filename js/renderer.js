@@ -3,7 +3,7 @@
 /*
 =========================================================
  SkyReader Renderer
- Version 3.2.7
+ Version 3.2.9
 
  PDF.js rendering engine + page-surface manager.
 
@@ -331,6 +331,12 @@ function hydratePageSurface(pageNumber){
         if(Number(pageNumber)!==Number(pageCount)) return;
         if(event.target.closest && event.target.closest(".pdfLink")) return;
         if(event.target.closest && event.target.closest(".skyreaderMediaAnnotationLayer")) return;
+        /* Share Mode: a tap on the last page must never close the book.
+           Touch pointer events are deliberately let through there (so swipes
+           work), which used to let this event fire and close the book through
+           the normal Reader route instead of Share Mode's own X / landing
+           flow. The only legitimate close in Share Mode is the X button. */
+        if(document.body && document.body.classList.contains("sky-share-mode")) return;
         document.dispatchEvent(new CustomEvent("skyreader:last-page-click"));
     },{passive:true});
 
@@ -468,13 +474,49 @@ progress(
 );
 
     try{
+        /*
+         * pdf.js is loaded as an ES module from a CDN (see index.html) and
+         * only exists on window once that download finishes. A normal open
+         * is a user click, long after that. A shared-book link is different:
+         * the Worker injects the item, so Share Mode reaches this line
+         * within milliseconds of page load - before pdf.js has arrived -
+         * and pdfjsLib.getDocument() below threw ReferenceError. Videos and
+         * slideshows never touch pdf.js, which is why only books vanished.
+         * Wait (bounded) for the same readiness gate every other PDF path
+         * is meant to use. Already-loaded case: no wait at all.
+         */
+        if(!window.pdfjsLib){
+            progress(6,"Preparing reader");
+            if(typeof window.waitForPdfjs==="function"){
+                await window.waitForPdfjs(30000);
+            }
+            if(!window.pdfjsLib){
+                throw new Error(
+                    "The PDF engine could not be loaded. Check your connection and reload."
+                );
+            }
+        }
+
         const pdfUrl=await resolvePdfUrl(book.pdf);
         progress(8,"Loading PDF");
 
         const task=pdfjsLib.getDocument({
             url:pdfUrl,
             enableXfa:false,
-            useSystemFonts:true
+            useSystemFonts:true,
+            /*
+             * Cross-origin PDFs are streamed through the Worker's
+             * /__sky_pdf_proxy, and every byte-range request is one
+             * billed Worker request. pdf.js asks for 64 KiB at a time
+             * by default (about 16 requests per MB); 256 KiB cuts that
+             * up to fourfold while keeping the worst-case wait for a
+             * single chunk small on slow connections. Only the
+             * granularity of the range requests changes - pages are
+             * still fetched on demand, and background auto-fetch of the
+             * rest of the file is deliberately left on.
+             * Next step to try once this is proven: 1048576 (1 MiB).
+             */
+            rangeChunkSize:262144
         });
 
         activeLoadingTask=task;
@@ -1015,7 +1057,15 @@ function scheduleAnnotationWork(pageNumber,surface,page,viewport,token){
     (async()=>{
         const linksStart=performance.now();
         try{
-            await renderLinks(surface,page,viewport);
+            /* Links and media are independent. A failure while wiring links
+               must never stop the embedded video/audio from being wired. */
+            try{
+                await renderLinks(surface,page,viewport);
+            }catch(linkError){
+                if(token===openToken){
+                    console.warn("[Renderer] Link wiring failed for page",pageNumber,linkError);
+                }
+            }
             if(token!==openToken) return;
 
             const mediaStart=performance.now();
@@ -1053,13 +1103,100 @@ function scheduleAnnotationWork(pageNumber,surface,page,viewport,token){
  Hyperlinks
 -------------------------------------------------------*/
 
+/* Only these schemes may be opened from a PDF link. PDF.js already
+   sanitises `annotation.url`, but `unsafeUrl` is the raw string, so it
+   is checked here before it is ever put into an href. */
+function isSafeLinkUrl(value){
+    if(!value || typeof value!=="string") return false;
+    try{
+        const parsed=new URL(value,window.location.href);
+        return ["http:","https:","mailto:","tel:"].includes(parsed.protocol);
+    }catch(_){
+        return false;
+    }
+}
+
+/* Turn a PDF link destination into a 1-based page number.
+   `dest` is either a named destination (string) that must be looked up,
+   or an explicit destination array already ([pageRef,/XYZ,...]). The
+   old code always called pdf.getDestination(dest), which fails for the
+   explicit-array form that Word/PowerPoint exports commonly use. */
+async function resolveLinkDestinationPage(dest){
+    if(!pdf || dest==null) return null;
+
+    const explicit=(typeof dest==="string") ? await pdf.getDestination(dest) : dest;
+    if(!Array.isArray(explicit) || !explicit.length) return null;
+
+    const target=explicit[0];
+    if(Number.isInteger(target)) return target+1;
+
+    const pageIndex=await pdf.getPageIndex(target);
+    return pageIndex+1;
+}
+
+/* Convert a PDF-space rectangle [x1,y1,x2,y2] into viewport (canvas
+   pixel) space.
+
+   PDF.js 6.x PageViewport no longer has convertToViewportRectangle(),
+   and calling it threw "is not a function" before a single link was
+   created. This helper uses the method when a PDF.js build still has it,
+   otherwise applies the viewport transform matrix itself, and as a last
+   resort rebuilds that matrix from viewBox/scale/rotation using the
+   same maths PDF.js uses internally. */
+function pdfRectToViewportRect(viewport,rect){
+    if(typeof viewport.convertToViewportRectangle==="function"){
+        return viewport.convertToViewportRectangle(rect);
+    }
+
+    let t=viewport.transform;
+
+    if(!Array.isArray(t) || t.length!==6){
+        const scale=viewport.scale||1;
+        const rotation=(((viewport.rotation||0)%360)+360)%360;
+        const vb=viewport.viewBox||[0,0,viewport.width/scale,viewport.height/scale];
+
+        let a,b,c,d;
+        switch(rotation){
+            case 90:  a=0;  b=1;  c=1;  d=0;  break;
+            case 180: a=-1; b=0;  c=0;  d=1;  break;
+            case 270: a=0;  b=-1; c=-1; d=0;  break;
+            default:  a=1;  b=0;  c=0;  d=-1; break;
+        }
+
+        const cx=(vb[2]+vb[0])/2;
+        const cy=(vb[3]+vb[1])/2;
+        let ox,oy;
+        if(a===0){
+            ox=Math.abs(cy-vb[1])*scale;
+            oy=Math.abs(cx-vb[0])*scale;
+        }else{
+            ox=Math.abs(cx-vb[0])*scale;
+            oy=Math.abs(cy-vb[1])*scale;
+        }
+
+        t=[
+            a*scale,b*scale,c*scale,d*scale,
+            ox-a*scale*cx-c*scale*cy,
+            oy-b*scale*cx-d*scale*cy
+        ];
+    }
+
+    const apply=(x,y)=>[
+        t[0]*x+t[2]*y+t[4],
+        t[1]*x+t[3]*y+t[5]
+    ];
+    const p1=apply(rect[0],rect[1]);
+    const p2=apply(rect[2],rect[3]);
+    return [p1[0],p1[1],p2[0],p2[1]];
+}
+
 async function renderLinks(surface,page,viewport){
     surface.element
         .querySelectorAll(".pdfLink")
         .forEach(link=>link.remove());
 
     const annotationStart=performance.now();
-    const annotations=await page.getAnnotations();
+    const annotations=await page.getAnnotations({intent:"display"});
     const annotationMs=Math.round(performance.now()-annotationStart);
 
     if(annotationMs>250){
@@ -1069,42 +1206,99 @@ async function renderLinks(surface,page,viewport){
         );
     }
 
+    let linkAnnotations=0;
+    let wired=0;
+
     for(const annotation of annotations){
         if(annotation.subtype!=="Link") continue;
+        linkAnnotations++;
+
+        /* Work out what this link does BEFORE drawing anything, so an
+           inert box is never laid over the page. */
+        const rawUrl=annotation.url||annotation.unsafeUrl||null;
+        const targetUrl=isSafeLinkUrl(rawUrl) ? rawUrl : null;
+        const hasDest=annotation.dest!=null;
+        const namedAction=annotation.action||null;   /* NextPage, PrevPage, ... */
+
+        if(!targetUrl && !hasDest && !namedAction){
+            console.info(
+                "[Links] Page "+page.pageNumber+": Link annotation skipped "+
+                "(no usable URL, destination or action).",annotation
+            );
+            continue;
+        }
+
+        /* annotation.rect is in unscaled PDF user space (origin bottom-left,
+           and possibly offset/rotated), while `viewport` is rendered at
+           renderScale (2x). convertToViewportRectangle applies scale,
+           rotation, and page origin; the result is normalised because the
+           y axis flips. */
+        const vr=pdfRectToViewportRect(viewport,annotation.rect);
+        const vLeft=Math.min(vr[0],vr[2]);
+        const vTop=Math.min(vr[1],vr[3]);
+        const vWidth=Math.abs(vr[2]-vr[0]);
+        const vHeight=Math.abs(vr[3]-vr[1]);
+
+        if(!(vWidth>0) || !(vHeight>0)) continue;
 
         const link=document.createElement("a");
         link.className="pdfLink";
-        link.style.position="absolute";
-        link.style.left=(annotation.rect[0]/viewport.width*100)+"%";
-        link.style.top=((viewport.height-annotation.rect[3])/viewport.height*100)+"%";
-        link.style.width=((annotation.rect[2]-annotation.rect[0])/viewport.width*100)+"%";
-        link.style.height=((annotation.rect[3]-annotation.rect[1])/viewport.height*100)+"%";
-        link.style.cursor="pointer";
-        link.style.background="transparent";
-        link.style.zIndex="20";
+        link.style.left=(vLeft/viewport.width*100)+"%";
+        link.style.top=(vTop/viewport.height*100)+"%";
+        link.style.width=(vWidth/viewport.width*100)+"%";
+        link.style.height=(vHeight/viewport.height*100)+"%";
 
-        if(annotation.url){
-            /* External PDF links open in a separate browser tab/window.
-               Keep the reader page intact while allowing the device/browser
-               to decide whether the new destination becomes a tab or window. */
-            link.href=annotation.url;
+        if(targetUrl){
+            /* External links use a real anchor so the browser opens them as
+               a user-initiated navigation (no popup-blocker problems).
+               _blank keeps the reader page intact. */
+            link.href=targetUrl;
             link.target="_blank";
             link.rel="noopener noreferrer";
+            link.title=targetUrl;
         }
-        else if(annotation.dest){
+        else{
             link.href="#";
-            link.onclick=async event=>{
+            link.addEventListener("click",async event=>{
                 event.preventDefault();
+                try{
+                    if(hasDest){
+                        const destPage=await resolveLinkDestinationPage(annotation.dest);
+                        if(destPage) renderer.goTo(destPage);
+                        return;
+                    }
 
-                const destination=await pdf.getDestination(annotation.dest);
-                if(!destination) return;
-
-                const pageIndex=await pdf.getPageIndex(destination[0]);
-                renderer.goTo(pageIndex+1);
-            };
+                    switch(namedAction){
+                        case "NextPage":  renderer.goTo(currentPage+1); break;
+                        case "PrevPage":  renderer.goTo(currentPage-1); break;
+                        case "FirstPage": renderer.goTo(1); break;
+                        case "LastPage":  renderer.goTo(pageCount); break;
+                    }
+                }catch(error){
+                    console.warn("[Links] Internal link failed on page "+page.pageNumber,error);
+                }
+            });
         }
+
+        /* A click on a link is a link click, never a page turn. StPageFlip
+           listens for mousedown on the book block; stopping the event here
+           guarantees it cannot start a fold/flip from a link, and stops
+           the document-level click handlers from also reacting. */
+        ["pointerdown","mousedown","click"].forEach(type=>{
+            link.addEventListener(type,event=>event.stopPropagation());
+        });
 
         surface.element.appendChild(link);
+        wired++;
+    }
+
+    /* One quiet line per page so "no link annotations in this PDF" is
+       distinguishable from "annotations found but not wired". */
+    if(linkAnnotations>0){
+        console.info(
+            "[Links] Page "+page.pageNumber+": "+wired+" of "+linkAnnotations+
+            " link annotation(s) wired."
+        );
     }
 }
 
@@ -1119,6 +1313,19 @@ async function renderMediaAnnotations(surface,page,viewport){
     if(!surface || !surface.annotationLayer) return;
 
     const layer=surface.annotationLayer;
+
+    /* Never rebuild the layer while one of its videos is fullscreen.
+       Clearing it removes that <video> from the document, and the browser
+       ends fullscreen the instant the fullscreen element is removed -- which
+       is why "maximize" opened the video and closed it again straight away
+       (entering fullscreen resizes the page, the resize refreshes the
+       Reader, the refresh re-renders this page). The existing layer is
+       still valid, so skipping the rebuild loses nothing. */
+    const fullscreenHost=document.fullscreenElement || document.webkitFullscreenElement;
+    if(fullscreenHost && layer.contains(fullscreenHost)) return;
+    const nativeFullscreenVideo=layer.querySelector("video.mediaContent");
+    if(nativeFullscreenVideo && nativeFullscreenVideo.webkitDisplayingFullscreen) return;
+
     layer.innerHTML="";
     surface.annotationRenderer=null;
 
@@ -1213,14 +1420,17 @@ async function renderMediaAnnotations(surface,page,viewport){
             Math.round(performance.now()-annotationStart)+"ms"
         );
 
-        const mediaContainer=layer.querySelector(".mediaAnnotation");
-        const playButton=layer.querySelector(".mediaAnnotation .mediaPlayButton");
+        /* A page can carry several embedded videos. Every one needs the
+           same wiring; wiring only the first left the others as bare
+           PDF.js play buttons with none of SkyReader's controls. */
+        const mediaContainers=Array.from(layer.querySelectorAll(".mediaAnnotation"));
 
         /* PDF.js has now built the real media control (or produced none):
            the temporary loading holder has done its job either way. */
         removeEmbeddedVideoLoadingHolder(surface);
 
-        if(mediaContainer){
+        mediaContainers.forEach(mediaContainer=>{
+            const playButton=mediaContainer.querySelector(".mediaPlayButton");
             const removeMediaLoadingHolder=()=>
                 removeEmbeddedVideoLoadingHolder(surface);
 
@@ -1356,8 +1566,19 @@ async function renderMediaAnnotations(surface,page,viewport){
                 });
 
                 fullscreen.addEventListener("click",()=>{
-                    const request=video.requestFullscreen || video.webkitRequestFullscreen;
-                    if(typeof request==="function") request.call(video);
+                    /* iPhone Safari only offers webkitEnterFullscreen on a
+                       <video>; the standard calls do not exist there. */
+                    const request=video.requestFullscreen ||
+                                  video.webkitRequestFullscreen ||
+                                  video.webkitEnterFullscreen;
+                    if(typeof request==="function"){
+                        try{
+                            const result=request.call(video);
+                            if(result && typeof result.catch==="function") result.catch(()=>{});
+                        }catch(error){
+                            console.warn("[SkyReader] Video fullscreen failed.",error);
+                        }
+                    }
                 });
 
                 ["loadstart","loadedmetadata","loadeddata","canplay","playing"].forEach(type=>{
@@ -1385,7 +1606,9 @@ async function renderMediaAnnotations(surface,page,viewport){
             const mediaObserver=new MutationObserver(installMediaControls);
             mediaObserver.observe(mediaContainer,{childList:true,subtree:true});
             mediaContainer._skyreaderMediaObserver=mediaObserver;
-        }else{
+        });
+
+        if(!mediaContainers.length){
             console.warn("[SkyReader] PDF.js returned no mediaAnnotation element.",mediaAnnotations);
         }
     }catch(error){

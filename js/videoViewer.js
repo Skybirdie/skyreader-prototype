@@ -55,6 +55,162 @@ or, for videos one hour or longer:
 ---------------------------------------------------------
 */
 
+/*
+=========================================================
+ RESUME POSITION
+ Stored separately from "skyvideo-recent" (which stays a
+ plain id list used by sorting) as { id: {t, d, at} }.
+ Only local files are tracked; embedded (iframe) players
+ do not expose their position.
+=========================================================
+*/
+
+const VIDEO_POSITION_KEY = "skyvideo-positions";
+const VIDEO_POSITION_MIN_SECONDS = 5;
+const VIDEO_POSITION_END_MARGIN = 5;
+const VIDEO_POSITION_SAVE_INTERVAL = 5000;
+const VIDEO_POSITION_MAX_ENTRIES = 100;
+
+let pendingResumeTime = null;
+let lastPositionSave = 0;
+
+function readVideoPositions() {
+
+    try {
+
+        const value =
+            JSON.parse(
+                localStorage.getItem(VIDEO_POSITION_KEY) || "{}"
+            );
+
+        return value && typeof value === "object" && !Array.isArray(value)
+            ? value
+            : {};
+
+    }
+    catch (e) {
+
+        return {};
+
+    }
+
+}
+
+function writeVideoPositions(map) {
+
+    const keys = Object.keys(map);
+
+    if (keys.length > VIDEO_POSITION_MAX_ENTRIES) {
+
+        keys
+            .sort((a, b) => (map[a]?.at || 0) - (map[b]?.at || 0))
+            .slice(0, keys.length - VIDEO_POSITION_MAX_ENTRIES)
+            .forEach(key => { delete map[key]; });
+
+    }
+
+    try {
+
+        localStorage.setItem(
+            VIDEO_POSITION_KEY,
+            JSON.stringify(map)
+        );
+
+    }
+    catch (e) {}
+
+}
+
+function getVideoPosition(id) {
+
+    if (!id) {
+        return null;
+    }
+
+    const entry = readVideoPositions()[id];
+
+    return entry && Number.isFinite(entry.t) && entry.t > 0
+        ? entry
+        : null;
+
+}
+
+/*
+ Save (or clear) the current video's position. Clears the entry
+ when the video was restarted or finished. Does nothing until the
+ player has real metadata, and while a requested resume has not yet
+ been applied, so a freshly loaded source can never overwrite the
+ saved position with 0.
+*/
+function saveVideoPosition() {
+
+    if (
+        !currentVideo ||
+        !currentVideo.id ||
+        activePlayerType !== "video" ||
+        !videoElement ||
+        pendingResumeTime !== null ||
+        videoElement.readyState < 1
+    ) {
+        return;
+    }
+
+    const time = videoElement.currentTime;
+    const duration = videoElement.duration;
+
+    if (
+        !Number.isFinite(time) ||
+        !Number.isFinite(duration) ||
+        duration <= 0
+    ) {
+        return;
+    }
+
+    const map = readVideoPositions();
+    const id = String(currentVideo.id);
+
+    if (
+        videoElement.ended ||
+        time < VIDEO_POSITION_MIN_SECONDS ||
+        time >= duration - VIDEO_POSITION_END_MARGIN
+    ) {
+
+        if (map[id]) {
+
+            delete map[id];
+
+            writeVideoPositions(map);
+
+        }
+
+        return;
+
+    }
+
+    map[id] = {
+        t: Math.floor(time),
+        d: Math.floor(duration),
+        at: Date.now()
+    };
+
+    writeVideoPositions(map);
+
+}
+
+function saveVideoPositionThrottled() {
+
+    const now = Date.now();
+
+    if (now - lastPositionSave < VIDEO_POSITION_SAVE_INTERVAL) {
+        return;
+    }
+
+    lastPositionSave = now;
+
+    saveVideoPosition();
+
+}
+
 function formatVideoTime(seconds) {
 
     if (!Number.isFinite(seconds) || seconds < 0) {
@@ -235,6 +391,39 @@ function bindVideoTimingEvents() {
     videoElement.addEventListener(
         "ended",
         updateVideoTimer
+    );
+
+    /* Resume position tracking. */
+
+    videoElement.addEventListener(
+        "timeupdate",
+        saveVideoPositionThrottled
+    );
+
+    videoElement.addEventListener(
+        "pause",
+        saveVideoPosition
+    );
+
+    videoElement.addEventListener(
+        "ended",
+        saveVideoPosition
+    );
+
+    window.addEventListener(
+        "pagehide",
+        saveVideoPosition
+    );
+
+    document.addEventListener(
+        "visibilitychange",
+        () => {
+
+            if (document.visibilityState === "hidden") {
+                saveVideoPosition();
+            }
+
+        }
     );
 
 }
@@ -718,8 +907,13 @@ function createWatchAgainCard(video) {
     subtitle.className =
         "video-landing-recent-subtitle";
 
+    const savedPosition =
+        getVideoPosition(video.id);
+
     subtitle.textContent =
-        "Last watched";
+        savedPosition
+            ? "Resume at " + formatVideoTime(savedPosition.t)
+            : "Last watched";
 
 
     info.appendChild(title);
@@ -733,7 +927,12 @@ function createWatchAgainCard(video) {
         "click",
         () => {
 
-            openVideo(video);
+            openVideo(
+                video,
+                savedPosition
+                    ? { resumeAt: savedPosition.t }
+                    : undefined
+            );
 
         }
     );
@@ -853,21 +1052,26 @@ function createLandingCircle(video) {
         "video-landing-circle";
 
 
-    if (video.thumbnail) {
+    const image =
+        document.createElement("img");
 
-        const image =
-            document.createElement("img");
+    image.src =
+        video.thumbnail || "assets/default-thumbnail.png";
 
-        image.src =
-            video.thumbnail;
+    image.alt =
+        video.title || "";
 
-        image.alt =
-            video.title || "";
+    image.loading =
+        "lazy";
 
-        image.loading =
-            "lazy";
+    circle.appendChild(image);
 
-        circle.appendChild(image);
+    if (
+        window.VideoLibrary &&
+        typeof VideoLibrary.attachDurationBadge === "function"
+    ) {
+
+        VideoLibrary.attachDurationBadge(circle, video);
 
     }
 
@@ -1415,6 +1619,10 @@ function recordRecentVideo(video) {
 
 function stopForMediaManager() {
 
+    saveVideoPosition();
+
+    pendingResumeTime = null;
+
     clearActivePlayer();
 
 
@@ -1466,7 +1674,7 @@ function stopForMediaManager() {
 =========================================================
 */
 
-function openVideo(video) {
+function openVideo(video, options) {
 
     if (!video || !videoElement) {
         return;
@@ -1488,6 +1696,19 @@ function openVideo(video) {
 
     currentVideo =
         video;
+
+
+    /*
+    A resume time is only honoured when explicitly requested
+    (the Continue card). Every other open starts from 0.
+    */
+
+    pendingResumeTime =
+        options &&
+        Number.isFinite(options.resumeAt) &&
+        options.resumeAt > 0
+            ? options.resumeAt
+            : null;
 
 
     lastSelectedVideo =
@@ -1613,13 +1834,23 @@ function closeVideo() {
 
     /*
     Release true browser fullscreen first.
+
+    The Front Page "open full viewer" control fullscreens the
+    whole #videoViewer element (not just the <video>/iframe), so
+    that element must be released here too, otherwise the viewer
+    stays fullscreen/black with the section bars and panels hidden
+    after the item is closed.
     */
 
     if (
         document.fullscreenElement &&
         (
             document.fullscreenElement === videoElement ||
-            document.fullscreenElement === iframeElement
+            document.fullscreenElement === iframeElement ||
+            (
+                viewerElement &&
+                document.fullscreenElement === viewerElement
+            )
         )
     ) {
 
@@ -1628,6 +1859,11 @@ function closeVideo() {
         );
 
     }
+
+
+    saveVideoPosition();
+
+    pendingResumeTime = null;
 
 
     clearActivePlayer();
@@ -1722,6 +1958,35 @@ function closeVideo() {
 */
 
 function handleMetadata() {
+
+    /*
+    Apply a requested resume position once the duration is known.
+    */
+
+    if (
+        pendingResumeTime !== null &&
+        currentVideo &&
+        activePlayerType === "video"
+    ) {
+
+        const target = pendingResumeTime;
+
+        const duration = videoElement.duration;
+
+        if (Number.isFinite(duration) && duration > 0) {
+
+            pendingResumeTime = null;
+
+            if (target < duration - VIDEO_POSITION_END_MARGIN) {
+
+                videoElement.currentTime = target;
+
+            }
+
+        }
+
+    }
+
 
     /*
     Update playback timer immediately when duration
@@ -2125,6 +2390,31 @@ function getCurrentVideo() {
 
 
 /*
+ True while the current video is actively playing. Embedded
+ (iframe) players cannot be inspected, so they are treated as
+ playing while open. Used by AppSwitcher to honour the
+ Background Playback setting when leaving the Video section.
+*/
+function isPlaying() {
+
+    if (!currentVideo) {
+        return false;
+    }
+
+    if (activePlayerType === "iframe") {
+        return true;
+    }
+
+    return Boolean(
+        videoElement &&
+        !videoElement.paused &&
+        !videoElement.ended
+    );
+
+}
+
+
+/*
 =========================================================
  PUBLIC API
 =========================================================
@@ -2151,6 +2441,8 @@ return {
     fullscreen,
 
     getCurrentVideo,
+
+    isPlaying,
 
     renderLanding
 

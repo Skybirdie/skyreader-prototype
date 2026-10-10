@@ -201,6 +201,56 @@ return true;
 
         }
     }
+    /*
+     * Resume position: { id: {i, n, at} } in "skyslideshow-positions",
+     * kept separate from the "skyslideshow-recent" id list.
+     * Slide 1 and the final slide count as "no position".
+     */
+    const POSITION_KEY = "skyslideshow-positions";
+    const POSITION_MAX_ENTRIES = 100;
+
+    function readPositions() {
+        try {
+            const value = JSON.parse(localStorage.getItem(POSITION_KEY) || "{}");
+            return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+        } catch (e) {
+            return {};
+        }
+    }
+
+    function writePositions(map) {
+        const keys = Object.keys(map);
+        if (keys.length > POSITION_MAX_ENTRIES) {
+            keys
+                .sort((a, b) => (map[a]?.at || 0) - (map[b]?.at || 0))
+                .slice(0, keys.length - POSITION_MAX_ENTRIES)
+                .forEach(key => { delete map[key]; });
+        }
+        try { localStorage.setItem(POSITION_KEY, JSON.stringify(map)); } catch (e) {}
+    }
+
+    function getSavedPosition(id) {
+        if (!id) return null;
+        const entry = readPositions()[id];
+        return entry && Number.isInteger(entry.i) && entry.i > 0 ? entry : null;
+    }
+
+    function saveSlidePosition() {
+        if (!current || !current.id) return;
+        const map = readPositions();
+        const id = String(current.id);
+        const total = slideCount();
+        if (index <= 0 || index >= total - 1) {
+            if (map[id]) {
+                delete map[id];
+                writePositions(map);
+            }
+            return;
+        }
+        map[id] = { i: index, n: total, at: Date.now() };
+        writePositions(map);
+    }
+
     function renderLanding() {
         const container = document.getElementById("slideshowLandingLibrary"); if (!container) return;
         container.innerHTML = "";
@@ -261,10 +311,10 @@ img.addEventListener("error", () => {
 
             const info=document.createElement("div"); info.className="slideshow-landing-recent-info";
             const title=document.createElement("div"); title.className="slideshow-landing-recent-title"; title.textContent=recentItem.title||"";
-            const subtitle=document.createElement("div"); subtitle.className="slideshow-landing-recent-subtitle"; subtitle.textContent="Last viewed";
+            const subtitle=document.createElement("div"); subtitle.className="slideshow-landing-recent-subtitle"; const savedPosition=getSavedPosition(recentItem.id); subtitle.textContent=savedPosition?("Resume at slide "+(savedPosition.i+1)+" of "+savedPosition.n):"Last viewed";
             info.append(title,subtitle);
             b.append(img,info);
-            b.addEventListener("click",()=>open(recentItem)); recentContainer.appendChild(b);
+            b.addEventListener("click",()=>open(recentItem,savedPosition?{startIndex:savedPosition.i}:undefined)); recentContainer.appendChild(b);
         }
         list.forEach(item => {
             const b = document.createElement("button"); b.type="button"; b.className="slideshow-landing-card";
@@ -741,6 +791,7 @@ function updateAudioCue() { const cue = document.getElementById("slideshowAudioC
         if(!total)return;
 
         index=Math.max(0,Math.min(indexToShow,total-1));
+        saveSlidePosition();
         updateStatus();
 
         let built;
@@ -760,22 +811,6 @@ function updateAudioCue() { const cue = document.getElementById("slideshowAudioC
 
         const startTransition=()=>{
             if(generation!==transitionGeneration || !current)return;
-
-            /*
-             * A one-slide slideshow has nothing to transition to.
-             * Display the slide directly instead of fading the same
-             * slide in again when its playback interval is reached.
-             * Multi-slide shows continue through the existing
-             * SlideshowTransitions path unchanged.
-             */
-            if(total === 1){
-                stage.innerHTML="";
-                stage.appendChild(fresh);
-                transitionBusy=false;
-                if(playing) schedule();
-                return;
-            }
-
             stage.appendChild(fresh);
             transitionBusy=true;
 
@@ -821,27 +856,6 @@ function updateAudioCue() { const cue = document.getElementById("slideshowAudioC
         const total=slideCount();
         if(!total)return;
 
-        /*
-         * SINGLE-SLIDE SPECIAL CASE
-         *
-         * Never transition from the only slide back to itself.
-         * When original/music audio is driving playback, leave the
-         * slide displayed until that audio ends; its existing ended
-         * handler will call finish(). Without continuous audio, the
-         * normal slide interval simply completes the slideshow.
-         */
-        if(total === 1){
-            if(
-                (audioMode === "original" || audioMode === "music") &&
-                !audioCompleted
-            ){
-                return;
-            }
-
-            if(playing) finish();
-            return;
-        }
-
         if(index<total-1){
             if(audioMode==="effects") playSound(EFFECT_URL);
             show(index+1,1,fromTimer);
@@ -856,6 +870,14 @@ function updateAudioCue() { const cue = document.getElementById("slideshowAudioC
             !audioCompleted;
 
         if(audioIsDrivingPlayback){
+            if(total<=1){
+                // A single-slide slideshow has nothing to transition
+                // to. Keep the slide on screen as-is and just keep
+                // waiting for the audio to finish instead of
+                // re-rendering it as a pointless self-transition.
+                schedule();
+                return;
+            }
             if(audioMode==="effects") playSound(EFFECT_URL);
             show(0,1,fromTimer);
         }else if(playing){
@@ -995,11 +1017,12 @@ if (
         updateTitle();
         updateStatus();
         setAudioMode("none");
+        renderLanding();
     }
     function refreshLayout(){ if(!root||!stage)return; }
     function toggleFullscreen(){if(!root)return;if(document.fullscreenElement)document.exitFullscreen?.();else root.requestFullscreen?.().catch(()=>{});}
 
-async function open(item) {
+async function open(item, options) {
 
     if (!item) return;
 
@@ -1102,7 +1125,9 @@ if (
 
         setAudioMode(item.audio ? "original" : "none");
 
-        await show(0);
+        /* A start slide is only honoured when explicitly requested (Continue card). */
+        const requestedStart=options && Number.isInteger(options.startIndex) ? options.startIndex : 0;
+        await show(requestedStart>0 && requestedStart<total ? requestedStart : 0);
 
         try{
             const key="skyslideshow-recent";

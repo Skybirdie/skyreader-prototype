@@ -2664,25 +2664,67 @@ async function waitForSharedSlideshowReady() {
 
     function stopNonBookMedia() {
 
+        /*
+         * VideoViewer's public API names this closeVideo() (there is no
+         * VideoViewer.close), so the old check never matched and a
+         * playing video / YouTube iframe kept playing after X. closeVideo()
+         * pauses and unloads the <video> and blanks the iframe. The
+         * close() branch is kept in case an older build exposes it.
+         */
         if (
             isVideoShare() &&
-            window.VideoViewer &&
-            typeof VideoViewer.close ===
-                "function"
+            window.VideoViewer
         ) {
 
-            try {
+            const closeVideoFn =
+                typeof VideoViewer.closeVideo ===
+                    "function"
+                    ? VideoViewer.closeVideo
+                    : (
+                        typeof VideoViewer.close ===
+                            "function"
+                            ? VideoViewer.close
+                            : null
+                    );
 
-                VideoViewer.close();
+            if (closeVideoFn) {
 
+                try {
+
+                    closeVideoFn.call(
+                        VideoViewer
+                    );
+
+                }
+                catch (error) {
+
+                    console.warn(
+                        "[SkyMedia Share] Video close cleanup:",
+                        error
+                    );
+                }
             }
-            catch (error) {
+        }
 
-                console.warn(
-                    "[SkyMedia Share] Video close cleanup:",
-                    error
+        /* Safety net: blank any video iframe still in the viewer. */
+        if (isVideoShare()) {
+
+            document
+                .querySelectorAll(
+                    "#videoViewer iframe"
+                )
+                .forEach(
+                    frame => {
+
+                        try {
+                            frame.src =
+                                "about:blank";
+                        }
+                        catch (error) {
+                            /* ignore */
+                        }
+                    }
                 );
-            }
         }
 
 
@@ -3410,7 +3452,21 @@ async function waitForSharedSlideshowReady() {
                 "#pageJump",
                 "#pageJumpInput",
                 ".sky-share-actions",
-                ".sky-share-close-button"
+                ".sky-share-close-button",
+                /*
+                 * The final-page guards exist only to stop a click on
+                 * the last page from CLOSING the book. They cancel every
+                 * click/mousedown/mouseup inside #viewerArea, and a phone
+                 * tap reaches a button as a synthesized click - so an
+                 * embedded video's play button and its controls, and PDF
+                 * hyperlinks, were dead on the last page of a shared
+                 * book. These are interactive content, never a close
+                 * gesture (Renderer already excludes them from
+                 * skyreader:last-page-click), so they pass through.
+                 */
+                ".mediaAnnotation",
+                ".skyreaderMediaControls",
+                ".pdfLink"
             ].join(",")
         );
     }
@@ -3485,6 +3541,27 @@ async function waitForSharedSlideshowReady() {
     function blockFinalPageMouseEvent(
         event
     ) {
+
+        /*
+         * skyreader:last-page-click is dispatched on document, so the
+         * "target is inside #viewerArea" test below can never match it and
+         * it used to slip through on touch (touch pointer events are
+         * deliberately allowed past these guards so swipes work). In a
+         * shared book it must never reach the Reader's close handler.
+         */
+        if (event.type === "skyreader:last-page-click") {
+            if (isBookShare()) {
+                event.preventDefault();
+                event.stopPropagation();
+                if (
+                    typeof event.stopImmediatePropagation ===
+                        "function"
+                ) {
+                    event.stopImmediatePropagation();
+                }
+            }
+            return;
+        }
 
         if (
             !isFinalPageBookSurface(
@@ -4118,6 +4195,84 @@ async function waitForSharedSlideshowReady() {
        CLOSED STATE
     ===================================================== */
 
+    /* =====================================================
+       CLOSED STATE - REPLAY BUTTON
+       -----------------------------------------------------
+       Reopens the shared item (book / video / slideshow)
+       from its start by reloading the share link. A reload
+       rebuilds the page exactly as the link first did, so
+       none of the close-state styling has to be undone.
+       The book resume marker is only written while a book
+       is OPEN; this reload happens from the closed state,
+       so a book starts at page 1.
+       Visibility, position and glow live in share.css.
+    ===================================================== */
+    function createClosedReplayButton() {
+
+        if (!shell) {
+            return null;
+        }
+
+        let button =
+            shell.querySelector(
+                ".sky-share-replay-button"
+            );
+
+        if (button) {
+            return button;
+        }
+
+        button =
+            document.createElement(
+                "button"
+            );
+
+        button.type =
+            "button";
+
+        button.className =
+            "sky-share-replay-button";
+
+        button.title =
+            "Replay from the start";
+
+        button.setAttribute(
+            "aria-label",
+            "Replay from the start"
+        );
+
+        button.innerHTML =
+            '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
+            '<path d="M4.5 12a7.5 7.5 0 1 0 2.4-5.5" ' +
+            'fill="none" stroke="currentColor" stroke-width="2.2" ' +
+            'stroke-linecap="round" stroke-linejoin="round"/>' +
+            '<path d="M4 3.5v4.6h4.6" fill="none" stroke="currentColor" ' +
+            'stroke-width="2.2" stroke-linecap="round" ' +
+            'stroke-linejoin="round"/>' +
+            '</svg>';
+
+        button.addEventListener(
+            "click",
+            event => {
+
+                event.preventDefault();
+                event.stopPropagation();
+
+                button.disabled =
+                    true;
+
+                window.location.reload();
+            }
+        );
+
+        shell.appendChild(
+            button
+        );
+
+        return button;
+    }
+
+
     function showClosedPanel() {
 
         if (!shell) {
@@ -4258,6 +4413,8 @@ async function waitForSharedSlideshowReady() {
 
 
         createClosedGoButton();
+
+        createClosedReplayButton();
 
         hideClosedStateMobileChrome();
     }
@@ -4909,6 +5066,24 @@ async function waitForSharedSlideshowReady() {
 
 
                                 if (!mediaHost) {
+                                    return;
+                                }
+
+                                /*
+                                 * An embedded PDF video can be fullscreen
+                                 * (its own maximize button). Going
+                                 * fullscreen resizes the page, which used
+                                 * to refresh the Reader and rebuild the
+                                 * video's layer, ending fullscreen at once.
+                                 * Leave the Reader alone while it lasts;
+                                 * the resize on exit is measured normally.
+                                 */
+                                if (
+                                    document.fullscreenElement &&
+                                    document.fullscreenElement !== shell &&
+                                    document.fullscreenElement.tagName ===
+                                        "VIDEO"
+                                ) {
                                     return;
                                 }
 

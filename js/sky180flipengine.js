@@ -150,6 +150,43 @@ function syncCenterShadowBounds(){
     flipHost.style.setProperty("--sky180-book-height",`${height}px`);
 }
 
+/*
+ * BookStack is a passive, optional decoration (thin page-edge stacks on
+ * the outer sides of a two-page spread). It never influences paging or
+ * layout, and every call is isolated so a failure cannot affect reading.
+ * animateMs>0 lets the stack thickness ease to its new value.
+ */
+function syncBookStack(spreadIndex=null,animateMs=0,fromSpread=null){
+    try{
+        if(!window.BookStack || typeof window.BookStack.update!=="function") return;
+        if(!flipHost || !flipbook || !engineReady) return;
+        if(typeof flipbook.getBoundsRect!=="function") return;
+
+        if(spreadIndex===null &&
+           typeof flipbook.getPageCollection==="function" &&
+           typeof flipbook.getPageCollection().getCurrentSpreadIndex==="function"){
+            spreadIndex=flipbook.getPageCollection().getCurrentSpreadIndex();
+        }
+
+        window.BookStack.update({
+            host:flipHost,
+            bounds:flipbook.getBoundsRect(),
+            spreadIndex:spreadIndex||0,
+            fromSpread:fromSpread,
+            live:()=>(flipbook && typeof flipbook.getBoundsRect==="function")
+                ? {bounds:flipbook.getBoundsRect()}
+                : null,
+            pageCount:pageCount,
+            singlePage:singlePageMode,
+            twoPageDocument:twoPageDocumentMode,
+            animateMs:animateMs
+        });
+    }
+    catch(error){}
+}
+
+window.addEventListener("skyreader:bookstack-changed",()=>syncBookStack());
+
 function applyHostAlignment(spreadIndex=null,animate=false,transitionOverride=null){
     if(!flipHost || !flipbook) return;
 
@@ -285,6 +322,86 @@ engine.initialize=function(options={}){
     initialized=true;
 };
 
+/*
+ * Interactive-zone guard
+ *
+ * StPageFlip drives its hover page-curl from a window-level mousemove
+ * listener that only looks at pointer POSITION, and it starts a page turn
+ * from a mousedown/mouseup pair on the book. Neither knows that a PDF link
+ * or an embedded video sits under the pointer, so moving toward one could
+ * curl the page and pressing on one could turn it.
+ *
+ * This guard makes those zones "belong to the content": while the pointer
+ * is over a PDF hyperlink (.pdfLink) or an embedded-media annotation
+ * (.mediaAnnotation), StPageFlip's hover-curl and gesture start are
+ * ignored. Everywhere else the book behaves exactly as before, and an
+ * already-running drag is never interrupted.
+ *
+ * It works by wrapping two methods on the PageFlip INSTANCE (userMove and
+ * startUserTouch); the vendored page-flip.browser.js is not modified and no
+ * event propagation is stopped, so links and video controls receive their
+ * events normally.
+ */
+const INTERACTIVE_ZONE_SELECTOR=".pdfLink, .skyreaderMediaAnnotationLayer .mediaAnnotation";
+let pointerInInteractiveZone=false;
+let releaseInteractiveGuard=function(){};
+
+function installInteractiveGuard(book){
+    releaseInteractiveGuard();
+
+    if(!book || typeof book.userMove!=="function" || typeof book.startUserTouch!=="function"){
+        return;
+    }
+
+    const track=event=>{
+        const target=event && event.target;
+        pointerInInteractiveZone=!!(target && target.closest && target.closest(INTERACTIVE_ZONE_SELECTOR));
+    };
+    const types=["mousemove","mousedown","touchstart"];
+
+    /* Capture phase on window runs BEFORE StPageFlip's own window/element
+       listeners, so the flag is always current when they call us. */
+    types.forEach(type=>window.addEventListener(type,track,{capture:true,passive:true}));
+
+    const originalUserMove=book.userMove;
+    const originalStartUserTouch=book.startUserTouch;
+
+    book.userMove=function(position,isTouch){
+        if(!isTouch && pointerInInteractiveZone){
+            const state=typeof book.getState==="function" ? book.getState() : "read";
+
+            /* Never interrupt a drag the reader already started. */
+            if(state!=="user_fold"){
+                /* If a hover curl is already showing (pointer slid from a
+                   page corner onto a zone), let it settle back flat by
+                   handing StPageFlip a point far outside the book. */
+                if(state==="fold_corner"){
+                    try{
+                        originalUserMove.call(book,{x:-100000,y:-100000},false);
+                    }catch(error){}
+                }
+                return;
+            }
+        }
+        return originalUserMove.call(book,position,isTouch);
+    };
+
+    book.startUserTouch=function(position){
+        if(pointerInInteractiveZone) return;
+        return originalStartUserTouch.call(book,position);
+    };
+
+    releaseInteractiveGuard=function(){
+        types.forEach(type=>window.removeEventListener(type,track,{capture:true}));
+        try{
+            delete book.userMove;
+            delete book.startUserTouch;
+        }catch(error){}
+        pointerInInteractiveZone=false;
+        releaseInteractiveGuard=function(){};
+    };
+}
+
 engine.open=async function(options={}){
     if(!initialized) engine.initialize(options);
 
@@ -402,6 +519,8 @@ engine.open=async function(options={}){
         }
     );
 
+    installInteractiveGuard(flipbook);
+
 
 
 
@@ -440,6 +559,16 @@ engine.open=async function(options={}){
                 flipbook.getPageCollection().getCurrentSpreadIndex(),
                 false
             );
+
+            syncBookStack();
+
+            /* Layout can still settle just after init (the first measurement
+               may precede the final size); re-measure shortly afterwards so
+               the stack never keeps pre-layout numbers. */
+            const stackBook=flipbook;
+            [300,1200].forEach(delay=>{
+                setTimeout(()=>{ if(flipbook===stackBook) syncBookStack(); },delay);
+            });
 
             /* Reveal only after the final initial position is known. */
             requestAnimationFrame(()=>{
@@ -553,6 +682,10 @@ engine.open=async function(options={}){
                     settledSpreadIndex===0,
                     settledSpreadIndex===0 ? 360 : null
                 );
+
+                /* No-op when the stack already eased to this spread
+                   during the turn; settles it after a dragged turn. */
+                syncBookStack(settledSpreadIndex,300);
             }
             flipHost.classList.remove("sky180-cover-reverse","sky180-final-forward");
             if(flipbook && typeof flipbook.getPageCollection==="function") {
@@ -594,6 +727,28 @@ engine.open=async function(options={}){
 
                 if(targetIndex>=0 && targetIndex<collection.getSpread().length){
                     applyHostAlignment(targetIndex,true);
+                }
+
+                /* BookStack needs the real turn direction. The flip
+                   controller has no getDirection(); the active
+                   calculation does (1 = backward), as the hover code
+                   above already relies on. Used only by the stack. */
+                let stackTarget=targetIndex;
+                try{
+                    const calc=typeof controller.getCalculation==="function"
+                        ? controller.getCalculation()
+                        : null;
+                    const calcDirection=calc && typeof calc.getDirection==="function"
+                        ? calc.getDirection()
+                        : null;
+                    if(calcDirection===0 || calcDirection===1){
+                        stackTarget=sourceIndex+(calcDirection===1 ? -1 : 1);
+                    }
+                }
+                catch(error){}
+
+                if(stackTarget>=0 && stackTarget<collection.getSpread().length){
+                    syncBookStack(stackTarget,normalFlippingTime,sourceIndex);
                 }
             }
 
@@ -648,14 +803,20 @@ engine.next=function(){
     const targetSpreadIndex=
         spread.getCurrentSpreadIndex()+1;
 
+    /* The closing-partner treatment belongs to the desktop two-page
+     * composition only. lastSpreadIndex() uses spread math that is wrong
+     * for single-page mode (one page per spread), where it matched a
+     * mid-book turn and hid StPageFlip's temporary copy of the turning
+     * page via the :last-of-type rule in reader.css. */
+    const finalForwardTurn=
+        !singlePageMode && !twoPageDocumentMode &&
+        targetSpreadIndex===lastSpreadIndex();
+
     prepareHostForTransition(targetSpreadIndex);
     flipHost.classList.remove("sky180-cover-reverse");
-    flipHost.classList.toggle(
-        "sky180-final-forward",
-        targetSpreadIndex===lastSpreadIndex()
-    );
+    flipHost.classList.toggle("sky180-final-forward",finalForwardTurn);
     flipHost.classList.remove("sky180-open-spread");
-    if(targetSpreadIndex===lastSpreadIndex() && pageCount%2===0) syncSyntheticMask("closing");
+    if(finalForwardTurn && pageCount%2===0) syncSyntheticMask("closing");
     flipbook.flipNext();
     return true;
 };
@@ -720,6 +881,11 @@ engine.goTo=function(page){
          */
         const flipTarget=(singlePageMode || twoPageDocumentMode) ? target-1 : target;
         flipbook.turnToPage(flipTarget);
+
+        /* A direct jump emits no turn states, so the page-edge stack
+           (decorative, optional) is brought in line here; instant, since
+           the pages themselves change instantly. */
+        syncBookStack(null,0);
     }
     catch(error){
         currentPage=previous;
@@ -763,4 +929,4 @@ engine.spread=function(){
 
 
 
-engine.resize=function(){ /* * IMPORTANT: ResizeObserver can fire immediately after the private * StPageFlip host is appended, while loadFromHTML() is still building * the PageFlip UI. Calling update() during that interval can interrupt * the first initialization and produce the intermittent cold-start * failure where the book does not appear until a second interaction. * * Ignore resize requests until StPageFlip has emitted its init event. * Renderer will call resize again after Renderer.open() awaits the * engine readiness promise. */ if(!flipbook || !engineReady) return; /* * StPageFlip owns the book rectangle. Let it recalculate from the * available viewer size, then re-apply the opening/closing spread alignment. */ flipbook.update(); syncCenterShadowBounds(); if(typeof flipbook.getPageCollection==="function"){ applyHostAlignment( flipbook.getPageCollection().getCurrentSpreadIndex(), false ); } }; engine.page=function(){ return currentPage; }; engine.pages=function(){ return pageCount; }; engine.isSinglePage=function(){ return singlePageMode; }; engine.isTwoPageDocument=function(){ return twoPageDocumentMode; }; engine.busy=function(){ return busy; }; engine.active=function(){ return flipbook!==null; }; engine.close=function(){ openSequence++; if(pendingReadyReject){ try{ pendingReadyReject(new Error("Sky180FlipEngine: open cancelled.")); }catch(error){} pendingReadyReject=null; } if(flipbook){ try{ /* * A failed open can leave a PageFlip instance constructed but * not yet loaded. Its destroy() method assumes the UI exists, * so only destroy after loadFromHTML() has created the UI. */ const ui=typeof flipbook.getUI==="function" ? flipbook.getUI() : null; if(ui && typeof ui.destroy==="function"){ flipbook.destroy(); } } catch(error){ console.warn("[Sky180FlipEngine] destroy failed",error); } } if(flipHost){ flipHost.classList.remove("sky180-is-flipping","sky180-layout-pending","sky180-layout-ready"); } flipbook=null; flipHost=null; engineReady=false; pageCount=0; currentPage=1; singlePageMode=false; twoPageDocumentMode=false; busy=false; }; engine.destroy=engine.close; engine.on=function(name,callback){ if(Object.prototype.hasOwnProperty.call(handlers,name)){ handlers[name]=callback; } return engine; }; engine.version="1.6.0"; return engine; })();
+engine.resize=function(){ /* * IMPORTANT: ResizeObserver can fire immediately after the private * StPageFlip host is appended, while loadFromHTML() is still building * the PageFlip UI. Calling update() during that interval can interrupt * the first initialization and produce the intermittent cold-start * failure where the book does not appear until a second interaction. * * Ignore resize requests until StPageFlip has emitted its init event. * Renderer will call resize again after Renderer.open() awaits the * engine readiness promise. */ if(!flipbook || !engineReady) return; /* * StPageFlip owns the book rectangle. Let it recalculate from the * available viewer size, then re-apply the opening/closing spread alignment. */ flipbook.update(); syncCenterShadowBounds(); if(typeof flipbook.getPageCollection==="function"){ applyHostAlignment( flipbook.getPageCollection().getCurrentSpreadIndex(), false ); } syncBookStack(); }; engine.page=function(){ return currentPage; }; engine.pages=function(){ return pageCount; }; engine.isSinglePage=function(){ return singlePageMode; }; engine.isTwoPageDocument=function(){ return twoPageDocumentMode; }; engine.busy=function(){ return busy; }; engine.active=function(){ return flipbook!==null; }; engine.close=function(){ openSequence++; if(pendingReadyReject){ try{ pendingReadyReject(new Error("Sky180FlipEngine: open cancelled.")); }catch(error){} pendingReadyReject=null; } if(flipbook){ try{ /* * A failed open can leave a PageFlip instance constructed but * not yet loaded. Its destroy() method assumes the UI exists, * so only destroy after loadFromHTML() has created the UI. */ const ui=typeof flipbook.getUI==="function" ? flipbook.getUI() : null; if(ui && typeof ui.destroy==="function"){ flipbook.destroy(); } } catch(error){ console.warn("[Sky180FlipEngine] destroy failed",error); } } if(flipHost){ flipHost.classList.remove("sky180-is-flipping","sky180-layout-pending","sky180-layout-ready"); } releaseInteractiveGuard(); try{ if(window.BookStack) window.BookStack.detach(); }catch(error){} flipbook=null; flipHost=null; engineReady=false; pageCount=0; currentPage=1; singlePageMode=false; twoPageDocumentMode=false; busy=false; }; engine.destroy=engine.close; engine.on=function(name,callback){ if(Object.prototype.hasOwnProperty.call(handlers,name)){ handlers[name]=callback; } return engine; }; engine.version="1.6.6"; return engine; })();

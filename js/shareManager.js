@@ -371,6 +371,31 @@ window.ShareManager = (function () {
         return el;
     }
 
+    /*
+     * While a viewer is fullscreen on its own element (#videoViewer,
+     * #slideshowViewer) only that element's descendants are painted, so
+     * a cue left on <body> would be invisible. Put it inside the
+     * fullscreen element when there is one (never a <video>/<iframe>,
+     * which cannot hold children), otherwise on <body>.
+     */
+    function overlayHost() {
+
+        const fs =
+            document.fullscreenElement;
+
+        if (
+            fs &&
+            fs !== document.documentElement &&
+            fs !== document.body &&
+            !/^(VIDEO|IFRAME|IMG|AUDIO|CANVAS)$/
+                .test(fs.tagName)
+        ) {
+            return fs;
+        }
+
+        return document.body;
+    }
+
     function showLinkCopiedFeedback() {
 
         if (
@@ -382,6 +407,13 @@ window.ShareManager = (function () {
         }
 
         const el = getLinkCopiedElement();
+
+        const host = overlayHost();
+
+        if (el.parentNode !== host) {
+
+            host.appendChild(el);
+        }
 
         if (linkCopiedHideTimer) {
 
@@ -553,6 +585,44 @@ window.ShareManager = (function () {
             "SkyMedia";
 
         /* -------------------------------------------------
+           Share panel (embedded in Glide)
+
+           Inside an iframe the browser refuses the native share
+           sheet, so item share links open the share panel
+           (js/itemShare.js) instead. Share Mode never does, and
+           outside an iframe nothing changes: the native sheet
+           below is still tried first.
+        ------------------------------------------------- */
+
+        const panelAvailable =
+            !isShareMode() &&
+            window.ItemShare &&
+            typeof ItemShare.open === "function";
+
+        function openSharePanel() {
+
+            return ItemShare.open({
+                url,
+                title,
+                text: title,
+                subtitle:
+                    cleanString(item.subtitle) ||
+                    cleanString(item.author),
+                thumbnail:
+                    cleanString(item.thumbnail)
+            });
+        }
+
+        if (
+            panelAvailable &&
+            ItemShare.isEmbedded() &&
+            openSharePanel()
+        ) {
+
+            return url;
+        }
+
+        /* -------------------------------------------------
            Native share
         ------------------------------------------------- */
 
@@ -564,9 +634,9 @@ window.ShareManager = (function () {
 
             try {
 
+                /* Link only: title/text would be added to the message
+                   by apps like WhatsApp. The card comes from the link. */
                 await navigator.share({
-                    title,
-                    text: title,
                     url
                 });
 
@@ -583,7 +653,31 @@ window.ShareManager = (function () {
                 console.log(
                     "[ShareManager] Native share was not completed."
                 );
+
+                /*
+                 * The native sheet refused (not a user
+                 * cancellation): use the share panel, whose
+                 * Copy link is the clipboard path below.
+                 */
+
+                if (
+                    panelAvailable &&
+                    !(error && error.name === "AbortError") &&
+                    openSharePanel()
+                ) {
+
+                    return url;
+                }
             }
+
+        } else if (
+            panelAvailable &&
+            openSharePanel()
+        ) {
+
+            /* No native share at all (e.g. desktop Firefox). */
+
+            return url;
         }
 
         /* -------------------------------------------------
@@ -1114,6 +1208,10 @@ function isShareMode() {
         buildUrl,
 
         share,
+
+        copyToClipboard,
+
+        showLinkCopiedFeedback,
 
         readTarget,
 
