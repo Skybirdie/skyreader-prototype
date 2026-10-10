@@ -20,14 +20,15 @@
 
 <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
 <link rel="icon" href="/favicon.ico" type="image/x-icon">
-<link rel="stylesheet" href="css/style.css">
-<link rel="stylesheet" href="css/reader.css?v=1.1.0">
+<link rel="stylesheet" href="css/style.css?v=1.0.3">
+<link rel="stylesheet" href="css/reader.css?v=1.2.0">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.3.289/pdf_viewer.css">
 
 <link rel="stylesheet" href="css/library.css">
-<link rel="stylesheet" href="css/video.css">
-<link rel="stylesheet" href="css/slideshow.css?v=1.1.0">
-<link rel="stylesheet" href="css/front-page.css?v=release-notification-1">
+<link rel="stylesheet" href="css/video.css?v=1.0.7">
+<link rel="stylesheet" href="css/slideshow.css?v=1.1.5">
+<link rel="stylesheet" href="css/front-page.css?v=fs4">
+<link rel="stylesheet" href="css/item-share.css?v=is1">
 <link rel="stylesheet" href="css/share.css">
 
 <script>
@@ -78,13 +79,65 @@ window.waitForPdfjs = function (timeoutMs) {
 };
 </script>
 <script type="module">
-import * as pdfjsLibModule from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.3.289/pdf.min.mjs";
-import { EventBus, PDFLinkService } from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.3.289/pdf_viewer.mjs";
-pdfjsLibModule.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.3.289/pdf.worker.min.mjs";
-window.pdfjsLib=pdfjsLibModule;
-window.PDFLinkService=PDFLinkService;
-window.PDFEventBus=EventBus;
-window.dispatchEvent(new Event("skyreader-pdfjs-ready"));
+/*
+ * pdf.js 6's standard build calls very new built-ins
+ * (Map.prototype.getOrInsertComputed, Promise.try) with no fallback.
+ * Safari/iOS versions that lack them fail as soon as a book is opened
+ * ("...getOrInsertComputed is not a function"), while videos and
+ * slideshows keep working.
+ *
+ * Browsers that have those built-ins keep loading exactly the same
+ * cdnjs files as before. Only browsers that lack them are given pdf.js's
+ * own "legacy" build (same version, polyfills included, page + worker).
+ * If the legacy files cannot be loaded, the standard build is used, so
+ * this can never be worse than the previous behaviour.
+ */
+const CDNJS_BASE="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/6.3.289/";
+const LEGACY_BASE="https://cdn.jsdelivr.net/npm/pdfjs-dist@6.3.289/legacy/";
+
+const needsLegacy=
+    typeof Map.prototype.getOrInsertComputed!=="function" ||
+    typeof Promise.try!=="function";
+
+async function loadStandard(){
+    const lib=await import(CDNJS_BASE+"pdf.min.mjs");
+    const viewer=await import(CDNJS_BASE+"pdf_viewer.mjs");
+    lib.GlobalWorkerOptions.workerSrc=CDNJS_BASE+"pdf.worker.min.mjs";
+    return {lib,viewer};
+}
+
+async function loadLegacy(){
+    const lib=await import(LEGACY_BASE+"build/pdf.min.mjs");
+    const viewer=await import(LEGACY_BASE+"web/pdf_viewer.mjs");
+    lib.GlobalWorkerOptions.workerSrc=LEGACY_BASE+"build/pdf.worker.min.mjs";
+    return {lib,viewer};
+}
+
+/*
+ * Wrapped in an async function rather than using top-level await, so
+ * older iOS versions that predate top-level await still parse this script.
+ */
+(async function(){
+try{
+    let loaded=null;
+    if(needsLegacy){
+        try{
+            loaded=await loadLegacy();
+        }catch(error){
+            console.warn("[SkyReader] pdf.js legacy build unavailable; using the standard build.",error);
+        }
+    }
+    if(!loaded){
+        loaded=await loadStandard();
+    }
+    window.pdfjsLib=loaded.lib;
+    window.PDFLinkService=loaded.viewer.PDFLinkService;
+    window.PDFEventBus=loaded.viewer.EventBus;
+    window.dispatchEvent(new Event("skyreader-pdfjs-ready"));
+}catch(error){
+    console.error("[SkyReader] pdf.js failed to load.",error);
+}
+})();
 </script>
 <script src="page-flip.browser.js"></script>
 
@@ -190,6 +243,20 @@ body.sky-share-mode #workspacePrimaryLogo {
             <svg class="icon" aria-hidden="true"><use href="#icon-slideshow"></use></svg><span>Images/Graphics</span>
         </button>
     </nav>
+
+    <!--
+         Front-page-only "share this link" button.
+         Lives inside #frontPage so it is shown/hidden with the Front Page
+         itself and can never appear in Books, Videos or Images/Graphics.
+         It is a plain link share (see js/frontShare.js) and is unrelated
+         to the app's share mode. Image: assets/front-share.png
+    -->
+    <button id="frontShareButton"
+            type="button"
+            title="Share Meditation Mornings"
+            aria-label="Share Meditation Mornings">
+        <img src="assets/front-share.png" alt="" draggable="false">
+    </button>
 </section>
 
 <div id="app">
@@ -628,7 +695,7 @@ stroke-linecap="round"/>
 
 <script src="js/dateVisibility.js"></script>
 <script src="js/skyreader.js"></script>
-<script src="js/storage.js"></script>
+<script src="js/storage.js?v=rr1"></script>
 <script src="js/bookmarks.js"></script>
 <script src="js/keyValueStore.js"></script>
 <script src="js/favorites.js"></script>
@@ -637,43 +704,46 @@ stroke-linecap="round"/>
 <script src="js/dateDisplay.js"></script>
 <script src="js/contentContract.js?v=3.0.1"></script>
 <script src="js/glideContract.js?v=3.0.1"></script>
-<script src="js/manifest.js?v=1.3.1"></script>
+<script src="js/manifest.js?v=1.4.0"></script>
 <script src="js/librarySorter.js?v=1.2.0"></script>
-<script src="js/library.js"></script>
+<script src="js/library.js?v=cat1"></script>
 <script src="js/animation.js"></script>
 <script src="js/audio.js?v=2.1.0"></script>
 <script src="js/pdfengine.js"></script>
-<script src="js/sky180flipengine.js"></script>
+<script src="js/bookStack.js?v=2.3"></script>
+<script src="js/sky180flipengine.js?v=1.6.6"></script>
 <script src="js/loadingSequence.js"></script>
-<script src="js/renderer.js?v=3.2.6"></script>
+<script src="js/renderer.js?v=3.2.13"></script>
 <script src="js/reader.js"></script>
-<script src="js/navigation.js"></script>
+<script src="js/navigation.js?v=n2"></script>
 <script src="js/bookmarkPanel.js"></script>
-<script src="js/ui.js"></script>
-<script src="js/settingsPanel.js"></script>
+<script src="js/ui.js?v=1.0.1"></script>
+<script src="js/settingsPanel.js?v=1.0.2"></script>
 <script src="js/mediaManager.js"></script>
-<script src="js/shareManager.js"></script>
-<script src="js/shareViewer.js"></script>
+<script src="js/itemShare.js?v=1.0.2"></script>
+<script src="js/shareManager.js?v=is2"></script>
+<script src="js/shareViewer.js?v=sv4"></script>
 
 <script src="js/app.js"></script>
 <script src="js/videoContract.js"></script>
 <script src="js/videoFavorites.js"></script>
 <script src="js/videoSorter.js"></script>
-<script src="js/videoLibrary.js"></script>
-<script src="js/videoViewer.js?v=1.1.0"></script>
+<script src="js/videoLibrary.js?v=dur2"></script>
+<script src="js/videoViewer.js?v=1.1.4"></script>
 <script src="js/videoUI.js"></script>
 <script src="js/slideshowContract.js"></script>
 <script src="js/slideshowFavorites.js"></script>
-<script src="js/slideshowSorter.js"></script>
+<script src="js/slideshowSorter.js?v=rr1"></script>
 <script src="js/slideshowTransitions.js"></script>
 <script src="js/slideshowLibrary.js?v=1.1.0"></script>
 <script src="js/zoomController.js"></script>
-<script src="js/slideshowViewer.js?v=4.4.1"></script>
+<script src="js/slideshowViewer.js?v=4.4.2"></script>
 <script src="js/slideshowUI.js"></script>
 <script src="js/frontMediaRenderer.js?v=4.2.1"></script>
 <script src="js/frontPage.js?v=4.3.1"></script>
+<script src="js/frontShare.js?v=2.1.3"></script>
 <script src="js/releaseNotification.js?v=1.1.0"></script>
-<script src="js/appSwitcher.js?v=1.1.0"></script>
+<script src="js/appSwitcher.js?v=1.1.2"></script>
 <script src="js/responsiveAppMenu.js"></script>
 
 <script>
