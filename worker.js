@@ -2,7 +2,7 @@
 
 /*
 =========================================================
- SkyMedia Worker
+ MMicjMedia Worker
 
  FINAL SHORT SHARE LINK ARCHITECTURE
 
@@ -10,29 +10,8 @@
 
      /s/<section>/<id>
 
- The selected item is already encoded as a ONE-ITEM
- SR2 contract before it reaches this Worker.
-
- Flow:
-
-     ShareManager
-          ↓
-     POST /__sky_share_prime
-          ↓
-     Worker stores the one-item record by section + ID
-          ↓
-     Worker returns /s/<section>/<id>
-          ↓
-     Worker retrieves payload
-          ↓
-     window.SkyMediaContract
-     window.__SKY_SHARE_TARGET
-          ↓
-     existing GlideContract / Manifest
-          ↓
-     existing ShareManager
-          ↓
-     existing ShareViewer
+ The selected item is retrieved from the catalog or
+ direct-share KV record.
 
  The browser address bar NEVER receives the long contract.
 =========================================================
@@ -42,13 +21,14 @@ const CONTRACT_PREFIX = "sr2.";
 const KEY_LENGTH = 16;
 
 const SKYMEDIA_BASE_URL =
-  "https://skyreader-prototype.sliburd81.workers.dev";
+  "https://mmicj.meditation-mornings-icj.workers.dev";
 
 /* =========================================================
    Open Graph / Social Preview
 ========================================================= */
 
-const OG_SITE_NAME = "Meditation Mornings";
+const OG_SITE_NAME =
+  "Meditation Mornings";
 
 const OG_DEFAULT_THUMBNAIL =
   "https://storage.googleapis.com/glide-prod.appspot.com/uploads-v2/mKxnsa8ky8uPGbBKpTyv/pub/lu8ys9mg3bqa2jgeWIFB.webp";
@@ -59,6 +39,126 @@ const OG_LOGO =
 const OG_IMAGE_PATH =
   "/__sky_og_image";
 
+/* =========================================================
+   PDF RANGE PROXY
+
+   Book PDFs are hosted on the Glide GCS bucket — a different
+   origin from this app. GCS supports HTTP range requests fine,
+   but a cross-origin fetch from the BROWSER can't see the
+   Accept-Ranges / Content-Length response headers needed to
+   confirm that support, unless the bucket's CORS policy
+   explicitly exposes them (it doesn't, and it isn't ours to
+   change). PDF.js reacts to that missing visibility by quietly
+   downloading the entire file instead of streaming it — fine
+   for a normal PDF, a multi-minute stall for one bloated by
+   embedded video/audio.
+
+   This route re-fetches the source PDF from the Worker instead
+   (server-to-server, not subject to browser CORS), forwarding
+   the incoming Range header both ways, and returns it to the
+   browser same-origin — where none of the header-visibility
+   restrictions above apply. PDF.js gets its 206 responses back
+   and streams the book normally again.
+========================================================= */
+
+const PDF_PROXY_PATH =
+  "/__sky_pdf_proxy";
+
+/* Only ever proxy to hosts we expect book PDFs to live on. This
+   is not an open relay for arbitrary URLs.
+
+   Hosts: set the plain variable PDF_PROXY_ALLOWED_HOSTS to a
+   comma-separated list of host names (a leading "*." allows any
+   sub-domain, e.g. "*.r2.dev"). Unset, the default is Glide's bucket
+   host, so existing deployments behave exactly as before. */
+const PDF_PROXY_DEFAULT_HOSTS = [
+  "storage.googleapis.com"
+];
+
+function pdfProxyHostAllowed(
+  env,
+  hostname
+) {
+  const configured =
+    String(
+      env?.PDF_PROXY_ALLOWED_HOSTS || ""
+    )
+      .split(",")
+      .map(value => value.trim().toLowerCase())
+      .filter(Boolean);
+
+  const hosts =
+    configured.length
+      ? configured
+      : PDF_PROXY_DEFAULT_HOSTS;
+
+  const host =
+    String(hostname || "").toLowerCase();
+
+  return hosts.some(
+    entry =>
+      entry.startsWith("*.")
+        ? host.endsWith(entry.slice(1))
+        : host === entry
+  );
+}
+
+/* Path prefixes. storage.googleapis.com is a shared host, so an
+   un-configured proxy only relays this Glide app's own uploads there
+   (otherwise it would relay anybody's files and spend THIS Worker's
+   request quota). To change or widen it without a redeploy, set the
+   plain variable PDF_PROXY_ALLOWED_PREFIXES to a comma-separated list
+   of path prefixes, each starting with "/"; when set it applies to every
+   allowed host. Hosts you added yourself via PDF_PROXY_ALLOWED_HOSTS
+   (your own bucket) need no prefix unless you set one. The check runs
+   on the parsed URL, so "../" and "%2e%2e" tricks are already
+   normalised. */
+const PDF_PROXY_DEFAULT_PATH_PREFIXES = [
+  "/glide-prod.appspot.com/uploads-v2/mKxnsa8ky8uPGbBKpTyv/"
+];
+
+function pdfProxyPathAllowed(
+  env,
+  pathname,
+  hostname
+) {
+  const configured =
+    String(
+      env?.PDF_PROXY_ALLOWED_PREFIXES || ""
+    )
+      .split(",")
+      .map(value => value.trim())
+      .filter(value => value.startsWith("/"));
+
+  if (configured.length) {
+    return configured.some(
+      prefix =>
+        pathname.startsWith(prefix)
+    );
+  }
+
+  if (
+    String(hostname || "").toLowerCase() ===
+    "storage.googleapis.com"
+  ) {
+    return PDF_PROXY_DEFAULT_PATH_PREFIXES.some(
+      prefix =>
+        pathname.startsWith(prefix)
+    );
+  }
+
+  return true;
+}
+
+/* Bumped once, deliberately: an earlier version of this proxy could
+   cache a WRONG partial response under a given PDF's URL (see the
+   comment in handlePdfProxy). Changing this forces every PDF to be
+   fetched fresh under a new cache key instead of potentially being
+   served whatever that earlier bug already wrote into Cloudflare's
+   cache for the same URL. */
+const PDF_PROXY_CACHE_VERSION =
+  "2"; /* No longer used: the proxy streams straight through now. */
+
 const SHARE_PATH_PREFIX =
   "/s/";
 
@@ -68,30 +168,59 @@ const SHARE_RECORD_PREFIX =
 const CATALOG_RECORD_PREFIX =
   "catalog:v1:";
 
+/* ---------------------------------------------------------
+   CATALOG SNAPSHOT
+
+   One KV record holding the complete, cleaned catalog, so the
+   app can load it from the base URL without a Glide contract.
+
+   Written by the catalog publish (below) ONLY when the catalog
+   actually changed, and served at CATALOG_SNAPSHOT_PATH.
+--------------------------------------------------------- */
+
+const CATALOG_SNAPSHOT_PATH =
+  "/__sky_catalog";
+
+const CATALOG_SNAPSHOT_KEY =
+  "catalog:snapshot:v1";
+
+const CATALOG_SNAPSHOT_PREV_KEY =
+  "catalog:snapshot:v1:prev";
+
+/* Bump to force one re-write of the snapshot after a format change. */
+const CATALOG_SNAPSHOT_FORMAT =
+  "1";
+
+/* Refuse a publish that keeps fewer than this share of the
+   previous item count (unless the publish sends force:true). */
+const CATALOG_SNAPSHOT_MIN_RETAIN_RATIO =
+  0.5;
+
+/* The shrink guard only applies once the previous snapshot had at
+   least this many items, so small catalogs can be edited freely. */
+const CATALOG_SNAPSHOT_GUARD_MIN_PREVIOUS =
+  6;
+
+/* Browsers may reuse the snapshot for this long without asking. */
+const CATALOG_SNAPSHOT_CLIENT_MAX_AGE =
+  300;
+
+/* Per-isolate memory copy, so warm isolates do not read KV on
+   every request. (The Cache API is not available on workers.dev.) */
+const CATALOG_SNAPSHOT_MEMORY_TTL_MS =
+  60000;
+
+const KV_CACHE_TTL =
+  300;
+
 /* =========================================================
-   KV read caching
-
-   Every KV value this Worker reads is immutable for the
-   lifetime of a publish: a catalog item, a primed share
-   record, or an encoded contract. None of them change
-   between two requests for the same link.
-
-   cacheTtl lets the colo serve repeat reads from its local
-   cache instead of going back to KV storage, which removes
-   a KV read (and ~50-100ms) from every repeat view of the
-   same shared item.
-
-   Lower this while actively republishing the catalog if you
-   need edits to appear immediately.
+   KV READ HELPER
 ========================================================= */
-
-const KV_CACHE_TTL = 300;
 
 function kvGet(
   env,
   key
 ) {
-
   return env.MEDIA_KV.get(
     key,
     {
@@ -102,12 +231,158 @@ function kvGet(
 }
 
 /* =========================================================
-   TEMPORARY CATALOG PUBLISH TEST
+   KV MISS GUARD + LIMITED LOGGING
 
-   This is intentionally a temporary shared test token.
-   It proves the Glide -> Worker POST path before we move
-   publishing authentication to a proper secret-backed
-   Glide workflow/API arrangement.
+   Link-preview crawlers and bots request /s/<section>/<id> URLs
+   that do not exist. Each one used to cost two KV reads (catalog
+   record, then the legacy share record) and one log event, and
+   KV bills a read even when the answer is "not found".
+
+   kvGetGuarded() remembers a miss inside this isolate for a
+   minute, so asking for the same missing key again costs nothing.
+   A publish clears the memory, so a newly published item is never
+   hidden by an old miss.
+
+   logLimited() writes the same log line at most once per ten
+   minutes per isolate, which keeps expected misses (and a KV
+   outage) from turning into one Observability event per request.
+========================================================= */
+
+const KV_MISS_TTL_MS =
+  60000;
+
+const KV_MISS_MAX_ENTRIES =
+  500;
+
+const kvMissMemo =
+  new Map();
+
+async function kvGetGuarded(
+  env,
+  key
+) {
+  const now =
+    Date.now();
+
+  const missedAt =
+    kvMissMemo.get(
+      key
+    );
+
+  if (
+    missedAt !== undefined &&
+    now - missedAt <
+      KV_MISS_TTL_MS
+  ) {
+    return null;
+  }
+
+  const value =
+    await kvGet(
+      env,
+      key
+    );
+
+  if (!value) {
+    if (
+      kvMissMemo.size >=
+      KV_MISS_MAX_ENTRIES
+    ) {
+      kvMissMemo.clear();
+    }
+
+    kvMissMemo.set(
+      key,
+      now
+    );
+  } else if (
+    missedAt !== undefined
+  ) {
+    kvMissMemo.delete(
+      key
+    );
+  }
+
+  return value;
+}
+
+const LOG_LIMIT_WINDOW_MS =
+  600000;
+
+const logLastAt =
+  new Map();
+
+function logLimited(
+  level,
+  label,
+  ...args
+) {
+  const now =
+    Date.now();
+
+  const last =
+    logLastAt.get(
+      label
+    );
+
+  if (
+    last !== undefined &&
+    now - last <
+      LOG_LIMIT_WINDOW_MS
+  ) {
+    return;
+  }
+
+  if (
+    logLastAt.size >= 50
+  ) {
+    logLastAt.clear();
+  }
+
+  logLastAt.set(
+    label,
+    now
+  );
+
+  console[level](
+    ...args
+  );
+}
+
+/* =========================================================
+   SHARE TARGET PLAUSIBILITY
+
+   The app has exactly three sections. Anything else, or an id
+   containing control characters, cannot be a real shared item,
+   so it is refused before any KV read.
+========================================================= */
+
+const KNOWN_SHARE_SECTIONS =
+  new Set([
+    "reader",
+    "video",
+    "slideshow"
+  ]);
+
+function isPlausibleShareTarget(
+  section,
+  id
+) {
+  return (
+    KNOWN_SHARE_SECTIONS.has(
+      section
+    ) &&
+    typeof id === "string" &&
+    id.length > 0 &&
+    id.length <= 512 &&
+    !/[\u0000-\u001f\u007f]/.test(
+      id
+    )
+  );
+}
+
+/* =========================================================
+   TEMPORARY CATALOG PUBLISH TEST
 ========================================================= */
 
 const CATALOG_TEST_TOKEN =
@@ -120,8 +395,10 @@ const CATALOG_TEST_STATUS_KEY =
    FNV-1A
 ========================================================= */
 
-function fnv1a32(value, seed) {
-
+function fnv1a32(
+  value,
+  seed
+) {
   let hash =
     (0x811c9dc5 ^ seed) >>> 0;
 
@@ -130,8 +407,8 @@ function fnv1a32(value, seed) {
     i < value.length;
     i++
   ) {
-
-    hash ^= value.charCodeAt(i);
+    hash ^=
+      value.charCodeAt(i);
 
     hash =
       Math.imul(
@@ -143,16 +420,18 @@ function fnv1a32(value, seed) {
   return hash >>> 0;
 }
 
-function hex8(value) {
-
+function hex8(
+  value
+) {
   return value
     .toString(16)
     .padStart(8, "0")
     .toUpperCase();
 }
 
-function makeKey(payload) {
-
+function makeKey(
+  payload
+) {
   const hash1 =
     fnv1a32(
       payload,
@@ -175,8 +454,10 @@ function makeKey(payload) {
    DIRECT SHARE RECORDS
 ========================================================= */
 
-function makeShareRecordKey(section, id) {
-
+function makeShareRecordKey(
+  section,
+  id
+) {
   const normalizedSection =
     normalizeSection(section);
 
@@ -186,13 +467,17 @@ function makeShareRecordKey(section, id) {
   return (
     SHARE_RECORD_PREFIX +
     makeKey(
-      normalizedSection + "\0" + normalizedId
+      normalizedSection +
+      "\0" +
+      normalizedId
     )
   );
 }
 
-function makeCatalogRecordKey(section, id) {
-
+function makeCatalogRecordKey(
+  section,
+  id
+) {
   const normalizedSection =
     normalizeSection(section);
 
@@ -204,13 +489,14 @@ function makeCatalogRecordKey(section, id) {
    * Keep the literal "\\0" here.
    *
    * Existing catalog records were written using this
-   * exact key construction, so the read path must remain
-   * identical during Phase 4.
+   * exact key construction.
    */
   return (
     CATALOG_RECORD_PREFIX +
     makeKey(
-      normalizedSection + "\\0" + normalizedId
+      normalizedSection +
+      "\\0" +
+      normalizedId
     )
   );
 }
@@ -219,42 +505,13 @@ function makeCatalogRecordKey(section, id) {
    MEDIA NORMALIZATION
 ========================================================= */
 
-/*
- * Glide can supply slideshow media in several forms:
- *
- *   1. Actual array:
- *
- *      [
- *        "https://...1.jpg",
- *        "https://...2.jpg"
- *      ]
- *
- *   2. Comma-separated string:
- *
- *      "https://...1.jpg, https://...2.jpg"
- *
- *   3. JSON-encoded array:
- *
- *      "[\"https://...1.jpg\",\"https://...2.jpg\"]"
- *
- * SkyMedia's canonical slideshow representation is an
- * array of image URLs.
- *
- * This function converts the Glide representations into
- * that canonical form while leaving ordinary book/video
- * media URLs as strings.
- */
-
 function normalizeMediaValue(
   media,
   type
 ) {
-
-  /*
-   * Already an actual array.
-   */
-  if (Array.isArray(media)) {
-
+  if (
+    Array.isArray(media)
+  ) {
     return media
       .map(
         value =>
@@ -274,26 +531,18 @@ function normalizeMediaValue(
     return "";
   }
 
-  /*
-   * A JSON-encoded array can arrive as a string.
-   *
-   * Example:
-   *
-   *   ["https://...1.jpg","https://...2.jpg"]
-   */
   if (
     type === "slideshow" &&
     value.startsWith("[") &&
     value.endsWith("]")
   ) {
-
     try {
-
       const decoded =
         JSON.parse(value);
 
-      if (Array.isArray(decoded)) {
-
+      if (
+        Array.isArray(decoded)
+      ) {
         return decoded
           .map(
             item =>
@@ -303,29 +552,15 @@ function normalizeMediaValue(
           )
           .filter(Boolean);
       }
-
     } catch (_) {
-
-      /*
-       * If it is not valid JSON, continue below and
-       * treat it as the normal Glide string form.
-       */
+      /* Continue below. */
     }
   }
 
-  /*
-   * Glide may provide multiple slideshow images as one
-   * comma-separated string.
-   *
-   * Example:
-   *
-   *   url1.jpg, url2.jpg, url3.jpg
-   */
   if (
     type === "slideshow" &&
     value.includes(",")
   ) {
-
     return value
       .split(",")
       .map(
@@ -335,13 +570,6 @@ function normalizeMediaValue(
       .filter(Boolean);
   }
 
-  /*
-   * Ordinary book/video media remains a string.
-   *
-   * A single slideshow URL also remains a string because
-   * there is nothing to split. This is compatible with
-   * existing C3.1 handling of single-media items.
-   */
   return value;
 }
 
@@ -349,13 +577,13 @@ function normalizeMediaValue(
    SHARE ITEM NORMALIZATION
 ========================================================= */
 
-function normalizeShareItem(item) {
-
+function normalizeShareItem(
+  item
+) {
   if (
     !item ||
     typeof item !== "object"
   ) {
-
     return null;
   }
 
@@ -373,7 +601,6 @@ function normalizeShareItem(item) {
     );
 
   const result = {
-
     id:
       String(
         item.id ?? ""
@@ -425,7 +652,6 @@ function normalizeShareItem(item) {
     item.dateAdd !== undefined &&
     item.dateAdd !== null
   ) {
-
     const dateAdd =
       String(
         item.dateAdd
@@ -441,32 +667,31 @@ function normalizeShareItem(item) {
     !result.id ||
     !result.type
   ) {
-
     return null;
   }
 
   return result;
 }
 
-function buildShareManifest(item) {
-
+function buildShareManifest(
+  item
+) {
   return {
-
     version:
       "1.0",
 
     content:
       [item],
 
-    frontPage:
-      {
-        categories: []
-      }
+    frontPage: {
+      categories: []
+    }
   };
 }
 
-function getDirectShareTarget(url) {
-
+function getDirectShareTarget(
+  url
+) {
   const prefix =
     SHARE_PATH_PREFIX;
 
@@ -475,7 +700,6 @@ function getDirectShareTarget(url) {
       prefix
     )
   ) {
-
     return null;
   }
 
@@ -488,7 +712,6 @@ function getDirectShareTarget(url) {
   if (
     parts.length !== 2
   ) {
-
     return null;
   }
 
@@ -496,7 +719,6 @@ function getDirectShareTarget(url) {
   let id = "";
 
   try {
-
     section =
       decodeURIComponent(
         parts[0]
@@ -506,9 +728,7 @@ function getDirectShareTarget(url) {
       decodeURIComponent(
         parts[1]
       );
-
   } catch (_) {
-
     return null;
   }
 
@@ -526,9 +746,11 @@ function getDirectShareTarget(url) {
     !section ||
     !id ||
     section.length > 40 ||
-    id.length > 512
+    !isPlausibleShareTarget(
+      section,
+      id
+    )
   ) {
-
     return null;
   }
 
@@ -538,10 +760,25 @@ function getDirectShareTarget(url) {
   };
 }
 
+/* =========================================================
+   DIRECT SHARE READ
+========================================================= */
+
 async function getDirectShareRecord(
   env,
   target
 ) {
+  /*
+   * Optional switch (plain variable, off by default): once no
+   * legacy share:v1 links are in use any more, setting
+   * DISABLE_LEGACY_SHARE_RECORDS to any value skips this second
+   * KV read for every item that is not in the catalog.
+   */
+  if (
+    env?.DISABLE_LEGACY_SHARE_RECORDS
+  ) {
+    return null;
+  }
 
   const key =
     makeShareRecordKey(
@@ -552,22 +789,26 @@ async function getDirectShareRecord(
   let raw;
 
   try {
-
     raw =
-      await kvGet(
+      await kvGetGuarded(
         env,
         key
       );
-
   } catch (error) {
-
-    console.error(
-      "SkyMedia direct-share KV read failed:",
+    logLimited(
+      "error",
+      "direct-share-kv-read",
+      "MMicjMedia direct-share KV read failed:",
       error
     );
 
     throw new Error(
-      "SkyMedia KV read failed."
+      "MMicjMedia KV read failed: " +
+      (
+        error instanceof Error
+          ? error.message
+          : String(error)
+      )
     );
   }
 
@@ -576,7 +817,6 @@ async function getDirectShareRecord(
   }
 
   try {
-
     const record =
       JSON.parse(raw);
 
@@ -584,7 +824,6 @@ async function getDirectShareRecord(
       !record ||
       !record.item
     ) {
-
       return null;
     }
 
@@ -599,14 +838,13 @@ async function getDirectShareRecord(
 
     if (
       item.id !== target.id ||
-      sectionFromItem(item) !== target.section
+      sectionFromItem(item) !==
+        target.section
     ) {
-
       return null;
     }
 
     return {
-
       key,
 
       item,
@@ -616,11 +854,9 @@ async function getDirectShareRecord(
           item
         )
     };
-
   } catch (error) {
-
     console.error(
-      "SkyMedia direct-share record decode failed:",
+      "MMicjMedia direct-share record decode failed:",
       error
     );
 
@@ -630,19 +866,12 @@ async function getDirectShareRecord(
 
 /* =========================================================
    CATALOG SHARE RECORD
-
-   Canonical Phase 4 source:
-
-       catalog:v1:<hashed section/id>
-
-   The catalog was published by Glide from p1.
 ========================================================= */
 
 async function getCatalogShareRecord(
   env,
   target
 ) {
-
   const key =
     makeCatalogRecordKey(
       target.section,
@@ -652,29 +881,34 @@ async function getCatalogShareRecord(
   let raw;
 
   try {
-
     raw =
-      await kvGet(
+      await kvGetGuarded(
         env,
         key
       );
-
   } catch (error) {
-
-    console.error(
-      "SkyMedia catalog KV read failed:",
+    logLimited(
+      "error",
+      "catalog-kv-read",
+      "MMicjMedia catalog KV read failed:",
       error
     );
 
     throw new Error(
-      "SkyMedia catalog KV read failed."
+      "MMicjMedia catalog KV read failed: " +
+      (
+        error instanceof Error
+          ? error.message
+          : String(error)
+      )
     );
   }
 
   if (!raw) {
-
-    console.warn(
-      "SkyMedia catalog item not found:",
+    logLimited(
+      "warn",
+      "catalog-item-miss",
+      "MMicjMedia catalog item not found:",
       key
     );
 
@@ -682,7 +916,6 @@ async function getCatalogShareRecord(
   }
 
   try {
-
     const record =
       JSON.parse(raw);
 
@@ -690,12 +923,6 @@ async function getCatalogShareRecord(
       !record ||
       !record.item
     ) {
-
-      console.error(
-        "SkyMedia catalog record has no item:",
-        key
-      );
-
       return null;
     }
 
@@ -705,12 +932,6 @@ async function getCatalogShareRecord(
       );
 
     if (!item) {
-
-      console.error(
-        "SkyMedia catalog record contains invalid item:",
-        key
-      );
-
       return null;
     }
 
@@ -723,9 +944,8 @@ async function getCatalogShareRecord(
       item.id !== target.id ||
       actualSection !== target.section
     ) {
-
       console.error(
-        "SkyMedia catalog identity mismatch:",
+        "MMicjMedia catalog identity mismatch:",
         {
           requestedSection:
             target.section,
@@ -744,7 +964,6 @@ async function getCatalogShareRecord(
     }
 
     return {
-
       key,
 
       item,
@@ -754,11 +973,9 @@ async function getCatalogShareRecord(
           item
         )
     };
-
   } catch (error) {
-
     console.error(
-      "SkyMedia catalog record decode failed:",
+      "MMicjMedia catalog record decode failed:",
       error
     );
 
@@ -767,13 +984,13 @@ async function getCatalogShareRecord(
 }
 
 /* =========================================================
-   Validation
+   VALIDATION
 ========================================================= */
 
-function isValidKey(key) {
-
+function isValidKey(
+  key
+) {
   return (
-
     typeof key ===
       "string" &&
 
@@ -786,8 +1003,9 @@ function isValidKey(key) {
   );
 }
 
-function isValidPayload(payload) {
-
+function isValidPayload(
+  payload
+) {
   if (!payload) {
     return false;
   }
@@ -797,7 +1015,6 @@ function isValidPayload(payload) {
       CONTRACT_PREFIX
     )
   ) {
-
     return false;
   }
 
@@ -816,13 +1033,11 @@ function isValidPayload(payload) {
 }
 
 /* =========================================================
-   Response helpers
+   RESPONSE HELPERS
 ========================================================= */
 
 function htmlHeaders() {
-
   return {
-
     "content-type":
       "text/html; charset=UTF-8",
 
@@ -835,9 +1050,7 @@ function htmlHeaders() {
 }
 
 function textHeaders() {
-
   return {
-
     "content-type":
       "text/plain; charset=UTF-8",
 
@@ -850,13 +1063,12 @@ function textHeaders() {
 }
 
 /* =========================================================
-   Asset request
+   ASSET REQUEST
 ========================================================= */
 
 function makeCleanAssetRequest(
   request
 ) {
-
   const assetUrl =
     new URL(
       "/index.html",
@@ -876,15 +1088,13 @@ function makeCleanAssetRequest(
 }
 
 /* =========================================================
-   C2.2 Base64URL decoder
+   C2.2 BASE64URL DECODER
 ========================================================= */
 
 function base64UrlDecode(
   value
 ) {
-
   try {
-
     let base64 =
       value
         .replace(
@@ -899,7 +1109,6 @@ function base64UrlDecode(
     while (
       base64.length % 4
     ) {
-
       base64 += "=";
     }
 
@@ -918,34 +1127,27 @@ function base64UrlDecode(
       i < binary.length;
       i++
     ) {
-
       bytes[i] =
-        binary.charCodeAt(
-          i
-        );
+        binary.charCodeAt(i);
     }
 
     return bytes;
-
-  } catch (error) {
-
+  } catch (_) {
     return null;
   }
 }
 
 /* =========================================================
-   C2.2 decompressor
+   C2.2 DECOMPRESSOR
 ========================================================= */
 
 function decompressBytes(
   bytes
 ) {
-
   if (
     !bytes ||
     bytes.length < 2
   ) {
-
     throw new Error(
       "C2.2 payload is too short."
     );
@@ -957,7 +1159,6 @@ function decompressBytes(
   if (
     version !== 2
   ) {
-
     throw new Error(
       "Unsupported C2.2 codec version: " +
       version
@@ -982,7 +1183,6 @@ function decompressBytes(
   while (
     pos < bytes.length
   ) {
-
     const flags =
       bytes[pos++];
 
@@ -992,7 +1192,6 @@ function decompressBytes(
       pos < bytes.length;
       bit++
     ) {
-
       const isMatch =
         (
           flags &
@@ -1000,7 +1199,6 @@ function decompressBytes(
         ) !== 0;
 
       if (!isMatch) {
-
         output.push(
           bytes[pos++]
         );
@@ -1012,7 +1210,6 @@ function decompressBytes(
         pos + 1 >=
         bytes.length
       ) {
-
         throw new Error(
           "Incomplete C2.2 match token."
         );
@@ -1040,7 +1237,6 @@ function decompressBytes(
         length < minLen ||
         length > maxLen
       ) {
-
         throw new Error(
           "Invalid C2.2 match length."
         );
@@ -1051,7 +1247,6 @@ function decompressBytes(
         offset > windowSize ||
         offset > output.length
       ) {
-
         throw new Error(
           "Invalid C2.2 match offset."
         );
@@ -1062,7 +1257,6 @@ function decompressBytes(
         i < length;
         i++
       ) {
-
         const sourceIndex =
           output.length -
           offset;
@@ -1080,19 +1274,17 @@ function decompressBytes(
 }
 
 /* =========================================================
-   Decode SR2
+   DECODE SR2
 ========================================================= */
 
 function decodeContractPayload(
   payload
 ) {
-
   if (
     !isValidPayload(
       payload
     )
   ) {
-
     throw new Error(
       "Invalid sr2 payload."
     );
@@ -1109,7 +1301,6 @@ function decodeContractPayload(
     );
 
   if (!compressed) {
-
     throw new Error(
       "Unable to Base64URL-decode sr2 payload."
     );
@@ -1132,19 +1323,17 @@ function decodeContractPayload(
 }
 
 /* =========================================================
-   Contract normalization
+   CONTRACT NORMALIZATION
 ========================================================= */
 
 function normalizeContractArray(
   contract
 ) {
-
   if (
     Array.isArray(
       contract
     )
   ) {
-
     return contract;
   }
 
@@ -1153,7 +1342,6 @@ function normalizeContractArray(
     typeof contract ===
       "object"
   ) {
-
     return [
       contract
     ];
@@ -1163,19 +1351,13 @@ function normalizeContractArray(
 }
 
 /* =========================================================
-   Item selection
-
-   The final share contract contains ONE item, so there is
-   no need for section/id query parameters.
-
-   We still accept id when processing legacy links.
+   ITEM SELECTION
 ========================================================= */
 
 function getSharedItem(
   contract,
   url
 ) {
-
   const items =
     normalizeContractArray(
       contract
@@ -1193,7 +1375,6 @@ function getSharedItem(
     ).trim();
 
   if (requestedId) {
-
     const match =
       items.find(
         item =>
@@ -1212,13 +1393,12 @@ function getSharedItem(
 }
 
 /* =========================================================
-   Type → Share Section
+   TYPE → SHARE SECTION
 ========================================================= */
 
 function normalizeSection(
   section
 ) {
-
   const value =
     String(
       section || ""
@@ -1233,7 +1413,6 @@ function normalizeSection(
     value === "pdf" ||
     value === "pdfs"
   ) {
-
     return "reader";
   }
 
@@ -1241,7 +1420,6 @@ function normalizeSection(
     value === "video" ||
     value === "videos"
   ) {
-
     return "video";
   }
 
@@ -1251,7 +1429,6 @@ function normalizeSection(
     value === "slide" ||
     value === "slides"
   ) {
-
     return "slideshow";
   }
 
@@ -1261,7 +1438,6 @@ function normalizeSection(
 function sectionFromItem(
   item
 ) {
-
   const type =
     String(
       item?.type || ""
@@ -1272,21 +1448,18 @@ function sectionFromItem(
   if (
     type === "book"
   ) {
-
     return "reader";
   }
 
   if (
     type === "video"
   ) {
-
     return "video";
   }
 
   if (
     type === "slideshow"
   ) {
-
     return "slideshow";
   }
 
@@ -1296,27 +1469,65 @@ function sectionFromItem(
 }
 
 /* =========================================================
-   Clean media URL
+   GLIDE CLEANUP
 ========================================================= */
 
-function cleanMediaUrl(
-  value
-) {
+/*
+ * This is the cleanup method proven in the GlideContract
+ * adapter.
+ *
+ * Glide may provide a media value like:
+ *
+ * [https://example.com/image.jpg](https://example.com/image.jpg)
+ *
+ * We want:
+ *
+ * https://example.com/image.jpg
+ *
+ * The destination URL in the Markdown expression is
+ * preferred, exactly as in the proven adapter.
+ */
+/*
+ * =========================================================
+ * GLIDE URL CLEANUP — STAGE 1A
+ * =========================================================
+ *
+ * This follows the proven GlideContract adapter behavior,
+ * with one additional normalization step for Glide values
+ * that arrive wrapped in Markdown code fences.
+ *
+ * Examples accepted:
+ *
+ *   https://example.com/image.jpg
+ *
+ *   [https://example.com/image.jpg](https://example.com/image.jpg)
+ *
+ *   ```[https://example.com/image.jpg](https://example.com/image.jpg)```
+ *
+ *   "https://example.com/image.jpg"
+ *
+ *   ```https://example.com/image.jpg```
+ *
+ * The returned value is ONLY the destination URL.
+ * =========================================================
+ */
 
-  if (
-    value === null ||
-    value === undefined
-  ) {
+function cleanString(value) {
+  return value === null || value === undefined
+    ? ""
+    : String(value).trim();
+}
 
-    return "";
-  }
 
-  let text =
-    String(value)
-      .trim();
+function unwrapMarkdown(value) {
+  let text = cleanString(value);
 
-  if (!text) {
-    return "";
+  if (!text) return "";
+
+  const markdownMatch = text.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+
+  if (markdownMatch) {
+    return cleanString(markdownMatch[2] || markdownMatch[1]);
   }
 
   if (
@@ -1324,66 +1535,297 @@ function cleanMediaUrl(
     text.startsWith('"') &&
     text.endsWith('"')
   ) {
+    text = text.slice(1, -1);
+  }
 
+  return text.trim();
+}
+
+
+function splitMediaValue(value) {
+  if (value === null || value === undefined) {
+    return [];
+  }
+
+  // Real array
+  if (Array.isArray(value)) {
+    return value
+      .flatMap(part => splitMediaValue(part))
+      .filter(Boolean);
+  }
+
+  let text = cleanString(value);
+
+  if (!text) return [];
+
+  // JSON array stored as text
+  if (text.startsWith("[") && text.endsWith("]")) {
     try {
+      const parsed = JSON.parse(text);
 
-      const decoded =
-        JSON.parse(
-          text
-        );
-
-      if (
-        typeof decoded ===
-        "string"
-      ) {
-
-        text =
-          decoded.trim();
+      if (Array.isArray(parsed)) {
+        return parsed
+          .flatMap(part => splitMediaValue(part))
+          .filter(Boolean);
       }
-
-    } catch (_) {
-
-      text =
-        text
-          .slice(
-            1,
-            -1
-          )
-          .trim();
+    } catch {
+      // Not JSON; continue normally.
     }
   }
 
-  const markdownMatch =
-    text.match(
-      /^\s*\[[^\]]+\]\((https?:\/\/[^)]+)\)\s*$/i
-    );
+  // Glide Markdown URL list
+  const markdownParts = text
+    .split(/\s*,\s*(?=\[)/g)
+    .map(part => unwrapMarkdown(part))
+    .filter(Boolean);
 
-  if (markdownMatch) {
-
-    return markdownMatch[1];
+  if (markdownParts.length > 1) {
+    return markdownParts;
   }
 
-  const urlMatch =
-    text.match(
-      /https?:\/\/[^\s<>"')]+/i
-    );
-
-  if (urlMatch) {
-
-    return urlMatch[0];
+  // Single value containing a Markdown URL
+  if (markdownParts.length === 1) {
+    return markdownParts;
   }
 
-  return "";
+  // Plain comma-separated values
+  if (text.includes(",")) {
+    return text
+      .split(",")
+      .map(part => unwrapMarkdown(part))
+      .filter(Boolean);
+  }
+
+  return [unwrapMarkdown(text)].filter(Boolean);
+}
+
+
+function cleanMediaUrl(value) {
+  const values = splitMediaValue(value);
+
+  if (!values.length) return "";
+
+  return values[0];
+}
+
+
+function cleanCatalogMediaValue(value, type) {
+  const values = splitMediaValue(value);
+
+  if (!values.length) {
+    return "";
+  }
+
+  const normalizedType = normalizeSection(type);
+
+  // Slideshows can contain multiple images.
+  if (normalizedType === "slideshow") {
+    return values.length === 1
+      ? values[0]
+      : values;
+  }
+
+  // Reader/video items use one media value.
+  return values[0];
+}
+/*
+ * Normalize catalog input using the proven Glide cleanup
+ * before it reaches normalizeShareItem().
+ */
+function normalizeCatalogPublishItem(rawItem) {
+  if (!rawItem || typeof rawItem !== "object") {
+    return null;
+  }
+
+  const type = normalizeSection(
+    rawItem.type ||
+    rawItem.section ||
+    ""
+  );
+
+  if (!type) {
+    return null;
+  }
+
+  const thumbnailValues = splitMediaValue(rawItem.thumbnail);
+  const mediaValues = splitMediaValue(rawItem.media);
+  const audioValues = splitMediaValue(rawItem.audio);
+
+  const cleanedItem = {
+    id: cleanString(rawItem.id),
+    type,
+    title: cleanString(rawItem.title),
+    subtitle: cleanString(rawItem.subtitle),
+
+    thumbnail: thumbnailValues.length
+      ? thumbnailValues[0]
+      : "",
+
+    media:
+      type === "slideshow"
+        ? (
+            mediaValues.length === 1
+              ? mediaValues[0]
+              : mediaValues
+          )
+        : (
+            mediaValues.length
+              ? mediaValues[0]
+              : ""
+          ),
+
+    audio: audioValues.length
+      ? audioValues[0]
+      : "",
+
+    author: cleanString(rawItem.author),
+    category: cleanString(rawItem.category),
+    date: cleanString(rawItem.date)
+  };
+
+  if (rawItem.dateAdd !== undefined) {
+    cleanedItem.dateAdd = cleanString(rawItem.dateAdd);
+  }
+
+  if (!cleanedItem.id) {
+    return null;
+  }
+
+  return cleanedItem;
+}
+/* =========================================================
+   STAGE 1 CATALOG PREVIEW
+========================================================= */
+
+/*
+ * Stage 1 deliberately performs ZERO KV writes.
+ *
+ * It receives the Catalog Source snapshot, applies the
+ * exact Worker cleanup, and returns the cleaned result so
+ * we can verify the transformation before allowing
+ * publishing.
+ */
+/* =========================================================
+   CATALOG RECORD COMPARISON
+========================================================= */
+
+/*
+ * publishedAt is deliberately excluded from comparison.
+ * It changes on every publish request and therefore must not
+ * make an otherwise identical catalog item look changed.
+ *
+ * The comparison includes the stable record identity and the
+ * fully cleaned catalog item. This makes publishing idempotent:
+ * repeated publish requests do NOT rewrite unchanged items.
+ */
+function catalogRecordComparable(record) {
+  if (!record || typeof record !== "object") {
+    return null;
+  }
+
+  return {
+    version: String(record.version ?? ""),
+    section: normalizeSection(record.section || ""),
+    id: String(record.id ?? "").trim(),
+    item: record.item || null
+  };
+}
+
+function catalogRecordsEqual(existingRecord, incomingRecord) {
+  const existingComparable =
+    catalogRecordComparable(existingRecord);
+
+  const incomingComparable =
+    catalogRecordComparable(incomingRecord);
+
+  if (!existingComparable || !incomingComparable) {
+    return false;
+  }
+
+  return JSON.stringify(existingComparable) ===
+    JSON.stringify(incomingComparable);
+}
+
+async function getCatalogRecordForPublish(env, key) {
+  /*
+   * IMPORTANT: do NOT use kvGet() here.
+   *
+   * kvGet() intentionally uses a cacheTtl for normal share reads.
+   * Publishing needs a fresh comparison so a recent change is not
+   * hidden behind a cached catalog record.
+   */
+  return env.MEDIA_KV.get(key);
 }
 
 /* =========================================================
-   HTML escaping
+   STAGE 1 CATALOG PREVIEW
+========================================================= */
+
+function buildCatalogPreview(
+  contract
+) {
+  const cleanedItems =
+    [];
+
+  let skippedCount =
+    0;
+
+  for (
+    const rawItem of
+    contract
+  ) {
+    const item =
+      normalizeCatalogPublishItem(
+        rawItem
+      );
+
+    if (!item) {
+      skippedCount++;
+      continue;
+    }
+
+    const section =
+      sectionFromItem(
+        item
+      );
+
+    if (!section) {
+      skippedCount++;
+      continue;
+    }
+
+    cleanedItems.push(
+      item
+    );
+  }
+
+  return {
+    preview:
+      true,
+
+    kvWrites:
+      0,
+
+    contractItemCount:
+      contract.length,
+
+    cleanedItemCount:
+      cleanedItems.length,
+
+    skippedCount,
+
+    contract:
+      cleanedItems
+  };
+}
+
+/* =========================================================
+   HTML ESCAPING
 ========================================================= */
 
 function escapeHtml(
   value
 ) {
-
   return String(
     value ?? ""
   )
@@ -1410,7 +1852,7 @@ function escapeHtml(
 }
 
 /* =========================================================
-   Open Graph
+   OPEN GRAPH
 ========================================================= */
 
 function buildOgTags(
@@ -1418,7 +1860,6 @@ function buildOgTags(
   item,
   imageQuery
 ) {
-
   const url =
     new URL(
       request.url
@@ -1434,17 +1875,14 @@ function buildOgTags(
     imageQuery &&
     imageQuery.key
   ) {
-
     imageUrl.searchParams.set(
       "k",
       imageQuery.key
     );
-
   } else if (
     imageQuery &&
     imageQuery.target
   ) {
-
     imageUrl.searchParams.set(
       "section",
       imageQuery.target.section
@@ -1463,41 +1901,17 @@ function buildOgTags(
     ).trim();
 
   return (
-
     `<meta property="og:title" content="${escapeHtml(title)}">` +
-
     `<meta property="og:site_name" content="${escapeHtml(OG_SITE_NAME)}">` +
-
     `<meta property="og:url" content="${escapeHtml(url.toString())}">` +
-
     `<meta property="og:image" content="${escapeHtml(imageUrl.toString())}">` +
-
     `<meta property="og:image:width" content="1200">` +
-
     `<meta property="og:image:height" content="630">`
   );
 }
 
 /* =========================================================
-   Bootstrap
-
-   CRITICAL:
-
-   Do NOT rewrite the browser URL.
-
-   The address bar must remain the canonical share URL:
-
-       /s/<section>/<id>
-
-   e.g. /s/slideshow/abovealllove202609131952
-
-   The old /s/<16-character-key> form is compatibility
-   code only.
-
-   The contract is supplied directly to the existing
-   GlideContract adapter through its accepted global:
-
-       window.SkyMediaContract
+   BOOTSTRAP
 ========================================================= */
 
 function injectContractBootstrap(
@@ -1507,7 +1921,6 @@ function injectContractBootstrap(
   target,
   imageQuery = null
 ) {
-
   const item =
     manifest?.content?.[0] ||
     null;
@@ -1529,21 +1942,21 @@ function injectContractBootstrap(
 
   window.SkyMediaContract = ${JSON.stringify(manifest)};
 
-window.__SKY_SHARE_MODE = true;
+  window.__SKY_SHARE_MODE = true;
 
-window.__SKY_SHARE_TARGET = ${JSON.stringify({
-  section:
-    target?.section ||
-    section,
+  window.__SKY_SHARE_TARGET = ${JSON.stringify({
+    section:
+      target?.section ||
+      section,
 
-  id:
-    target?.id ||
-    id
-})};
+    id:
+      target?.id ||
+      id
+  })};
 
-window.__SKY_SHARE_KEY = ${JSON.stringify(
-  imageQuery?.key || ""
-)};
+  window.__SKY_SHARE_KEY = ${JSON.stringify(
+    imageQuery?.key || ""
+  )};
 
 })();
 </script>
@@ -1567,31 +1980,8 @@ window.__SKY_SHARE_KEY = ${JSON.stringify(
   if (
     index < 0
   ) {
-
     return html;
   }
-
-  /*
-   * CRITICAL — /s/<section>/<id> document base URL.
-   *
-   * index.html loads every stylesheet and script with a
-   * DOCUMENT-RELATIVE path ("css/style.css", "js/app.js").
-   *
-   * At "/" (the legacy ?contractz= route) those resolve to
-   * "/js/app.js" and everything works.
-   *
-   * At "/s/slideshow/<id>" they resolve to
-   * "/s/slideshow/js/app.js", which re-enters the share route
-   * and is rejected, so NO application script ever executes and
-   * the raw index.html shell is what the visitor sees.
-   *
-   * Forcing the document base back to the site root makes the
-   * share document load exactly the same resources as "/".
-   *
-   * The <base> element must be the FIRST thing inside <head>,
-   * before any relative href/src, or the preload scanner will
-   * already have resolved them against the /s/ path.
-   */
 
   const baseTag =
     '<base href="/">';
@@ -1606,9 +1996,10 @@ window.__SKY_SHARE_KEY = ${JSON.stringify(
 
   if (
     headMatch &&
-    !/<base\s/i.test(html)
+    !/<base\s/i.test(
+      html
+    )
   ) {
-
     const insertAt =
       headMatch.index +
       headMatch[0].length;
@@ -1618,9 +2009,7 @@ window.__SKY_SHARE_KEY = ${JSON.stringify(
         0,
         insertAt
       ) +
-
       baseTag +
-
       html.slice(
         insertAt
       );
@@ -1634,21 +2023,16 @@ window.__SKY_SHARE_KEY = ${JSON.stringify(
   if (
     headEnd < 0
   ) {
-
     return withBase;
   }
 
   return (
-
     withBase.slice(
       0,
       headEnd
     ) +
-
     ogTags +
-
     script +
-
     withBase.slice(
       headEnd
     )
@@ -1656,14 +2040,13 @@ window.__SKY_SHARE_KEY = ${JSON.stringify(
 }
 
 /* =========================================================
-   Serve index.html with recovered contract
+   SERVE INDEX.HTML
 ========================================================= */
 
 async function getIndexHtml(
   env,
   request
 ) {
-
   const assetResponse =
     await env.ASSETS.fetch(
       makeCleanAssetRequest(
@@ -1674,7 +2057,6 @@ async function getIndexHtml(
   if (
     !assetResponse.ok
   ) {
-
     return assetResponse;
   }
 
@@ -1690,7 +2072,6 @@ async function getIndexHtml(
         "text/html"
       )
   ) {
-
     return assetResponse;
   }
 
@@ -1703,7 +2084,6 @@ async function serveWithContract(
   payload,
   key = ""
 ) {
-
   const html =
     await getIndexHtml(
       env,
@@ -1714,14 +2094,12 @@ async function serveWithContract(
     typeof html !==
     "string"
   ) {
-
     return html;
   }
 
   let manifest;
 
   try {
-
     const contract =
       decodeContractPayload(
         payload
@@ -1735,17 +2113,29 @@ async function serveWithContract(
         )
       );
 
-    manifest =
-      buildShareManifest(
-        normalizeShareItem(
-          item
-        )
+    const normalized =
+      normalizeShareItem(
+        item
       );
 
+    if (!normalized) {
+      throw new Error(
+        "Shared contract contains no valid item."
+      );
+    }
+
+    manifest =
+      buildShareManifest(
+        normalized
+      );
   } catch (error) {
+    console.error(
+      "MMicjMedia publication decode failed:",
+      error
+    );
 
     return new Response(
-      "SkyMedia publication data is invalid.",
+      "MMicjMedia publication data is invalid.",
       {
         status:
           500,
@@ -1757,7 +2147,6 @@ async function serveWithContract(
   }
 
   return new Response(
-
     injectContractBootstrap(
       html,
       manifest,
@@ -1775,7 +2164,6 @@ async function serveWithContract(
         key
       }
     ),
-
     {
       status:
         200,
@@ -1786,12 +2174,15 @@ async function serveWithContract(
   );
 }
 
+/* =========================================================
+   SERVE DIRECT SHARE
+========================================================= */
+
 async function serveDirectShare(
   request,
   env,
   target
 ) {
-
   const record =
     await getDirectShareRecord(
       env,
@@ -1799,9 +2190,8 @@ async function serveDirectShare(
     );
 
   if (!record) {
-
     return new Response(
-      "SkyMedia shared item was not found.",
+      "MMicjMedia shared item was not found.",
       {
         status:
           404,
@@ -1822,7 +2212,6 @@ async function serveDirectShare(
     typeof html !==
     "string"
   ) {
-
     return html;
   }
 
@@ -1851,14 +2240,6 @@ async function serveDirectShare(
 
 /* =========================================================
    SERVE CATALOG SHARE
-
-   Canonical URL:
-
-       /s/<section>/<id>
-
-   Example:
-
-       /s/slideshow/abovealllove202609131952
 ========================================================= */
 
 async function serveCatalogShare(
@@ -1866,7 +2247,6 @@ async function serveCatalogShare(
   env,
   target
 ) {
-
   const record =
     await getCatalogShareRecord(
       env,
@@ -1887,7 +2267,6 @@ async function serveCatalogShare(
     typeof html !==
     "string"
   ) {
-
     return html;
   }
 
@@ -1922,11 +2301,9 @@ async function serveOgImage(
   request,
   env
 ) {
-
   if (!env.IMAGES) {
-
     return new Response(
-      "SkyMedia Images binding is not configured.",
+      "MMicjMedia Images binding is not configured.",
       {
         status:
           500,
@@ -1959,27 +2336,28 @@ async function serveOgImage(
       key
     )
   ) {
-
     let payload =
       null;
 
     try {
-
       payload =
         await kvGet(
           env,
           key
         );
-
     } catch (error) {
-
       console.error(
-        "SkyMedia OG KV read failed:",
+        "MMicjMedia OG KV read failed:",
         error
       );
 
       return new Response(
-        "SkyMedia KV read failed.",
+        "MMicjMedia KV read failed: " +
+        (
+          error instanceof Error
+            ? error.message
+            : String(error)
+        ),
         {
           status:
             500,
@@ -1996,9 +2374,8 @@ async function serveOgImage(
         payload
       )
     ) {
-
       return new Response(
-        "SkyMedia publication not found.",
+        "MMicjMedia publication not found.",
         {
           status:
             404,
@@ -2010,7 +2387,6 @@ async function serveOgImage(
     }
 
     try {
-
       const contract =
         decodeContractPayload(
           payload
@@ -2023,16 +2399,14 @@ async function serveOgImage(
             url
           )
         );
-
     } catch (error) {
-
       console.error(
-        "SkyMedia OG legacy contract decode failed:",
+        "MMicjMedia OG legacy contract decode failed:",
         error
       );
 
       return new Response(
-        "SkyMedia publication data could not be decoded.",
+        "MMicjMedia publication data could not be decoded.",
         {
           status:
             500,
@@ -2042,11 +2416,8 @@ async function serveOgImage(
         }
       );
     }
-
   } else {
-
     const target = {
-
       section:
         normalizeSection(
           url.searchParams.get(
@@ -2063,12 +2434,13 @@ async function serveOgImage(
     };
 
     if (
-      !target.section ||
-      !target.id
+      !isPlausibleShareTarget(
+        target.section,
+        target.id
+      )
     ) {
-
       return new Response(
-        "Invalid SkyMedia OG target.",
+        "Invalid MMicjMedia OG target.",
         {
           status:
             400,
@@ -2079,24 +2451,13 @@ async function serveOgImage(
       );
     }
 
-    /*
-     * Phase 4:
-     * OG preview now reads from the published catalog.
-     */
-
     let record =
       await getCatalogShareRecord(
         env,
         target
       );
 
-    /*
-     * Temporary backward compatibility for any
-     * older share:v1 records.
-     */
-
     if (!record) {
-
       record =
         await getDirectShareRecord(
           env,
@@ -2105,9 +2466,8 @@ async function serveOgImage(
     }
 
     if (!record) {
-
       return new Response(
-        "SkyMedia shared item was not found.",
+        "MMicjMedia shared item was not found.",
         {
           status:
             404,
@@ -2123,9 +2483,8 @@ async function serveOgImage(
   }
 
   if (!item) {
-
     return new Response(
-      "SkyMedia shared item is invalid.",
+      "MMicjMedia shared item is invalid.",
       {
         status:
           500,
@@ -2142,21 +2501,12 @@ async function serveOgImage(
     );
 
   if (!thumbnailUrl) {
-
     thumbnailUrl =
       OG_DEFAULT_THUMBNAIL;
   }
 
-  /*
-   * The thumbnail and the logo are static remote files.
-   * Caching them keeps a social crawler storm from pulling
-   * the same two images from Glide storage on every preview.
-   */
-
   const OG_SOURCE_FETCH = {
-
     cf: {
-
       cacheTtl:
         86400,
 
@@ -2175,12 +2525,10 @@ async function serveOgImage(
     !baseResponse.ok ||
     !baseResponse.body
   ) {
-
     if (
       thumbnailUrl !==
       OG_DEFAULT_THUMBNAIL
     ) {
-
       baseResponse =
         await fetch(
           OG_DEFAULT_THUMBNAIL,
@@ -2193,9 +2541,8 @@ async function serveOgImage(
     !baseResponse.ok ||
     !baseResponse.body
   ) {
-
     return new Response(
-      "SkyMedia OG thumbnail could not be loaded.",
+      "MMicjMedia OG thumbnail could not be loaded.",
       {
         status:
           502,
@@ -2216,9 +2563,8 @@ async function serveOgImage(
     !logoResponse.ok ||
     !logoResponse.body
   ) {
-
     return new Response(
-      "SkyMedia OG logo could not be loaded.",
+      "MMicjMedia OG logo could not be loaded.",
       {
         status:
           502,
@@ -2229,6 +2575,55 @@ async function serveOgImage(
     );
   }
 
+  /*
+   * The Images binding bills every .output() call and, once the
+   * free allowance is used up, throws. A link preview with a plain
+   * (un-badged) thumbnail is far better than a broken one, so any
+   * failure while composing sends the crawler to the thumbnail
+   * itself. The redirect is cached briefly so a burst of crawlers
+   * does not retry the transform each time.
+   */
+  const ogFallbackUrl =
+    baseResponse.url ||
+    thumbnailUrl;
+
+  try {
+    return await composeOgImage(
+      env,
+      baseResponse,
+      logoResponse
+    );
+  } catch (error) {
+    logLimited(
+      "warn",
+      "og-compose-failed",
+      "MMicjMedia OG image composition failed; redirecting to the thumbnail:",
+      error
+    );
+
+    return new Response(
+      null,
+      {
+        status:
+          302,
+
+        headers: {
+          "Location":
+            ogFallbackUrl,
+
+          "Cache-Control":
+            "public, max-age=300"
+        }
+      }
+    );
+  }
+}
+
+async function composeOgImage(
+  env,
+  baseResponse,
+  logoResponse
+) {
   const baseStreams =
     baseResponse.body.tee();
 
@@ -2236,16 +2631,13 @@ async function serveOgImage(
     null;
 
   try {
-
     imageInfo =
       await env.IMAGES.info(
         baseStreams[0]
       );
-
   } catch (error) {
-
     console.error(
-      "SkyMedia OG image info failed:",
+      "MMicjMedia OG image info failed:",
       error
     );
   }
@@ -2261,7 +2653,6 @@ async function serveOgImage(
       )
     )
   ) {
-
     logoWidth =
       Math.round(
         Number(
@@ -2331,29 +2722,158 @@ async function serveOgImage(
 }
 
 /* =========================================================
-   Share Prime
+   PDF RANGE PROXY (handler)
+========================================================= */
 
-   Client sends ONLY:
+async function handlePdfProxy(
+  request,
+  env
+) {
+  const url =
+    new URL(
+      request.url
+    );
 
-       {
-         contractz,
-         section,
-         id
-       }
+  const src =
+    url.searchParams.get(
+      "src"
+    );
 
-   Worker calculates the key.
+  if (!src) {
+    return new Response(
+      "Missing src parameter.",
+      { status: 400 }
+    );
+  }
 
-   section/id are retained only as diagnostic compatibility
-   fields. They are NOT part of the public URL.
+  let target;
+
+  try {
+    target =
+      new URL(
+        src
+      );
+  }
+  catch (error) {
+    return new Response(
+      "Invalid src URL.",
+      { status: 400 }
+    );
+  }
+
+  if (
+    target.protocol !== "https:" ||
+    !pdfProxyHostAllowed(
+      env,
+      target.hostname
+    )
+  ) {
+    return new Response(
+      "Source host is not allowed.",
+      { status: 403 }
+    );
+  }
+
+  if (
+    !pdfProxyPathAllowed(
+      env,
+      target.pathname,
+      target.hostname
+    )
+  ) {
+    return new Response(
+      "Source path is not allowed.",
+      { status: 403 }
+    );
+  }
+
+  /*
+   * STREAMING PASS-THROUGH (no Worker-side caching)
+   *
+   * The previous version of this proxy downloaded the WHOLE PDF from
+   * GCS on every request, tried to store it with the Cache API, and
+   * then let the Cache API slice byte ranges out of that stored copy.
+   * That cannot work on a *.workers.dev address: the Cache API is only
+   * functional on custom domains there, so cache.put() stored nothing
+   * and cache.match() never hit. Every request therefore fell through
+   * to "return the full 200 body", and cloning that body for
+   * cache.put() forced the Worker to hold the unread half of the copy
+   * in memory. For a small PDF that goes unnoticed; for a large one
+   * (a book with an embedded video, say) it exceeds the Worker's
+   * memory limit and the visitor sees a bare HTTP 500.
+   *
+   * Instead, the visitor's Range header is forwarded to GCS, which
+   * natively answers 206 Partial Content, and the response body is
+   * streamed straight back without ever being buffered. Nothing is
+   * cached by this code, so the original cache-poisoning problem (one
+   * cached byte range served back for every other range) cannot occur
+   * either. PDF.js gets real 206 responses and streams the book.
+   */
+  const upstreamHeaders=new Headers();
+  const rangeHeader=request.headers.get("Range");
+  if(rangeHeader) upstreamHeaders.set("Range",rangeHeader);
+  const ifRangeHeader=request.headers.get("If-Range");
+  if(ifRangeHeader) upstreamHeaders.set("If-Range",ifRangeHeader);
+  /* Keep byte offsets and Content-Length meaning what they say. */
+  upstreamHeaders.set("Accept-Encoding","identity");
+  let upstreamResponse;
+  try{
+    upstreamResponse=await fetch(
+      target.toString(),
+      {
+        method:request.method==="HEAD" ? "HEAD" : "GET",
+        headers:upstreamHeaders
+      }
+    );
+  }
+  catch(error){
+    return new Response(
+      "Upstream PDF fetch failed: "+
+        (error && error.message ? error.message : String(error)),
+      { status: 502 }
+    );
+  }
+  /* 200 and 206 are ok. 416 (range not satisfiable) is passed on to
+     the browser as-is; anything else is an upstream failure. */
+  if(!upstreamResponse.ok && upstreamResponse.status!==416){
+    return new Response(
+      "Upstream PDF fetch failed with status "+upstreamResponse.status+".",
+      { status: 502 }
+    );
+  }
+  const headers=new Headers();
+  const passthroughHeaders=[
+    "content-type",
+    "content-length",
+    "content-range",
+    "etag",
+    "last-modified"
+  ];
+  for(const name of passthroughHeaders){
+    const value=upstreamResponse.headers.get(name);
+    if(value) headers.set(name,value);
+  }
+  if(!headers.has("content-type")) headers.set("content-type","application/pdf");
+  headers.set("accept-ranges","bytes");
+  headers.set("cache-control","public, max-age=86400");
+  return new Response(
+    upstreamResponse.body,
+    {
+      status:upstreamResponse.status,
+      headers
+    }
+  );
+}
+
+/* =========================================================
+   SHARE PRIME
 ========================================================= */
 
 async function handleSharePrime(
   request,
   env
 ) {
-
   const corsHeaders = {
-
     "access-control-allow-origin":
       "*",
 
@@ -2374,7 +2894,6 @@ async function handleSharePrime(
     request.method ===
     "OPTIONS"
   ) {
-
     return new Response(
       null,
       {
@@ -2391,7 +2910,6 @@ async function handleSharePrime(
     request.method !==
     "POST"
   ) {
-
     return new Response(
       JSON.stringify({
         error:
@@ -2407,15 +2925,15 @@ async function handleSharePrime(
     );
   }
 
+  /* A prime may create the record an earlier miss was remembered for. */
+  kvMissMemo.clear();
+
   let body;
 
   try {
-
     body =
       await request.json();
-
   } catch (_) {
-
     return new Response(
       JSON.stringify({
         error:
@@ -2430,8 +2948,6 @@ async function handleSharePrime(
       }
     );
   }
-
-  /* New direct-ID registration. */
 
   const section =
     normalizeSection(
@@ -2453,12 +2969,11 @@ async function handleSharePrime(
     id &&
     item
   ) {
-
     if (
       item.id !== id ||
-      sectionFromItem(item) !== section
+      sectionFromItem(item) !==
+        section
     ) {
-
       return new Response(
         JSON.stringify({
           error:
@@ -2493,38 +3008,40 @@ async function handleSharePrime(
       });
 
     try {
-
       await env.MEDIA_KV.put(
         key,
         record
       );
 
       const stored =
-        await kvGet(
-          env,
+        await env.MEDIA_KV.get(
           key
         );
 
       if (
         stored !== record
       ) {
-
         throw new Error(
-          "KV verification failed."
+          "KV verification failed: stored value did not match the value written."
         );
       }
-
     } catch (error) {
-
       console.error(
-        "SkyMedia direct-share KV write failure:",
+        "MMicjMedia direct-share KV write failure:",
         error
       );
 
       return new Response(
         JSON.stringify({
           error:
-            "SkyMedia KV write failed."
+            "MMicjMedia KV write failed.",
+
+          detail:
+            error instanceof Error
+              ? error.message
+              : String(error),
+
+          key
         }),
         {
           status:
@@ -2566,7 +3083,9 @@ async function handleSharePrime(
     );
   }
 
-  /* Legacy SR2 registration remains supported. */
+  /* =======================================================
+     LEGACY SR2 REGISTRATION
+  ======================================================= */
 
   const payload =
     String(
@@ -2578,7 +3097,6 @@ async function handleSharePrime(
       payload
     )
   ) {
-
     return new Response(
       JSON.stringify({
         error:
@@ -2600,7 +3118,6 @@ async function handleSharePrime(
     );
 
   try {
-
     await env.MEDIA_KV.put(
       key,
       payload
@@ -2615,23 +3132,25 @@ async function handleSharePrime(
     if (
       stored !== payload
     ) {
-
       throw new Error(
         "KV verification failed."
       );
     }
-
   } catch (error) {
-
     console.error(
-      "SkyMedia share-prime KV failure:",
+      "MMicjMedia share-prime KV failure:",
       error
     );
 
     return new Response(
       JSON.stringify({
         error:
-          "SkyMedia KV write failed."
+          "MMicjMedia KV write failed.",
+
+        detail:
+          error instanceof Error
+            ? error.message
+            : String(error)
       }),
       {
         status:
@@ -2663,7 +3182,7 @@ async function handleSharePrime(
 }
 
 /* =========================================================
-   Legacy ?k=<key>&contractz=<payload>
+   LEGACY ?k=<key>&contractz=<payload>
 ========================================================= */
 
 async function handleLegacyPrime(
@@ -2672,7 +3191,6 @@ async function handleLegacyPrime(
   keyParam,
   contractz
 ) {
-
   const key =
     String(
       keyParam || ""
@@ -2684,9 +3202,8 @@ async function handleLegacyPrime(
     !isValidKey(key) ||
     !isValidPayload(contractz)
   ) {
-
     return new Response(
-      "SkyMedia publication link is invalid.",
+      "MMicjMedia publication link is invalid.",
       {
         status:
           400,
@@ -2701,9 +3218,8 @@ async function handleLegacyPrime(
     makeKey(contractz) !==
     key
   ) {
-
     return new Response(
-      "SkyMedia publication link is invalid.",
+      "MMicjMedia publication link is invalid.",
       {
         status:
           400,
@@ -2715,16 +3231,23 @@ async function handleLegacyPrime(
   }
 
   try {
-
     await env.MEDIA_KV.put(
       key,
       contractz
     );
-
   } catch (error) {
+    console.error(
+      "MMicjMedia legacy KV write failed:",
+      error
+    );
 
     return new Response(
-      "SkyMedia KV write failed.",
+      "MMicjMedia KV write failed: " +
+      (
+        error instanceof Error
+          ? error.message
+          : String(error)
+      ),
       {
         status:
           500,
@@ -2767,34 +3290,13 @@ async function handleLegacyPrime(
 }
 
 /* =========================================================
-   CANONICAL /s/<section>/<id>
-
-   Phase 4:
-
-       catalog:v1
-
-   Temporary fallback:
-
-       share:v1
-========================================================= */
-
-/* =========================================================
-   /s/... sub-resource fallback
-
-   Defensive companion to the injected <base href="/">.
-
-   Any request under the share prefix that is plainly a static
-   asset ("/s/slideshow/js/app.js", "/s/<key>/css/style.css")
-   is served from the site root instead of being treated as a
-   share key, which previously produced a 400 for every script
-   and stylesheet on the page.
+   SHARE SUBRESOURCE FALLBACK
 ========================================================= */
 
 async function serveShareSubresource(
   request,
   env
 ) {
-
   const url =
     new URL(
       request.url
@@ -2811,7 +3313,6 @@ async function serveShareSubresource(
   if (
     parts.length < 2
   ) {
-
     return null;
   }
 
@@ -2823,9 +3324,6 @@ async function serveShareSubresource(
       last
     )
   ) {
-
-    /* A real share target has no file extension. */
-
     return null;
   }
 
@@ -2834,7 +3332,6 @@ async function serveShareSubresource(
     i < parts.length;
     i++
   ) {
-
     const candidate =
       new URL(
         "/" +
@@ -2864,7 +3361,6 @@ async function serveShareSubresource(
     if (
       assetResponse.ok
     ) {
-
       return assetResponse;
     }
   }
@@ -2872,11 +3368,14 @@ async function serveShareSubresource(
   return null;
 }
 
+/* =========================================================
+   DIRECT SHARE ROUTER
+========================================================= */
+
 async function handleDirectShare(
   request,
   env
 ) {
-
   const target =
     getDirectShareTarget(
       new URL(
@@ -2889,12 +3388,12 @@ async function handleDirectShare(
   }
 
   /*
-   * NEW ARCHITECTURE
+   * Catalog takes priority.
    *
-   * The catalog published by Glide is the primary
-   * source of the shared item.
+   * This allows the canonical short URL to work from the
+   * Catalog Source without requiring ShareManager to write
+   * a share:v1 record first.
    */
-
   const catalogResponse =
     await serveCatalogShare(
       request,
@@ -2906,13 +3405,6 @@ async function handleDirectShare(
     return catalogResponse;
   }
 
-  /*
-   * TEMPORARY compatibility fallback.
-   *
-   * This allows previously primed share:v1 records
-   * to continue functioning while Phase 4 is tested.
-   */
-
   return serveDirectShare(
     request,
     env,
@@ -2921,17 +3413,13 @@ async function handleDirectShare(
 }
 
 /* =========================================================
-   /s/<16-character-key> legacy handler
-
-   Compatibility only. The canonical route is
-   /s/<section>/<id>, handled by handleDirectShare().
+   LEGACY /s/<16-character-key>
 ========================================================= */
 
 async function handleShortShare(
   request,
   env
 ) {
-
   const url =
     new URL(
       request.url
@@ -2945,7 +3433,6 @@ async function handleShortShare(
       prefix
     )
   ) {
-
     return null;
   }
 
@@ -2963,9 +3450,8 @@ async function handleShortShare(
       key
     )
   ) {
-
     return new Response(
-      "SkyMedia publication key is invalid.",
+      "MMicjMedia publication key is invalid.",
       {
         status:
           400,
@@ -2980,22 +3466,24 @@ async function handleShortShare(
     null;
 
   try {
-
     payload =
       await kvGet(
         env,
         key
       );
-
   } catch (error) {
-
     console.error(
-      "SkyMedia short-link KV read failed:",
+      "MMicjMedia short-link KV read failed:",
       error
     );
 
     return new Response(
-      "SkyMedia KV read failed.",
+      "MMicjMedia KV read failed: " +
+      (
+        error instanceof Error
+          ? error.message
+          : String(error)
+      ),
       {
         status:
           500,
@@ -3007,9 +3495,8 @@ async function handleShortShare(
   }
 
   if (!payload) {
-
     return new Response(
-      "SkyMedia publication not found.",
+      "MMicjMedia publication not found.",
       {
         status:
           404,
@@ -3025,9 +3512,8 @@ async function handleShortShare(
       payload
     )
   ) {
-
     return new Response(
-      "SkyMedia publication data is invalid.",
+      "MMicjMedia publication data is invalid.",
       {
         status:
           500,
@@ -3047,20 +3533,11 @@ async function handleShortShare(
 }
 
 /* =========================================================
-   TEMPORARY /__sky_catalog_publish TEST ENDPOINT
-
-   POST body is deliberately tiny for this first test.
-   It proves that the Glide JavaScript column can reach
-   the Worker and that the Worker can write/read MEDIA_KV.
-
-   This endpoint will later be changed to accept the full
-   catalog and use proper secret-backed authentication.
+   TEMPORARY CATALOG PUBLISH TEST
 ========================================================= */
 
 function catalogTestCorsHeaders() {
-
   return {
-
     "access-control-allow-origin":
       "*",
 
@@ -3078,11 +3555,495 @@ function catalogTestCorsHeaders() {
   };
 }
 
+/* ---------------------------------------------------------
+   SNAPSHOT HELPERS
+--------------------------------------------------------- */
+
+async function sha256Hex(text) {
+  const digest =
+    await crypto.subtle.digest(
+      "SHA-256",
+      new TextEncoder().encode(
+        text
+      )
+    );
+
+  return Array.from(
+    new Uint8Array(
+      digest
+    )
+  )
+    .map(
+      byte =>
+        byte
+          .toString(16)
+          .padStart(
+            2,
+            "0"
+          )
+    )
+    .join("");
+}
+
+/*
+ * Build the snapshot from the SAME cleaned items the per-item
+ * records use (buildCatalogPreview), so the snapshot and the
+ * share records can never disagree about an item.
+ *
+ * The payload has no timestamps, so identical catalogs always
+ * produce the identical hash.
+ */
+async function buildCatalogSnapshot(
+  contract,
+  body
+) {
+  const preview =
+    buildCatalogPreview(
+      contract
+    );
+
+  const payload = {
+    version:
+      "1.0",
+
+    content:
+      preview.contract
+  };
+
+  /*
+   * Optional extras. The Glide generator does not send these today;
+   * they are accepted so the Front Page categories / background can
+   * be carried later without another worker change.
+   */
+  const categories =
+    Array.isArray(
+      body?.frontPage?.categories
+    )
+      ? body.frontPage.categories
+          .map(
+            value =>
+              cleanString(
+                value
+              )
+          )
+          .filter(
+            Boolean
+          )
+      : [];
+
+  if (
+    categories.length
+  ) {
+    payload.frontPage = {
+      categories
+    };
+  }
+
+  const background =
+    cleanString(
+      body?.background
+    );
+
+  if (
+    background
+  ) {
+    payload.background =
+      background;
+  }
+
+  const json =
+    JSON.stringify(
+      payload
+    );
+
+  return {
+    json,
+
+    hash:
+      await sha256Hex(
+        CATALOG_SNAPSHOT_FORMAT +
+        "\n" +
+        json
+      ),
+
+    count:
+      preview.contract.length,
+
+    skippedCount:
+      preview.skippedCount
+  };
+}
+
+/*
+ * KV allows roughly one write per second to the same key. A second
+ * publish landing inside that window is retried once instead of
+ * failing the whole publish.
+ */
+async function kvPutWithRetry(
+  env,
+  key,
+  value,
+  options
+) {
+  try {
+    await env.MEDIA_KV.put(
+      key,
+      value,
+      options
+    );
+  } catch (_) {
+    await new Promise(
+      resolve =>
+        setTimeout(
+          resolve,
+          1100
+        )
+    );
+
+    await env.MEDIA_KV.put(
+      key,
+      value,
+      options
+    );
+  }
+}
+
+/*
+ * Items the PREVIOUS snapshot already recorded, keyed exactly like the
+ * per-item KV records. Because the snapshot is written LAST (after every
+ * item record), an item that is identical in the previous snapshot is
+ * known to be stored already, so the publish can skip its KV read.
+ *
+ * Returns null (=> fall back to the full per-item comparison) when the
+ * previous snapshot is missing, unreadable, or from another format.
+ */
+function buildPreviousItemMap(
+  snapshotValue
+) {
+  try {
+    const parsed =
+      JSON.parse(
+        snapshotValue
+      );
+
+    if (
+      !parsed ||
+      !Array.isArray(
+        parsed.content
+      )
+    ) {
+      return null;
+    }
+
+    const map =
+      new Map();
+
+    for (
+      const item of
+      parsed.content
+    ) {
+      const section =
+        sectionFromItem(
+          item
+        );
+
+      if (
+        !section ||
+        !item ||
+        !item.id
+      ) {
+        continue;
+      }
+
+      map.set(
+        makeCatalogRecordKey(
+          section,
+          item.id
+        ),
+        item
+      );
+    }
+
+    return map;
+  } catch (_) {
+    return null;
+  }
+}
+
+/* Isolate-local copy of the snapshot (see CATALOG_SNAPSHOT_MEMORY_TTL_MS). */
+let catalogSnapshotMemo =
+  null;
+
+function snapshotEtagMatches(
+  request,
+  etag
+) {
+  const header =
+    request.headers.get(
+      "If-None-Match"
+    );
+
+  if (!header) {
+    return false;
+  }
+
+  return header
+    .split(",")
+    .map(
+      value =>
+        value
+          .trim()
+          .replace(
+            /^W\//,
+            ""
+          )
+    )
+    .includes(
+      etag
+    );
+}
+
+async function handleCatalogSnapshot(
+  request,
+  env
+) {
+  const method =
+    request.method;
+
+  if (
+    method !== "GET" &&
+    method !== "HEAD"
+  ) {
+    return new Response(
+      JSON.stringify({
+        error:
+          "Catalog snapshot requires GET."
+      }),
+      {
+        status:
+          405,
+
+        headers: {
+          "Content-Type":
+            "application/json; charset=utf-8",
+
+          "Allow":
+            "GET, HEAD",
+
+          "Cache-Control":
+            "no-store"
+        }
+      }
+    );
+  }
+
+  const now =
+    Date.now();
+
+  let entry =
+    catalogSnapshotMemo &&
+    now -
+      catalogSnapshotMemo.at <
+      CATALOG_SNAPSHOT_MEMORY_TTL_MS
+      ? catalogSnapshotMemo
+      : null;
+
+  if (!entry) {
+    let stored;
+
+    try {
+      stored =
+        await env.MEDIA_KV.getWithMetadata(
+          CATALOG_SNAPSHOT_KEY
+        );
+    } catch (error) {
+      logLimited(
+        "error",
+        "snapshot-kv-read",
+        "MMicjMedia catalog snapshot KV read failure:",
+        error
+      );
+
+      /*
+       * Prefer an out-of-date snapshot over an error page: the
+       * catalog changes rarely, so stale is almost always fine.
+       */
+      if (
+        catalogSnapshotMemo
+      ) {
+        entry =
+          catalogSnapshotMemo;
+      } else {
+        return new Response(
+          JSON.stringify({
+            error:
+              "Catalog snapshot is temporarily unavailable."
+          }),
+          {
+            status:
+              503,
+
+            headers: {
+              "Content-Type":
+                "application/json; charset=utf-8",
+
+              "Retry-After":
+                "30",
+
+              "Cache-Control":
+                "no-store"
+            }
+          }
+        );
+      }
+    }
+
+    if (!entry) {
+      if (
+        !stored ||
+        stored.value === null
+      ) {
+        return new Response(
+          JSON.stringify({
+            error:
+              "No catalog snapshot has been published yet."
+          }),
+          {
+            status:
+              404,
+
+            headers: {
+              "Content-Type":
+                "application/json; charset=utf-8",
+
+              "Cache-Control":
+                "no-store"
+            }
+          }
+        );
+      }
+
+      const hash =
+        stored.metadata?.hash
+          ? String(
+              stored.metadata.hash
+            )
+          : await sha256Hex(
+              stored.value
+            );
+
+      entry =
+        catalogSnapshotMemo = {
+          value:
+            stored.value,
+
+          etag:
+            '"' +
+            hash.slice(
+              0,
+              32
+            ) +
+            '"',
+
+          at:
+            now
+        };
+    }
+  }
+
+  const headers = {
+    "Content-Type":
+      "application/json; charset=utf-8",
+
+    "Cache-Control":
+      "public, max-age=" +
+      CATALOG_SNAPSHOT_CLIENT_MAX_AGE,
+
+    "ETag":
+      entry.etag,
+
+    "X-Content-Type-Options":
+      "nosniff"
+  };
+
+  if (
+    snapshotEtagMatches(
+      request,
+      entry.etag
+    )
+  ) {
+    return new Response(
+      null,
+      {
+        status:
+          304,
+
+        headers
+      }
+    );
+  }
+
+  return new Response(
+    method === "HEAD"
+      ? null
+      : entry.value,
+    {
+      status:
+        200,
+
+      headers
+    }
+  );
+}
+
+/* ---------------------------------------------------------
+   PUBLISH AUTHORIZATION
+
+   The publish token can now be a Worker secret:
+
+     npx wrangler secret put CATALOG_PUBLISH_TOKEN
+
+   While the secret is set, both it and the original built-in
+   token are accepted, so the Glide generator can be switched
+   over without a gap. Once the generator sends the secret,
+   set the plain variable CATALOG_DISABLE_LEGACY_TOKEN to any
+   value (dashboard -> Variables) to stop accepting the
+   built-in token.
+--------------------------------------------------------- */
+
+function tokensEqual(
+  provided,
+  expected
+) {
+  if (
+    !provided ||
+    !expected ||
+    provided.length !== expected.length
+  ) {
+    return false;
+  }
+
+  let diff =
+    0;
+
+  for (
+    let i = 0;
+    i < expected.length;
+    i++
+  ) {
+    diff |=
+      provided.charCodeAt(i) ^
+      expected.charCodeAt(i);
+  }
+
+  return diff === 0;
+}
+
 function catalogTestAuthorized(
   request,
-  url
+  url,
+  env
 ) {
-
   const headerToken =
     String(
       request.headers.get(
@@ -3097,12 +4058,36 @@ function catalogTestAuthorized(
       ) || ""
     ).trim();
 
-  return (
-    headerToken ===
-      CATALOG_TEST_TOKEN ||
+  const secret =
+    String(
+      env?.CATALOG_PUBLISH_TOKEN || ""
+    ).trim();
 
-    queryToken ===
-      CATALOG_TEST_TOKEN
+  const acceptLegacy =
+    !(
+      secret &&
+      env?.CATALOG_DISABLE_LEGACY_TOKEN
+    );
+
+  return [
+    headerToken,
+    queryToken
+  ].some(
+    token =>
+      (
+        secret &&
+        tokensEqual(
+          token,
+          secret
+        )
+      ) ||
+      (
+        acceptLegacy &&
+        tokensEqual(
+          token,
+          CATALOG_TEST_TOKEN
+        )
+      )
   );
 }
 
@@ -3110,7 +4095,6 @@ async function handleCatalogPublishTest(
   request,
   env
 ) {
-
   const url =
     new URL(
       request.url
@@ -3123,7 +4107,6 @@ async function handleCatalogPublishTest(
     request.method ===
     "OPTIONS"
   ) {
-
     return new Response(
       null,
       {
@@ -3138,10 +4121,10 @@ async function handleCatalogPublishTest(
   if (
     !catalogTestAuthorized(
       request,
-      url
+      url,
+      env
     )
   ) {
-
     return new Response(
       JSON.stringify({
         error:
@@ -3156,13 +4139,14 @@ async function handleCatalogPublishTest(
     );
   }
 
-  /* GET with section + id returns the actual stored item. */
+  /* =======================================================
+     GET
+  ======================================================= */
 
   if (
     request.method ===
     "GET"
   ) {
-
     const section =
       normalizeSection(
         url.searchParams.get(
@@ -3181,7 +4165,6 @@ async function handleCatalogPublishTest(
       section &&
       id
     ) {
-
       const key =
         makeCatalogRecordKey(
           section,
@@ -3191,30 +4174,27 @@ async function handleCatalogPublishTest(
       let stored;
 
       try {
-
-        /*
-         * The diagnostic endpoint deliberately bypasses
-         * kvGet()'s cacheTtl. A verification read must show
-         * what is actually in KV right now, not a colo copy
-         * from up to KV_CACHE_TTL seconds ago.
-         */
-
         stored =
           await env.MEDIA_KV.get(
             key
           );
-
       } catch (error) {
-
         console.error(
-          "SkyMedia catalog item KV read failure:",
+          "MMicjMedia catalog item KV read failure:",
           error
         );
 
         return new Response(
           JSON.stringify({
             error:
-              "Catalog item KV read failed."
+              "Catalog item KV read failed.",
+
+            detail:
+              error instanceof Error
+                ? error.message
+                : String(error),
+
+            key
           }),
           {
             status:
@@ -3226,7 +4206,6 @@ async function handleCatalogPublishTest(
       }
 
       if (!stored) {
-
         return new Response(
           JSON.stringify({
             found:
@@ -3234,7 +4213,9 @@ async function handleCatalogPublishTest(
 
             section,
 
-            id
+            id,
+
+            key
           }),
           {
             status:
@@ -3259,23 +4240,28 @@ async function handleCatalogPublishTest(
     let statusRecord;
 
     try {
-
       statusRecord =
         await env.MEDIA_KV.get(
           CATALOG_TEST_STATUS_KEY
         );
-
     } catch (error) {
-
       console.error(
-        "SkyMedia catalog status KV read failure:",
+        "MMicjMedia catalog status KV read failure:",
         error
       );
 
       return new Response(
         JSON.stringify({
           error:
-            "Catalog status KV read failed."
+            "Catalog status KV read failed.",
+
+          detail:
+            error instanceof Error
+              ? error.message
+              : String(error),
+
+          key:
+            CATALOG_TEST_STATUS_KEY
         }),
         {
           status:
@@ -3304,11 +4290,14 @@ async function handleCatalogPublishTest(
     );
   }
 
+  /* =======================================================
+     POST
+  ======================================================= */
+
   if (
     request.method !==
     "POST"
   ) {
-
     return new Response(
       JSON.stringify({
         error:
@@ -3326,12 +4315,9 @@ async function handleCatalogPublishTest(
   let body;
 
   try {
-
     body =
       await request.json();
-
   } catch (_) {
-
     return new Response(
       JSON.stringify({
         error:
@@ -3357,7 +4343,6 @@ async function handleCatalogPublishTest(
     !contract ||
     contract.length === 0
   ) {
-
     return new Response(
       JSON.stringify({
         error:
@@ -3372,9 +4357,276 @@ async function handleCatalogPublishTest(
     );
   }
 
+  /* =======================================================
+     STAGE 1 — PREVIEW ONLY
+  ======================================================= */
+
+  /*
+   * IMPORTANT:
+   *
+   * Preview must perform ZERO KV writes.
+   *
+   * This lets us verify the Glide cleanup independently
+   * before allowing the catalog publisher to modify KV.
+   */
+  if (
+    body?.preview === true
+  ) {
+    const preview =
+      buildCatalogPreview(
+        contract
+      );
+
+    return new Response(
+      JSON.stringify(
+        preview
+      ),
+      {
+        status:
+          200,
+
+        headers
+      }
+    );
+  }
+
+  /* =======================================================
+     ACTUAL CATALOG PUBLISH
+  ======================================================= */
+
   const publishedAt =
     new Date()
       .toISOString();
+
+  /* =======================================================
+     SNAPSHOT GATE
+
+     1 KV read decides whether anything needs doing at all:
+
+       - same catalog as the stored snapshot -> nothing is
+         read or written per item, and no write happens.
+       - far fewer items than before -> refused, nothing is
+         written (send force:true to replace anyway).
+
+     Items are written first and the snapshot LAST, so a
+     matching hash always means the items were fully written.
+  ======================================================= */
+
+  let snapshot;
+
+  try {
+    snapshot =
+      await buildCatalogSnapshot(
+        contract,
+        body
+      );
+  } catch (error) {
+    console.error(
+      "MMicjMedia catalog snapshot build failure:",
+      error
+    );
+
+    return new Response(
+      JSON.stringify({
+        error:
+          "Catalog snapshot could not be built.",
+
+        detail:
+          error instanceof Error
+            ? error.message
+            : String(error)
+      }),
+      {
+        status:
+          500,
+
+        headers
+      }
+    );
+  }
+
+  if (
+    snapshot.count === 0
+  ) {
+    return new Response(
+      JSON.stringify({
+        error:
+          "Catalog publish contains no valid items; nothing was written.",
+
+        contractItemCount:
+          contract.length,
+
+        skippedCount:
+          snapshot.skippedCount
+      }),
+      {
+        status:
+          422,
+
+        headers
+      }
+    );
+  }
+
+  let previousSnapshot;
+
+  try {
+    previousSnapshot =
+      await env.MEDIA_KV.getWithMetadata(
+        CATALOG_SNAPSHOT_KEY
+      );
+  } catch (error) {
+    console.error(
+      "MMicjMedia catalog snapshot KV read failure:",
+      error
+    );
+
+    return new Response(
+      JSON.stringify({
+        error:
+          "Catalog snapshot KV read failed.",
+
+        detail:
+          error instanceof Error
+            ? error.message
+            : String(error),
+
+        key:
+          CATALOG_SNAPSHOT_KEY
+      }),
+      {
+        status:
+          500,
+
+        headers
+      }
+    );
+  }
+
+  const previousMeta =
+    previousSnapshot?.metadata &&
+    typeof previousSnapshot.metadata === "object"
+      ? previousSnapshot.metadata
+      : null;
+
+  const hadPrevious =
+    previousSnapshot?.value !== null &&
+    previousSnapshot?.value !== undefined;
+
+  if (
+    hadPrevious &&
+    body?.force !== true &&
+    previousMeta?.hash === snapshot.hash
+  ) {
+    return new Response(
+      JSON.stringify({
+        received:
+          true,
+
+        phase:
+          2,
+
+        receivedAt:
+          publishedAt,
+
+        method:
+          request.method,
+
+        test:
+          body?.test === true,
+
+        source:
+          String(
+            body?.source || ""
+          ),
+
+        contractItemCount:
+          contract.length,
+
+        storedCount:
+          0,
+
+        unchangedCount:
+          snapshot.count,
+
+        skippedCount:
+          snapshot.skippedCount,
+
+        sample:
+          [],
+
+        snapshot: {
+          action:
+            "unchanged",
+
+          count:
+            snapshot.count,
+
+          hash:
+            snapshot.hash
+        }
+      }),
+      {
+        status:
+          200,
+
+        headers
+      }
+    );
+  }
+
+  const previousCount =
+    Number(
+      previousMeta?.count
+    ) || 0;
+
+  if (
+    hadPrevious &&
+    body?.force !== true &&
+    previousCount >=
+      CATALOG_SNAPSHOT_GUARD_MIN_PREVIOUS &&
+    snapshot.count <
+      previousCount *
+        CATALOG_SNAPSHOT_MIN_RETAIN_RATIO
+  ) {
+    return new Response(
+      JSON.stringify({
+        error:
+          "Catalog publish refused: it keeps far fewer items than the current snapshot. Nothing was written.",
+
+        previousItemCount:
+          previousCount,
+
+        incomingItemCount:
+          snapshot.count,
+
+        hint:
+          "If this reduction is intended, publish again with force (generator p3 = publish-force)."
+      }),
+      {
+        status:
+          409,
+
+        headers
+      }
+    );
+  }
+
+  /*
+   * Compare against the previous snapshot in memory instead of reading
+   * every item record from KV. publish-force (force:true) skips this
+   * shortcut and re-checks every record against KV, which also repairs
+   * any record that was deleted by hand.
+   */
+  const previousItems =
+    hadPrevious &&
+    body?.force !== true &&
+    previousMeta?.v ===
+      CATALOG_SNAPSHOT_FORMAT
+      ? buildPreviousItemMap(
+          previousSnapshot.value
+        )
+      : null;
 
   let storedCount =
     0;
@@ -3382,25 +4634,30 @@ async function handleCatalogPublishTest(
   let skippedCount =
     0;
 
+  let unchangedCount =
+    0;
+
   const sample =
     [];
 
   try {
-
     for (
       const rawItem of
       contract
     ) {
-
+      /*
+       * IMPORTANT:
+       *
+       * Use the proven Glide cleanup BEFORE
+       * normalizeShareItem().
+       */
       const item =
-        normalizeShareItem(
+        normalizeCatalogPublishItem(
           rawItem
         );
 
       if (!item) {
-
         skippedCount++;
-
         continue;
       }
 
@@ -3410,9 +4667,7 @@ async function handleCatalogPublishTest(
         );
 
       if (!section) {
-
         skippedCount++;
-
         continue;
       }
 
@@ -3423,7 +4678,6 @@ async function handleCatalogPublishTest(
         );
 
       const record = {
-
         version:
           "1.0",
 
@@ -3437,6 +4691,124 @@ async function handleCatalogPublishTest(
         publishedAt
       };
 
+      /*
+       * Identical to the previous snapshot -> already stored; no read.
+       */
+      if (
+        previousItems
+      ) {
+        const previousItem =
+          previousItems.get(
+            key
+          );
+
+        if (
+          previousItem &&
+          catalogRecordsEqual(
+            {
+              version:
+                record.version,
+
+              section,
+
+              id:
+                item.id,
+
+              item:
+                previousItem
+            },
+            record
+          )
+        ) {
+          unchangedCount++;
+
+          if (
+            sample.length < 10
+          ) {
+            sample.push({
+              section,
+              id:
+                item.id,
+              key,
+              action:
+                "unchanged"
+            });
+          }
+
+          continue;
+        }
+      }
+
+      /*
+       * Idempotent publish: read the existing record first and
+       * write only when the catalog content is new or changed.
+       *
+       * This means a repeated request with the same contract is
+       * effectively a zero-item-write operation.
+       */
+      let existingRaw;
+
+      try {
+        existingRaw =
+          await getCatalogRecordForPublish(
+            env,
+            key
+          );
+      } catch (error) {
+        throw new Error(
+          "Catalog comparison KV read failed for " +
+          key +
+          ": " +
+          (
+            error instanceof Error
+              ? error.message
+              : String(error)
+          )
+        );
+      }
+
+      let existingRecord = null;
+
+      if (existingRaw) {
+        try {
+          existingRecord =
+            JSON.parse(existingRaw);
+        } catch (_) {
+          /*
+           * A malformed existing record is treated as changed so
+           * the publish can repair it.
+           */
+          existingRecord = null;
+        }
+      }
+
+      if (
+        catalogRecordsEqual(
+          existingRecord,
+          record
+        )
+      ) {
+        unchangedCount++;
+
+        if (
+          sample.length < 10
+        ) {
+          sample.push({
+            section,
+
+            id:
+              item.id,
+
+            key,
+
+            action:
+              "unchanged"
+          });
+        }
+
+        continue;
+      }
+
       await env.MEDIA_KV.put(
         key,
         JSON.stringify(
@@ -3449,18 +4821,99 @@ async function handleCatalogPublishTest(
       if (
         sample.length < 10
       ) {
-
         sample.push({
           section,
+
           id:
             item.id,
-          key
+
+          key,
+
+          action:
+            existingRecord
+              ? "updated"
+              : "created"
         });
       }
     }
 
-    const statusRecord = {
+    /* -------------------------------------------------------
+       SNAPSHOT WRITE (last)
 
+       Keep the previous snapshot as a one-step rollback copy,
+       then write the new one and verify it with an uncached read.
+    ------------------------------------------------------- */
+
+    if (
+      hadPrevious
+    ) {
+      await kvPutWithRetry(
+        env,
+        CATALOG_SNAPSHOT_PREV_KEY,
+        previousSnapshot.value,
+        {
+          metadata:
+            previousMeta || {}
+        }
+      );
+    }
+
+    await kvPutWithRetry(
+      env,
+      CATALOG_SNAPSHOT_KEY,
+      snapshot.json,
+      {
+        metadata: {
+          hash:
+            snapshot.hash,
+
+          count:
+            snapshot.count,
+
+          at:
+            publishedAt,
+
+          v:
+            CATALOG_SNAPSHOT_FORMAT
+        }
+      }
+    );
+
+    const snapshotReadBack =
+      await env.MEDIA_KV.getWithMetadata(
+        CATALOG_SNAPSHOT_KEY
+      );
+
+    if (
+      snapshotReadBack?.metadata?.hash !==
+      snapshot.hash
+    ) {
+      throw new Error(
+        "Catalog snapshot KV verification failed."
+      );
+    }
+
+    /* This isolate serves the new snapshot immediately. */
+    catalogSnapshotMemo =
+      null;
+
+    /* ...and no longer trusts an earlier "not found". */
+    kvMissMemo.clear();
+
+    const snapshotResult = {
+      action:
+        hadPrevious
+          ? "updated"
+          : "created",
+
+      count:
+        snapshot.count,
+
+      hash:
+        snapshot.hash
+    };
+
+    const statusRecord = {
       received:
         true,
 
@@ -3486,47 +4939,57 @@ async function handleCatalogPublishTest(
 
       storedCount,
 
+      unchangedCount,
+
       skippedCount,
 
-      sample
+      sample,
+
+      snapshot:
+        snapshotResult
     };
 
-    await env.MEDIA_KV.put(
-      CATALOG_TEST_STATUS_KEY,
-      JSON.stringify(
-        statusRecord
-      )
+    const statusJson =
+  JSON.stringify(
+    statusRecord
+  );
+
+if (storedCount > 0) {
+  await env.MEDIA_KV.put(
+    CATALOG_TEST_STATUS_KEY,
+    statusJson
+  );
+
+  /*
+   * Uncached verification of the status record.
+   *
+   * Only verify it when this publish actually wrote
+   * catalog data and therefore wrote a new status record.
+   */
+  const statusReadBack =
+    await env.MEDIA_KV.get(
+      CATALOG_TEST_STATUS_KEY
     );
 
-    const statusReadBack =
-      await kvGet(
-        env,
-        CATALOG_TEST_STATUS_KEY
-      );
-
-    if (
-      statusReadBack !==
-      JSON.stringify(
-        statusRecord
-      )
-    ) {
-
-      throw new Error(
-        "Catalog status KV verification failed."
-      );
-    }
+  if (
+    statusReadBack !==
+    statusJson
+  ) {
+    throw new Error(
+      "Catalog status KV verification failed."
+    );
+  }
+}
 
     if (
       sample.length > 0
     ) {
-
       const firstStored =
         await env.MEDIA_KV.get(
           sample[0].key
         );
 
       if (!firstStored) {
-
         throw new Error(
           "First catalog item KV verification failed."
         );
@@ -3544,18 +5007,21 @@ async function handleCatalogPublishTest(
         headers
       }
     );
-
   } catch (error) {
-
     console.error(
-      "SkyMedia catalog publish KV failure:",
+      "MMicjMedia catalog publish KV failure:",
       error
     );
 
     return new Response(
       JSON.stringify({
         error:
-          "Catalog publish KV write/verification failed."
+          "Catalog publish KV write/verification failed.",
+
+        detail:
+          error instanceof Error
+            ? error.message
+            : String(error)
       }),
       {
         status:
@@ -3568,7 +5034,7 @@ async function handleCatalogPublishTest(
 }
 
 /* =========================================================
-   Worker
+   WORKER
 ========================================================= */
 
 export default {
@@ -3578,7 +5044,6 @@ export default {
     env,
     ctx
   ) {
-
     const url =
       new URL(
         request.url
@@ -3592,8 +5057,35 @@ export default {
       url.pathname ===
       OG_IMAGE_PATH
     ) {
-
       return serveOgImage(
+        request,
+        env
+      );
+    }
+
+    /* -----------------------------------------------------
+       PDF range proxy
+    ----------------------------------------------------- */
+
+    if (
+      url.pathname ===
+      PDF_PROXY_PATH
+    ) {
+      return handlePdfProxy(
+        request,
+        env
+      );
+    }
+
+    /* -----------------------------------------------------
+       Catalog snapshot (read by the app on the base URL)
+    ----------------------------------------------------- */
+
+    if (
+      url.pathname ===
+      CATALOG_SNAPSHOT_PATH
+    ) {
+      return handleCatalogSnapshot(
         request,
         env
       );
@@ -3607,7 +5099,6 @@ export default {
       url.pathname ===
       "/__sky_catalog_publish"
     ) {
-
       return handleCatalogPublishTest(
         request,
         env
@@ -3622,7 +5113,6 @@ export default {
       url.pathname ===
       "/__sky_share_prime"
     ) {
-
       return handleSharePrime(
         request,
         env
@@ -3630,7 +5120,7 @@ export default {
     }
 
     /* -----------------------------------------------------
-       New canonical /s/<section>/<id>
+       Canonical /s/<section>/<id>
     ----------------------------------------------------- */
 
     if (
@@ -3638,7 +5128,6 @@ export default {
         SHARE_PATH_PREFIX
       )
     ) {
-
       const assetResponse =
         await serveShareSubresource(
           request,
@@ -3658,8 +5147,6 @@ export default {
       if (directResponse) {
         return directResponse;
       }
-
-      /* Legacy /s/<16-char-key> remains supported. */
 
       return handleShortShare(
         request,
@@ -3685,7 +5172,6 @@ export default {
       keyParam &&
       contractz
     ) {
-
       return handleLegacyPrime(
         request,
         env,
@@ -3701,7 +5187,6 @@ export default {
     if (
       keyParam
     ) {
-
       const key =
         keyParam
           .trim()
@@ -3712,9 +5197,8 @@ export default {
           key
         )
       ) {
-
         return new Response(
-          "SkyMedia publication key is invalid.",
+          "MMicjMedia publication key is invalid.",
           {
             status:
               400,
@@ -3729,17 +5213,24 @@ export default {
         null;
 
       try {
-
         payload =
           await kvGet(
             env,
             key
           );
-
       } catch (error) {
+        console.error(
+          "MMicjMedia KV read failed:",
+          error
+        );
 
         return new Response(
-          "SkyMedia KV read failed.",
+          "MMicjMedia KV read failed: " +
+          (
+            error instanceof Error
+              ? error.message
+              : String(error)
+          ),
           {
             status:
               500,
@@ -3751,9 +5242,8 @@ export default {
       }
 
       if (!payload) {
-
         return new Response(
-          "SkyMedia publication not found.",
+          "MMicjMedia publication not found.",
           {
             status:
               404,
@@ -3779,15 +5269,13 @@ export default {
     if (
       contractz
     ) {
-
       if (
         !isValidPayload(
           contractz
         )
       ) {
-
         return new Response(
-          "SkyMedia contract is invalid.",
+          "MMicjMedia contract is invalid.",
           {
             status:
               400,
