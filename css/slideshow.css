@@ -31,6 +31,47 @@
 #slideshowSection.app-section-hidden{display:none!important}
 .slideshow-section *,.slideshow-section *::before,.slideshow-section *::after{box-sizing:border-box}
 
+/* =========================================================
+   FULLSCREEN MEDIA CHROME
+
+   Front Page fullscreen opens the existing Slideshow Viewer
+   in the browser fullscreen layer. Slideshows sit against a
+   black media background there, so use the dark/glass control
+   treatment only while fullscreen. Normal theme behavior is
+   unchanged.
+========================================================= */
+#slideshowViewer:fullscreen{
+    --panel:#171a1f;
+    --panel2:#111419;
+    --text:#f4f6f8;
+    --control-bg:rgba(12,15,20,.72);
+    --control-text:#f3f6f8;
+    --line:rgba(255,255,255,.16);
+    background:#000;
+    color:#f4f6f8;
+}
+
+#slideshowViewer:fullscreen::backdrop{
+    background:#000;
+}
+
+#slideshowViewer:fullscreen .slideshow-control,
+#slideshowViewer:fullscreen .slideshow-audio-mode{
+    background:rgba(12,15,20,.72);
+    color:#f3f6f8;
+    border-color:rgba(255,255,255,.20);
+}
+
+#slideshowViewer:fullscreen .slideshow-control .icon,
+#slideshowViewer:fullscreen .slideshow-audio-mode .icon,
+#slideshowViewer:fullscreen .slideshow-audio-mode select{
+    color:#f3f6f8;
+}
+
+#slideshowViewer:fullscreen .slideshow-control:hover{
+    background:rgba(255,255,255,.16)!important;
+}
+
 /* ---------- Top bar ---------- */
 .slideshow-top-bar{
     height:var(--slideshow-topbar-height);
@@ -273,10 +314,13 @@ position:relative;    height: fit-content;
 .slideshow-library-card-media img{display:block;width:100%;object-fit:contain}
 .slideshow-library-card-info{padding:6px 34px 5px 2px;display:flex;flex-direction:column;gap:3px}
 
-.slideshow-library-grid[data-view="grid"] .slideshow-library-card-info {align-items:center; margin:0; padding:5px 0}
+.slideshow-library-grid[data-view="grid"] .slideshow-library-card-info {align-items:center; text-align:center; margin:0; padding:5px 10px}
 
 .slideshow-library-card-info strong{font-size:13px;line-height:1.2}
-.slideshow-library-card-info span{font-size:11px;color:rgba(255,255,255,.72)}
+/* Category line: was fixed light text, which vanished on the light
+   card background; use the theme's muted text colour like the Reader
+   panel cards. */
+.slideshow-library-card-info span{font-size:11px;color:var(--muted,rgba(255,255,255,.72));font-weight:550;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 .slideshow-library-card.selected .slideshow-library-card{box-shadow:
         0 0 0 3px #66CDAA,
@@ -313,7 +357,7 @@ position:relative;    height: fit-content;
 .slideshow-landing{
     position:absolute;left:50%;
     top:calc(50% - (var(--slideshow-statusbar-height,28px) + var(--slideshow-welcome-height,22px)) / 2);
-    width:calc(100% - 32px);height:55%;min-width:0;min-height:0;max-width:100%;
+    width:calc((100% - 32px) * .9);height:55%;min-width:0;min-height:0;max-width:100%;
     margin:0;transform:translate(-50%,-50%);padding:clamp(20px,4vw,46px);
     display:flex;flex-direction:column;overflow:hidden;border-radius:20px;
       background:color-mix(in srgb,var(--panel) 55%,transparent);
@@ -819,7 +863,7 @@ position:relative;    height: fit-content;
     /* width:100% matches #viewerLibrary (style.css, 999px breakpoint) and
        .video-landing (video.css, 999px breakpoint) - full-bleed on mobile
        so all three landings occupy the same screen width. */
-    .slideshow-landing{width:100%;height:60%;padding:20px}
+    .slideshow-landing{width:90%;height:60%;padding:20px}
     .slideshow-landing-hero{gap:10px}.slideshow-landing-logo{width:50px;height:50px;flex-basis:50px}
     .slideshow-landing-hero h2{font-size:clamp(24px,7vw,35px)}
     .slideshow-landing-hero p{font-size:11px; color:var(--muted)}
@@ -1540,4 +1584,93 @@ body.sky-share-mode .slideshow-audio-cue{
     transition:
         opacity .35s ease,
         visibility .35s ease;
+}
+
+/* =======================================================
+   PHONE: View Again card width matches the Reader Read Again
+   card (about a 10px inset inside the landing panel). The row
+   is pulled out through the landing padding, clamp(20px,4vw,46px);
+   the continue section keeps its own 10px padding as the inset.
+======================================================= */
+@media (max-width:560px){
+    .slideshow-landing .slideshow-landing-media-row{
+        margin-inline:calc(1px - clamp(20px,4vw,46px));
+        width:calc(100% - 2px + 2 * clamp(20px,4vw,46px));
+    }
+}
+
+
+/* =========================================================
+   MOBILE LANDING ALIGNMENT (Slideshow) - phones only (<=700px)
+   View Again card now spans exactly the library section's width
+   (inset 20px, same as the Reader and Video landings). Replaces
+   the old ~11px-inset pull-out; top/bottom 10px is unchanged.
+   ========================================================= */
+@media (max-width:700px){
+    .slideshow-landing .slideshow-landing-media-row{
+        margin-inline:0;
+        width:100%;
+    }
+    .slideshow-landing .slideshow-landing-continue-section{
+        padding-left:0;
+        padding-right:0;
+    }
+    .slideshow-landing .slideshow-landing-hero h2{
+        margin:0;
+        font-size:clamp(25px,5vw,35px);
+        line-height:1.05;
+        -webkit-text-size-adjust:100%;
+        text-size-adjust:100%;
+    }
+    .slideshow-landing .slideshow-landing-recent-subtitle{
+        font-size:12px;
+        font-weight:400;
+        line-height:1.2;
+        color:var(--muted);
+        -webkit-text-size-adjust:100%;
+        text-size-adjust:100%;
+    }
+}
+
+
+/* MOBILE HERO SUBTITLE (Slideshow) - phones only (<=700px)
+   Same size and spacing as the Video hero subtitle. */
+@media (max-width:700px){
+    .slideshow-landing .slideshow-landing-hero p{
+        margin:4px 0 0;
+        font-size:14px;
+        line-height:1.2;
+    }
+}
+
+
+/* =========================================================
+   HERO LOGO STANDARD (Reader / Video / Slideshow)
+   Same logo tile, gap and proportions in all three heroes; see the
+   matching block at the end of style.css for the formulas. Here the
+   <img> is the tile itself, so the 72% glyph size is produced with
+   14% padding on each side.
+   ========================================================= */
+#slideshowLanding .slideshow-landing-hero{
+    --hero-h2:clamp(30px,4vw,55px);
+    --hero-icon:calc(var(--hero-h2) * 1.05 + 21px);
+    gap:calc(var(--hero-h2) * .4);
+}
+#slideshowLanding .slideshow-landing-logo{
+    display:block;
+    box-sizing:border-box;
+    width:var(--hero-icon);
+    height:var(--hero-icon);
+    flex:0 0 auto;
+    padding:calc(var(--hero-icon) * .14);
+    object-fit:contain;
+    border-radius:calc(var(--hero-icon) * .31);
+    background:color-mix(in srgb,var(--panel) 55%,transparent);
+    box-shadow:none;
+}
+@media (max-width:700px){
+    #slideshowLanding .slideshow-landing-hero{--hero-h2:clamp(25px,5vw,35px)}
+    #slideshowLanding .slideshow-landing-logo{
+        background:color-mix(in srgb,var(--panel) 75%,transparent);
+    }
 }

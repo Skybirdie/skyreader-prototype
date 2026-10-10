@@ -146,16 +146,13 @@ border: none;
 
 /* ---------------------------------------------------------
    Reader fullscreen
+   ---------------------------------------------------------
+   Page fullscreen no longer hides #topBar by itself. What the Reader
+   looks like in fullscreen is its own Focus viewer state
+   (#app.viewerFocus, applied by UI.toggleFullscreen), which already
+   hides the top bar where that mode is meant to (phones / touch
+   tablets) and keeps it on desktop.
    --------------------------------------------------------- */
-
-html:fullscreen #topBar{
-  display:none !important;
-  height:0 !important;
-  min-height:0 !important;
-  flex:0 0 0 !important;
-  padding:0 !important;
-  overflow:hidden !important;
-}
 
 
 #settingsButton{
@@ -303,7 +300,11 @@ html:fullscreen #topBar{
   right:0;
   top:50%;
   bottom:auto;
-  width: 100%;
+  /* 90% of the former full width; auto side margins keep it centered
+     between left:0 / right:0 (same axis as before). */
+  width: 90%;
+  margin-left:auto;
+  margin-right:auto;
   /* Strictly 60% of the viewer background height. */
   height:60%;
   min-height:0;
@@ -1730,7 +1731,18 @@ html[data-theme="dark"] #readerPanel #toolbar .iconButton{
 .sr-settings-panel{
   position:fixed;
   inset:0;
-  z-index:10000;
+  /* #srSettingsPanel is appended straight to <body> (see
+     js/settingsPanel.js), a sibling of #app, not a descendant — so its
+     z-index competes directly against #app's, not against anything
+     inside #app. #app.viewerFocus (book fullscreen) raises #app itself
+     to z-index:99999!important, which put this modal (10000) behind
+     the fullscreen reader: the Settings button (inside #topBar, inside
+     #app) still opened it, but the dialog painted underneath #app and
+     was invisible. 100000 keeps this modal above #app in every state,
+     including book fullscreen, while staying below the near-max
+     z-index used for share toasts / #skyLinkCopiedFeedback, which are
+     intentionally the one thing allowed to sit above every modal. */
+  z-index:100000;
   display:flex;
   align-items:center;
   justify-content:center;
@@ -1808,6 +1820,48 @@ html[data-theme="dark"] #readerPanel #toolbar .iconButton{
 
 
 
+/* =========================================================
+   MOBILE READER FULLSCREEN
+   ---------------------------------------------------------
+   On phones (and touch tablets, matching what the reader engine already
+   treats as a single-page device) the Reader's fullscreen / "Focus
+   viewer" toggle also hides the top bar, the welcome banner and the
+   status bar (title + page indicator), so the book gets the whole
+   screen.
+
+   Desktop is deliberately untouched: the query below never matches a
+   desktop/mouse window, so #app.viewerFocus keeps its existing
+   behaviour there (library panel hidden, top bar / banner / status kept).
+
+   Nothing needs to be "restored" in JavaScript. These rules exist only
+   while #app carries .viewerFocus, and the existing code removes that
+   class on exit-fullscreen (the toolbar toggle) and on closing the book
+   (Reader "closed" -> exitViewerFocus()), so the chrome comes back
+   automatically. If the device is rotated or resized across the
+   breakpoint while in fullscreen, the rules apply/lift by themselves.
+
+   The condition mirrors isSinglePageDevice() in renderer.js:
+   narrow (<=760px) OR a coarse-pointer touch device up to 1024px.
+   ========================================================= */
+
+@media (max-width:760px), (pointer:coarse) and (max-width:1024px){
+
+  #app.viewerFocus #topBar{
+    display:none!important;
+    height:0!important;
+    min-height:0!important;
+    flex:0 0 0!important;
+    padding:0!important;
+    overflow:hidden!important;
+  }
+
+  #app.viewerFocus #statusBar,
+  #app.viewerFocus .sr-welcome-banner{
+    display:none!important;
+  }
+
+}
+
 /* ---------- Responsive system ---------- */
 
 @media (max-width:999px){
@@ -1872,7 +1926,7 @@ html[data-theme="dark"] #readerPanel #toolbar .iconButton{
     padding-right:env(safe-area-inset-right);
   }
 
-  #viewerLibrary{padding:10px;height:63%;width:100%}
+  #viewerLibrary{padding:10px;height:63%;width:90%}
   #viewerShelfView .bookCard{width:clamp(96px,16vw,145px);min-width:clamp(96px,16vw,145px);max-width:clamp(96px,16vw,145px);}
 
   #topSearchGroup{
@@ -1913,6 +1967,12 @@ html[data-theme="dark"] #readerPanel #toolbar .iconButton{
   #listView .listThumb{width:48px;height:68px;flex-basis:48px;}
   #listView .listTitle{font-size:14px;}
   #listView .listSubtitle{font-size:12px;}
+
+  /* Reader landing shelf on phones: a little wider than the generic
+     max-width:999px rule above (which clamps to 96px at phone widths).
+     Thumbnail height is driven by the shelf height, not the card width,
+     so only the width changes. */
+  #viewerShelfView .bookCard{width:clamp(108px,28vw,132px);min-width:clamp(108px,28vw,132px);max-width:clamp(108px,28vw,132px);}
 }
 
 @media (max-width:999px){
@@ -1979,6 +2039,26 @@ html[data-theme="dark"] #readerPanel #toolbar .iconButton{
 
   #libraryPanel.visible{transform:translateX(0)!important;}
   #libraryPanel.libraryCollapsed{transform:translateX(-102%)!important;}
+
+  /* Exception: narrowLibraryToggle (in #topBar, which stays visible
+     during book fullscreen — see #app.viewerFocus in the non-responsive
+     rules above) can still open #libraryPanel as an overlay drawer over
+     the fullscreen book here (SkyReader.toggleLibrary() adds .visible /
+     removes .libraryCollapsed; see js/library.js, js/skyreader.js).
+     Without this exception, #app.viewerFocus #libraryPanel's blanket
+     display:none!important wins regardless of .visible, so toggling the
+     drawer open while a book is in fullscreen had no visible effect.
+     Scoped to this narrow (max-width:999px) block only: at >=1000px
+     #libraryPanel normally carries .visible permanently as the
+     always-on sidebar (there is no narrowLibraryToggle there), so
+     applying this at that width would leak the sidebar back into what
+     should be a fully immersive desktop fullscreen. This drawer's own
+     z-index (1900!important, above) already paints above #topBar
+     (z-index 100, its own local stacking context) inside the stacking
+     context #app.viewerFocus establishes, so no z-index change is
+     needed for the drawer or the toggle button itself — confirmed by
+     inspecting computed styles with the drawer forced open. */
+  #app.viewerFocus #libraryPanel.visible{display:flex!important;}
 
 
   #recentSection{
@@ -3088,4 +3168,95 @@ margin:0 !important;
     max-height: 24px;
     padding: 2px 8px;
     line-height: 20px;
+}
+
+/* =========================================================
+   MOBILE LANDING ALIGNMENT (Reader) - phones only (<=700px)
+   Matches Video/Slideshow landings:
+   - Read Again card inset 20px from the landing edges (same width
+     as the other two sections' continue cards)
+   - same 10px top/bottom space between hero and card row
+   - same hero h2 size and secondary text styling
+   ========================================================= */
+@media (max-width:700px){
+  #viewerLibrary .viewerContinue{
+    width:calc(100% - 20px);
+    padding:10px 0;
+  }
+  #viewerLibrary .viewerLibraryHero h2{
+    margin:0;
+    font-size:clamp(25px,5vw,35px);
+    line-height:1.05;
+    -webkit-text-size-adjust:100%;
+    text-size-adjust:100%;
+  }
+  #viewerContinue #srRecentShelf .sr-recent-page{
+    margin-top:0;
+    font-size:12px;
+    font-weight:400;
+    line-height:1.2;
+    opacity:1;
+    color:var(--muted);
+    -webkit-text-size-adjust:100%;
+    text-size-adjust:100%;
+  }
+}
+
+
+/* MOBILE HERO SUBTITLE (Reader) - phones only (<=700px)
+   Same size and spacing as the Video hero subtitle. */
+@media (max-width:700px){
+  #viewerLibrary .viewerLibraryHero p{
+    margin:4px 0 0;
+    font-size:14px;
+    line-height:1.2;
+  }
+}
+
+
+/* READ AGAIN CARD HEIGHT (Reader) - all widths
+   The shelf row had 4px top/bottom padding on desktop, so the card
+   was 12px taller than Watch Again / View Again (10px row padding
+   each side). Same 10px now, so all three cards are the same
+   fraction of their landing height. */
+#viewerLibrary .viewerContinue{
+  padding-top:10px;
+  padding-bottom:10px;
+}
+
+
+/* =========================================================
+   HERO LOGO STANDARD (Reader / Video / Slideshow)
+   Identical logo tile in all three landing heroes. Everything is
+   derived from the hero title size (--hero-h2, the same clamp the
+   h2 uses), so the tile and the gap scale with the text:
+   tile = title size * 1.05 (title line) + 21px (4px + 14px
+   subtitle line), i.e. about the height of the two text lines;
+   gap = 40% of the title size; corner radius = 31% of the tile.
+   ========================================================= */
+#viewerLibrary .viewerLibraryHero{
+  --hero-h2:clamp(30px,4vw,55px);
+  --hero-icon:calc(var(--hero-h2) * 1.05 + 21px);
+  gap:calc(var(--hero-h2) * .4);
+}
+#viewerLibrary .viewerLibraryVector{
+  width:var(--hero-icon);
+  height:var(--hero-icon);
+  flex:0 0 auto;
+  border-radius:calc(var(--hero-icon) * .31);
+  background:color-mix(in srgb,var(--panel) 55%,transparent);
+  color:var(--text);
+  box-shadow:none;
+}
+#viewerLibrary .viewerLibraryLogo{
+  display:block;
+  width:72%;
+  height:72%;
+  object-fit:contain;
+}
+@media (max-width:700px){
+  #viewerLibrary .viewerLibraryHero{--hero-h2:clamp(25px,5vw,35px)}
+  #viewerLibrary .viewerLibraryVector{
+    background:color-mix(in srgb,var(--panel) 75%,transparent);
+  }
 }

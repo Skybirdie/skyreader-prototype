@@ -16,6 +16,50 @@
 /* =======================================================
    VIDEO SECTION
 ======================================================= */
+/* =======================================================
+   FULLSCREEN MEDIA CHROME
+
+   Front Page fullscreen opens the existing Video Viewer in
+   the browser fullscreen layer. The media area is black, so
+   keep the viewer controls in a dark/glass treatment while
+   fullscreen. Normal (non-fullscreen) theme behavior is
+   unchanged.
+======================================================= */
+#videoViewer:fullscreen{
+    --panel:#171a1f;
+    --panel2:#111419;
+    --text:#f4f6f8;
+    --control-bg:rgba(12,15,20,.72);
+    --control-text:#f3f6f8;
+    --line:rgba(255,255,255,.16);
+    background:#000;
+    color:#f4f6f8;
+}
+
+#videoViewer:fullscreen::backdrop{
+    background:#000;
+}
+
+#videoViewer:fullscreen .video-icon-button,
+#videoViewer:fullscreen .video-viewer-close,
+#videoViewer:fullscreen .video-viewer-share{
+    background:rgba(12,15,20,.72);
+    color:#f3f6f8;
+    border-color:rgba(255,255,255,.20);
+}
+
+#videoViewer:fullscreen .video-icon-button .icon,
+#videoViewer:fullscreen .video-viewer-close .icon,
+#videoViewer:fullscreen .video-viewer-share .icon{
+    color:#f3f6f8;
+}
+
+#videoViewer:fullscreen .video-icon-button:hover,
+#videoViewer:fullscreen .video-viewer-close:hover,
+#videoViewer:fullscreen .video-viewer-share:hover{
+    background:rgba(255,255,255,.16);
+}
+
 
 .video-section{
     --video-topbar-height:clamp(44px,5.5vh,68px);
@@ -545,6 +589,126 @@ AppSwitcher marks the active section.
     display:none!important;
 }
 
+/* Category under the title in grid (circle) view; sizes follow the
+   three circle sizes and stay smaller than the title. */
+.video-circle-category{
+    max-width:100%;
+    margin-top:3px;
+    color:rgba(255,255,255,.92);
+    font-size:11px;
+    font-weight:550;
+    line-height:1.15;
+    text-shadow:0 1px 3px rgba(0,0,0,.85);
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+}
+.video-circle-size-2 .video-circle-category{font-size:10px;}
+/* The smallest circle (62px) has no room for a second line. */
+.video-circle-size-3 .video-circle-category{display:none;}
+
+/* Grid labels live in the middle 60% of the circle height (20% padding
+   top and bottom; side padding keeps text inside the chord). Long titles
+   truncate with an ellipsis instead of spilling out of the region. */
+.video-circle-overlay{
+    padding:20% 11%;
+}
+.video-circle-title{
+    display:-webkit-box;
+    -webkit-box-orient:vertical;
+    -webkit-line-clamp:2;
+    line-clamp:2;
+    max-width:100%;
+    min-height:0;
+    overflow:hidden;
+    overflow-wrap:anywhere;
+    text-overflow:ellipsis;
+}
+.video-circle-title:last-child{
+    -webkit-line-clamp:3;
+    line-clamp:3;
+}
+.video-circle-size-1 .video-circle-title,
+.video-circle-size-2 .video-circle-title,
+.video-circle-size-3 .video-circle-title{
+    max-width:100%;
+}
+.video-circle-size-1 .video-circle-title{
+    -webkit-line-clamp:3;
+    line-clamp:3;
+}
+.video-circle-size-1 .video-circle-title:last-child{
+    -webkit-line-clamp:4;
+    line-clamp:4;
+}
+.video-circle-size-3 .video-circle-title,
+.video-circle-size-3 .video-circle-title:last-child{
+    -webkit-line-clamp:2;
+    line-clamp:2;
+}
+/* Smallest circle: a little less side padding so short words don't split. */
+.video-circle-size-3 .video-circle-overlay{
+    padding:20% 8%;
+}
+
+/* Duration wave: two flowing layers across the lower part of the
+   thumbnail (a translucent light wave behind, the solid brand wave in
+   front) with the time centered on the solid layer. Everything is sized
+   in percentages of the circle, so one rule fits every circle size.
+   Colors: edit #4b8781 (front) and #a1ccc8 (back) inside the two data
+   URIs below. */
+.video-duration-badge{
+    position:absolute;
+    left:0;
+    right:0;
+    bottom:0;
+    z-index:3;
+    height:26%;
+    display:flex;
+    align-items:flex-end;
+    justify-content:center;
+    padding-bottom:3%;
+    box-sizing:border-box;
+    color:#fff;
+    font-size:10px;
+    font-weight:600;
+    line-height:1;
+    letter-spacing:.2px;
+    white-space:nowrap;
+    font-variant-numeric:tabular-nums;
+    text-shadow:0 1px 2px rgba(0,0,0,.25);
+    pointer-events:none;
+}
+.video-duration-badge::before,
+.video-duration-badge::after{
+    content:"";
+    position:absolute;
+    inset:0;
+    background-size:100% 100%;
+    background-repeat:no-repeat;
+}
+.video-duration-badge::before{
+    z-index:-2;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 40' preserveAspectRatio='none'%3E%3Cpath fill='%23a1ccc8' d='M0 6C35 10.5 75 15.5 105 8S165 0 200 -2V40H0Z'/%3E%3C/svg%3E");
+}
+.video-duration-badge::after{
+    z-index:-1;
+    /* Soft shadow cast by the front wave onto the back wave for depth.
+       Tune the blur/opacity here (0 -1.5px 3px rgba(...)). */
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 40' preserveAspectRatio='none'%3E%3Cpath fill='%234b8781' d='M0 18C40 31 80 27 110 17S170 5 200 15V40H0Z'/%3E%3C/svg%3E");
+}
+.video-circle-size-1 .video-duration-badge{
+    font-size:11px;
+}
+.video-circle-size-2 .video-duration-badge{
+    font-size:9px;
+}
+.video-circle-size-3 .video-duration-badge{
+    height:34%;
+    padding-bottom:3.4%;
+    font-size:8px;
+}
+
 
 .video-favorite-control{
     position:absolute;
@@ -573,17 +737,13 @@ AppSwitcher marks the active section.
 /* Keep the standardized 25px favorite inside the circular clipping boundary.
    Larger circles need a deeper inset; the smallest circle keeps its
    previous positioning. */
-.video-circle-size-1 .video-favorite-control{
-    top:20%;
-    right:20%;
-}
-.video-circle-size-2 .video-favorite-control{
-    top:24%;
-    right:24%;
-}
-.video-circle-size-3 .video-favorite-control{
-    top:4px;
-    right:4px;
+/* Pinned to the circle's upper-right (45deg) inner edge at every size.
+   Geometry: a 25px control with a 3px clearance from the rim sits at
+   inset = 14.64% of the circle - 1.54px from the top and right edges,
+   so the heart is never cropped and keeps the same relative spot. */
+.video-circle .video-favorite-control{
+    top:calc(14.64% - 1.54px);
+    right:calc(14.64% - 1.54px);
 }
 
 .video-favorite-control .video-favorite-icon{
@@ -593,7 +753,11 @@ AppSwitcher marks the active section.
     width:100%;
     height:100%;
     line-height:1;
-    transform:translateY(-1px);
+    /* The ♥/♡ text is hidden and the heart is drawn as a mask below,
+       because font glyphs sit high in their line box and drift from
+       device to device. The mask is centered exactly by flexbox. */
+    font-size:0;
+    transform:none;
 }
 
 .video-favorite-control:hover{
@@ -642,6 +806,28 @@ AppSwitcher marks the active section.
 
 .video-landing-favorite:hover{
     transform:scale(1.08);
+}
+
+/* Exactly-centered heart shapes (outline = not favorite, filled = favorite).
+   They inherit the button's text color, so the red favorite color and the
+   theme color keep working unchanged. */
+.video-favorite-control .video-favorite-icon::before,
+.video-landing-favorite::before{
+    content:"";
+    display:block;
+    width:15px;
+    height:15px;
+    background:currentColor;
+    -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M16.5 3c-1.74 0-3.41.81-4.5 2.09C10.91 3.81 9.24 3 7.5 3 4.42 3 2 5.42 2 8.5c0 3.78 3.4 6.86 8.55 11.54L12 21.35l1.45-1.32C18.6 15.36 22 12.28 22 8.5 22 5.42 19.58 3 16.5 3zm-4.4 15.55l-.1.1-.1-.1C7.14 14.24 4 11.39 4 8.5 4 6.5 5.5 5 7.5 5c1.54 0 3.04.99 3.57 2.36h1.87C13.46 5.99 14.96 5 16.5 5c2 0 3.5 1.5 3.5 3.5 0 2.89-3.14 5.74-7.9 10.05z'/%3E%3C/svg%3E") center/contain no-repeat;
+    mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M16.5 3c-1.74 0-3.41.81-4.5 2.09C10.91 3.81 9.24 3 7.5 3 4.42 3 2 5.42 2 8.5c0 3.78 3.4 6.86 8.55 11.54L12 21.35l1.45-1.32C18.6 15.36 22 12.28 22 8.5 22 5.42 19.58 3 16.5 3zm-4.4 15.55l-.1.1-.1-.1C7.14 14.24 4 11.39 4 8.5 4 6.5 5.5 5 7.5 5c1.54 0 3.04.99 3.57 2.36h1.87C13.46 5.99 14.96 5 16.5 5c2 0 3.5 1.5 3.5 3.5 0 2.89-3.14 5.74-7.9 10.05z'/%3E%3C/svg%3E") center/contain no-repeat;
+}
+.video-favorite-control.is-favorite .video-favorite-icon::before,
+.video-landing-favorite.is-favorite::before{
+    -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z'/%3E%3C/svg%3E") center/contain no-repeat;
+    mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z'/%3E%3C/svg%3E") center/contain no-repeat;
+}
+.video-landing-favorite{
+    font-size:0;
 }
 
 .video-landing-favorite.is-favorite{
@@ -1498,7 +1684,7 @@ html[data-theme="dark"] .video-narrow-library-toggle{
         calc(50% - (var(--video-statusbar-height,28px) + var(--video-welcome-height,22px)) / 2);
 
     width:
-        calc(100% - 32px);
+        calc((100% - 32px) * .9);
 
     height:55%;
 
@@ -2463,7 +2649,7 @@ padding: 10px;
            (style.css) and .slideshow-landing's width:100% at its mobile
            breakpoint (slideshow.css) - all three landings are full-bleed
            on mobile so they occupy the same screen width. */
-        width:100%;
+        width:90%;
 
         height:60%;
 
@@ -2999,4 +3185,131 @@ and (orientation:landscape){
 /* Focus mode intentionally remains media-only. */
 .video-section.videoFocus .video-viewer > .sr-welcome-banner{
     display:none!important;
+}
+
+/* =======================================================
+   PHONE: Watch Again card width matches the Reader Read Again
+   card (about a 10px inset inside the landing panel).
+   The card sat inside the landing padding + the row padding
+   + the circle-row padding (~34px each side at 390px), so it
+   rendered narrower than the Reader card. Pull the row out to
+   the panel edge and drop the circle-row padding for this one
+   card. Padding of .video-landing is clamp(20px,4vw,46px).
+======================================================= */
+@media (max-width:560px){
+    #videoLanding .video-landing-media-row{
+        margin-inline:calc(1px - clamp(20px,4vw,46px));
+        width:calc(100% - 2px + 2 * clamp(20px,4vw,46px));
+        max-width:none;
+    }
+
+    #videoLanding #videoLandingContinue{
+        padding-inline:0;
+    }
+}
+
+
+/* =======================================================
+   PHONE: Video library list view text matches the Reader
+   library list view (#listView .listTitle 14px, .listSubtitle
+   12px at max-width:600px). The clamp() sizes above resolved to
+   ~11.7px / 8px on phones, which was too small to read.
+======================================================= */
+@media (max-width:600px){
+    .video-list-title{
+        font-size:14px;
+    }
+
+    .video-list-meta{
+        font-size:12px;
+    }
+}
+
+
+/* =========================================================
+   MOBILE LANDING ALIGNMENT (Video) - phones only (<=700px)
+   Same continue-card width, hero spacing and text sizes as the
+   Reader and Slideshow landings.
+   ========================================================= */
+@media (max-width:700px){
+    /* Card inset 20px from the landing edges (was 30px: landing
+       padding + 10px row padding). Top/bottom 10px is unchanged. */
+    .video-landing .video-landing-media-row{
+        padding-left:0;
+        padding-right:0;
+    }
+    .video-landing .video-landing-hero-copy h2{
+        margin:0;
+        font-size:clamp(25px,5vw,35px);
+        line-height:1.05;
+        -webkit-text-size-adjust:100%;
+        text-size-adjust:100%;
+    }
+    .video-landing-continue-section .video-landing-recent-subtitle{
+        font-size:12px;
+        font-weight:400;
+        line-height:1.2;
+        color:var(--muted);
+        -webkit-text-size-adjust:100%;
+        text-size-adjust:100%;
+    }
+}
+
+
+/* MOBILE HERO SUBTITLE (Video) - phones only (<=700px)
+   Size is unchanged (14px); spacing/line-height are pinned so the
+   Reader and Slideshow subtitles match it exactly. */
+@media (max-width:700px){
+    .video-landing .video-landing-hero-copy p{
+        margin:4px 0 0;
+        font-size:14px;
+        line-height:1.2;
+    }
+}
+
+
+/* WATCH AGAIN CARD WIDTH (Video) - phones only (<=700px)
+   Cancels the older <=560px pull-out above that stretched the card
+   to the landing's outer edge. The card now sits inside the
+   landing padding (20px at phone widths), the same inset as the
+   Reader and Slideshow continue cards. */
+@media (max-width:700px){
+    #videoLanding .video-landing-media-row{
+        margin-inline:0;
+        width:100%;
+        max-width:100%;
+    }
+}
+
+
+/* =========================================================
+   HERO LOGO STANDARD (Reader / Video / Slideshow)
+   Same logo tile, gap and proportions in all three heroes; see the
+   matching block at the end of style.css for the formulas.
+   ========================================================= */
+#videoLanding .video-landing-hero{
+    --hero-h2:clamp(30px,4vw,55px);
+    --hero-icon:calc(var(--hero-h2) * 1.05 + 21px);
+    gap:calc(var(--hero-h2) * .4);
+}
+#videoLanding .video-landing-hero-icon{
+    width:var(--hero-icon);
+    height:var(--hero-icon);
+    flex:0 0 auto;
+    border-radius:calc(var(--hero-icon) * .31);
+    background:color-mix(in srgb,var(--panel) 55%,transparent);
+    color:var(--text);
+    box-shadow:none;
+}
+#videoLanding .video-landing-hero-logo{
+    display:block;
+    width:72%;
+    height:72%;
+    object-fit:contain;
+}
+@media (max-width:700px){
+    #videoLanding .video-landing-hero{--hero-h2:clamp(25px,5vw,35px)}
+    #videoLanding .video-landing-hero-icon{
+        background:color-mix(in srgb,var(--panel) 75%,transparent);
+    }
 }
