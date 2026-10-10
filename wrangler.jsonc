@@ -1,11 +1,11 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
 
-  "name": "mmicj",
+  "name": "skyreader-prototype",
 
   "main": "worker.js",
 
-  "compatibility_date": "2026-09-19",
+  "compatibility_date": "2026-09-18",
 
   /*
    * OBSERVABILITY
@@ -64,7 +64,7 @@
   "kv_namespaces": [
     {
       "binding": "MEDIA_KV",
-      "id": "7c42947459a5469097506444ac39304f"
+      "id": "8a4f692a796b4aeab25262e831739781"
     }
   ],
 
