@@ -9,6 +9,23 @@ window.ShareManager = (function () {
     const SHARE_PRIME_PATH =
         "/__sky_share_prime";
 
+    /*
+     * SHARE MODE SWITCH (set in worker.js: SHARE_MODE_ENABLED, or the
+     * Worker variable of the same name). The Worker writes the current
+     * value into the page as window.__SKY_SHARE_MODE_ENABLED.
+     *
+     *   true   Share buttons create /s/<section>/<id> (Share Viewer)
+     *   false  Share buttons create /?view=<section>&item=<section>/<id>
+     *          (the item opens inside the main app)
+     *
+     * When the page carries no value (offline copy, Glide embed) the
+     * default is true, the behaviour the app always had.
+     */
+    function isShareModeEnabled() {
+
+        return window.__SKY_SHARE_MODE_ENABLED !== false;
+    }
+
 
     /* =====================================================
        SECTION NORMALIZATION
@@ -314,22 +331,56 @@ window.ShareManager = (function () {
      * The Share button no longer sends anything to
      * /__sky_share_prime and therefore performs NO KV write.
      *
-     * The Worker receives the section and item ID directly
-     * in the permanent short URL.
+     * Two link styles exist (see isShareModeEnabled):
+     *
+     *   Share Mode on   /s/<section>/<id>
+     *                   The standalone Share Viewer.
+     *
+     *   Share Mode off  /?view=<section>&item=<section>/<id>
+     *                   Opens the item inside the full app, from the
+     *                   complete library (the same link the browser's
+     *                   own share command shares).
+     *
+     * Links already in circulation keep working either way (the
+     * Worker redirects /s/ links while Share Mode is off).
      */
     const baseUrl =
         window.location.origin;
 
+    if (isShareModeEnabled()) {
+
+        return (
+            baseUrl +
+            "/s/" +
+            encodeURIComponent(
+                normalizedSection
+            ) +
+            "/" +
+            encodeURIComponent(
+                normalizedId
+            )
+        );
+    }
+
+    const params =
+        new URLSearchParams();
+
+    params.set(
+        "view",
+        normalizedSection
+    );
+
+    params.set(
+        "item",
+        normalizedSection +
+        "/" +
+        normalizedId
+    );
+
     return (
         baseUrl +
-        "/s/" +
-        encodeURIComponent(
-            normalizedSection
-        ) +
-        "/" +
-        encodeURIComponent(
-            normalizedId
-        )
+        "/?" +
+        params.toString()
     );
 }
 

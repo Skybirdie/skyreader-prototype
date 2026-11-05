@@ -107,87 +107,34 @@ function progress(percent,text){
 /* Must match PDF_PROXY_PATH in worker.js. */
 const PDF_PROXY_PATH="/__sky_pdf_proxy";
 
-/* Which cross-origin hosts have their PDFs streamed through the Worker's
-   /__sky_pdf_proxy. Everything else is fetched directly by the browser.
-
-   Why a list and not "every cross-origin PDF": the proxy exists for one
-   reason - a third-party host that does not expose Accept-Ranges /
-   Content-Length to this page (CORS) makes PDF.js download the WHOLE file
-   before the first page shows. Hosts you control (e.g. R2 with a CORS rule
-   exposing those headers) stream fine when fetched directly, and need no
-   Worker request at all.
-
-   Configure with window.SKY_PDF_PROXY_HOSTS, set BEFORE this script runs:
-       window.SKY_PDF_PROXY_HOSTS = ["storage.googleapis.com"];  // default
-       window.SKY_PDF_PROXY_HOSTS = [];   // never proxy (no Worker needed)
-   Entries are host names; "*.example.com" matches any sub-domain. */
-function pdfProxyHosts(){
-    const configured=window.SKY_PDF_PROXY_HOSTS;
-    if(Array.isArray(configured)){
-        return configured
-            .map(value=>String(value||"").trim().toLowerCase())
-            .filter(Boolean);
-    }
-    return ["storage.googleapis.com"];
-}
-
-function pdfHostIsProxied(hostname){
-    const host=String(hostname||"").toLowerCase();
-    return pdfProxyHosts().some(entry=>
-        entry.startsWith("*.")
-            ? host.endsWith(entry.slice(1))
-            : host===entry
-    );
-}
-
-/* If the proxy turns out to be unavailable (no Worker on this host, route
-   missing, host refused) the app falls back to a direct fetch and remembers
-   that for the rest of the browser session, so later books do not repeat
-   the failed attempt. */
-const PDF_PROXY_DOWN_KEY="sky.pdfProxyDown";
-
-function pdfProxyKnownDown(){
-    try{ return window.sessionStorage.getItem(PDF_PROXY_DOWN_KEY)==="1"; }
-    catch(error){ return false; }
-}
-
-function markPdfProxyDown(){
-    try{ window.sessionStorage.setItem(PDF_PROXY_DOWN_KEY,"1"); }
-    catch(error){ /* storage unavailable - the fallback still works per book */ }
-}
-
-function isPdfProxyUrl(url){
-    return typeof url==="string" &&
-        url.indexOf(window.location.origin+PDF_PROXY_PATH+"?")===0;
-}
-
-/* The plain cross-origin URL for a book PDF, or "" when there is none. */
-function directPdfUrl(value){
-    const raw=String(value||"").trim();
-    if(!/^https?:/i.test(raw)) return "";
-    try{
-        return new URL(raw).origin!==window.location.origin ? raw : "";
-    }catch(error){
-        return "";
-    }
-}
+/* ONLY these hosts are routed through the Worker proxy (they are the ones that
+   hide Accept-Ranges / Content-Length from the browser). Must stay inside
+   PDF_PROXY_ALLOWED_HOSTS in worker.js. Every other cross-origin PDF, notably the
+   R2 bucket's own domain whose CORS rule exposes those headers, is read DIRECTLY
+   by PDF.js: no Worker request at all, and R2 reads only. */
+const PDF_PROXY_HOSTS=["storage.googleapis.com"];
 
 async function resolvePdfUrl(value){
     const raw=String(value||"").trim();
     if(!raw) throw new Error("Book is missing a PDF URL.");
 
-    /* Absolute http(s) URLs are preserved. A cross-origin one is routed
-       through this app's own /__sky_pdf_proxy only when its host is on the
-       proxy list (see pdfProxyHosts) and the proxy has not already failed
-       in this session. */
+    /* Absolute/data/blob URLs are already complete and must be preserved —
+       EXCEPT that a cross-origin http(s) PDF (e.g. Glide's GCS bucket) is
+       routed through this app's own /__sky_pdf_proxy instead of being
+       fetched directly. A direct cross-origin fetch hides the response
+       headers PDF.js needs (Accept-Ranges/Content-Length) unless the
+       remote host's CORS policy explicitly exposes them, which is not
+       something this app controls for a third-party bucket. Without that
+       visibility PDF.js silently downloads the entire file instead of
+       streaming it — harmless for a small PDF, a multi-minute stall for
+       one bloated by embedded video/audio. Routing through the Worker
+       makes the browser's request same-origin, where none of that
+       header-visibility restriction applies. */
     if(/^(?:https?:)/i.test(raw)){
         try{
             const parsed=new URL(raw);
-            if(
-                parsed.origin!==window.location.origin &&
-                pdfHostIsProxied(parsed.hostname) &&
-                !pdfProxyKnownDown()
-            ){
+            if(parsed.origin!==window.location.origin
+                && PDF_PROXY_HOSTS.includes(parsed.hostname)){
                 return window.location.origin+PDF_PROXY_PATH+"?src="+encodeURIComponent(raw);
             }
         }catch(error){
@@ -546,22 +493,25 @@ progress(
          * Wait (bounded) for the same readiness gate every other PDF path
          * is meant to use. Already-loaded case: no wait at all.
          */
-        if(!window.pdfjsLib){
+        const pdfjsUsable=()=>typeof window.pdfjsUsable==="function"
+            ? window.pdfjsUsable()
+            : Boolean(window.pdfjsLib);
+        if(!pdfjsUsable()){
             progress(6,"Preparing reader");
             if(typeof window.waitForPdfjs==="function"){
                 await window.waitForPdfjs(30000);
             }
-            if(!window.pdfjsLib){
+            if(!pdfjsUsable()){
                 throw new Error(
                     "The PDF engine could not be loaded. Check your connection and reload."
                 );
             }
         }
 
-        let pdfUrl=await resolvePdfUrl(book.pdf);
+        const pdfUrl=await resolvePdfUrl(book.pdf);
         progress(8,"Loading PDF");
 
-        const docOptions={
+        const task=pdfjsLib.getDocument({
             url:pdfUrl,
             enableXfa:false,
             useSystemFonts:true,
@@ -578,9 +528,7 @@ progress(
              * Next step to try once this is proven: 1048576 (1 MiB).
              */
             rangeChunkSize:262144
-        };
-
-        let task=pdfjsLib.getDocument(docOptions);
+        });
 
         activeLoadingTask=task;
 
@@ -603,30 +551,7 @@ progress(
 
         let resolvedPdf;
         try{
-            try{
-                resolvedPdf=await task.promise;
-            }catch(error){
-                /* A proxied load failed (no Worker here, route missing, host
-                   refused). Retry once straight from the source - the way
-                   books loaded before the proxy existed - unless a newer
-                   open has taken over in the meantime. */
-                const direct=directPdfUrl(book.pdf);
-                if(
-                    isPdfProxyUrl(pdfUrl) &&
-                    direct &&
-                    token===openToken &&
-                    presentation===presentationToken
-                ){
-                    console.warn("[Renderer] PDF proxy unavailable; loading directly.",error);
-                    markPdfProxyDown();
-                    pdfUrl=direct;
-                    task=pdfjsLib.getDocument({...docOptions,url:direct});
-                    activeLoadingTask=task;
-                    resolvedPdf=await task.promise;
-                }else{
-                    throw error;
-                }
-            }
+            resolvedPdf=await task.promise;
         }finally{
             if(activeLoadingTask===task){
                 activeLoadingTask=null;
@@ -1744,6 +1669,45 @@ renderer.goTo=async function(page){
     scheduleWindow(currentPage,token);
 
     return true;
+};
+
+/*-------------------------------------------------------
+ Page text (used by read-aloud, js/readAloud.js)
+
+ Asks pdf.js for the text of ONE page of the book that is already
+ open. Nothing is fetched beyond what that page needs. Returns
+ {height, items:[{s,x,y,w,h,e}]} (y measured from the bottom of the
+ page) or null if the book changed or closed meanwhile.
+-------------------------------------------------------*/
+
+renderer.pageText=async function(number){
+    if(!pdf) return null;
+
+    number=Math.max(1,Math.min(pageCount,Number(number)||1));
+
+    const token=openToken;
+    const page=await getPage(number);
+    const content=await page.getTextContent();
+
+    if(token!==openToken || !pdf) return null;
+
+    const view=page.view||[0,0,0,0];
+    const items=[];
+
+    for(const item of content.items){
+        if(typeof item.str!=="string") continue;
+        const t=item.transform||[1,0,0,1,0,0];
+        items.push({
+            s:item.str,
+            x:t[4]-view[0],
+            y:t[5]-view[1],
+            w:item.width||0,
+            h:item.height||Math.abs(t[3])||0,
+            e:!!item.hasEOL
+        });
+    }
+
+    return {height:view[3]-view[1],items:items};
 };
 
 renderer.refresh=function(){

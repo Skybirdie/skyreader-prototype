@@ -314,7 +314,7 @@ function openFull(item){
         const thumbnailUrl=
             resolveThumbnail(raw.thumbnail) ||
             resolveThumbnail(item.thumbnail) ||
-            "assets/default-thumbnail.png";
+            "assets/errors/thumbnail.webp";
 
         /*
          * IMPORTANT:
@@ -903,7 +903,9 @@ async function renderSlideshow(item,token){
         }
 
         try{
-            if(!window.pdfjsLib){
+            /* No waiting here on purpose: if pdf.js is not fully ready (worker
+               configured) the door falls back to its thumbnail immediately. */
+            if(!(typeof window.pdfjsUsable==="function"?window.pdfjsUsable():window.pdfjsLib)){
                 throw new Error("PDF.js unavailable");
             }
 
@@ -951,7 +953,7 @@ update();
             img.className="front-media-fallback";
             img.src=
                 item.thumbnail ||
-                "assets/default-thumbnail.png";
+                "assets/errors/thumbnail.webp";
             img.alt=item.title||"";
 
             ui.content.appendChild(img);
@@ -1274,7 +1276,7 @@ cleanupFn=()=>{
             await draw(delta>0?1:-1);
         }
         try{
-            if(!window.pdfjsLib)throw new Error("PDF.js unavailable");
+            if(!(typeof window.pdfjsUsable==="function"?window.pdfjsUsable():window.pdfjsLib))throw new Error("PDF.js unavailable");
             const url=item.raw.pdf||item.raw.media||item.raw.url||item.raw.PDF||""; if(!url)throw new Error("PDF URL missing");
 
             /* See the other pdfjsLib.getDocument() call above in this
@@ -1296,7 +1298,7 @@ await new Promise(resolve=>{
 if(token!==generation)return;
 
 await draw();
-        }catch(e){console.error("[FrontMediaRenderer] PDF preview failed",e);ui.content.innerHTML="";const img=document.createElement("img");img.className="front-media-fallback";img.src=item.thumbnail||"assets/default-thumbnail.png";img.alt=item.title||"";ui.content.appendChild(img);ui.status.textContent="PDF preview unavailable";}
+        }catch(e){console.error("[FrontMediaRenderer] PDF preview failed",e);ui.content.innerHTML="";const img=document.createElement("img");img.className="front-media-fallback";img.src=item.thumbnail||"assets/errors/thumbnail.webp";img.alt=item.title||"";ui.content.appendChild(img);ui.status.textContent="PDF preview unavailable";}
         watchContentResize(ui.content,()=>{
     if(pdf && !busy){
         draw();
@@ -1388,7 +1390,7 @@ function watchContentResize(content, redraw){
         if(item.section==="video")renderVideo(item,token);
         else if(item.section==="slideshow")renderSlideshow(item,token);
         else if(item.section==="reader")renderPdf(item,token);
-        else {const ui=shell(item,"unknown");const img=document.createElement("img");img.className="front-media-fallback";img.src=item.thumbnail||"assets/default-thumbnail.png";img.alt=item.title||"";ui.content.appendChild(img);addOpenControl(ui.controlsRight,item);}
+        else {const ui=shell(item,"unknown");const img=document.createElement("img");img.className="front-media-fallback";img.src=item.thumbnail||"assets/errors/thumbnail.webp";img.alt=item.title||"";ui.content.appendChild(img);addOpenControl(ui.controlsRight,item);}
     }
     function init(element){host=element||document.getElementById("frontMediaHost");return !!host;
     }
