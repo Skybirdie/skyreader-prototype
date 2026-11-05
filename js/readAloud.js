@@ -29,6 +29,10 @@
    - Voices and quality are whatever the device offers. iPhones stop
      speaking when the screen locks; the button then shows "paused".
 
+   How things are SAID (names, acronyms, "e.g.", colons / semicolons / dashes,
+   list commas, the silence after a paragraph) lives in js/readAloudRules.js.
+   That file is optional: without it the text is spoken as tidied here.
+
    Page turns it makes itself are silent (the turn sound would talk over the voice).
 
    Reader hooks used: Reader.isOpen / page / pages / spread / next,
@@ -120,7 +124,14 @@ const BULLET_START=/^[\u2022\u2023\u25E6\u2043\u2219\u25AA\u25AB\u25CF\u25CB\u25
 const DASH_BULLET=/^[-\u2013\u2014]\s+/;
 const PRIVATE_USE=/[\uE000-\uF8FF]/g;
 const INVISIBLE=/[\u0000-\u0008\u000B-\u001F\u007F\u00AD\u200B-\u200F\u2028\u2029\u202A-\u202E\u2060\uFEFF]/g;
-const TERMINAL=/[.!?\u2026:;]["')\]\u201D\u2019]*$/;
+const SUP="\u2063";    /* invisible mark left after a superscript: "say a full stop here" (readAloudRules.js turns it into one) */
+const TERMINAL=/(?:[.!?\u2026:;]["')\]\u201D\u2019]*|\u2063)$/;
+/* superscript digits, signs and letters (footnote marks, verse numbers): normalising would flatten them into "God1" */
+const SUPER_CHARS=/[\u00B2\u00B3\u00B9\u2070\u2071\u2074-\u207F\u02B0-\u02B8\u02E0-\u02E4\u1D2C-\u1D6A\u1D78\u1D9B-\u1DBF]+/g;
+/* ornamental symbols (stars, diamonds, dingbats, emoji, arrows-in-circles, dagger, asterisk, pipe ...).
+   NOT mathematical signs (+ - = < > % etc. are a different Unicode class), not currency, not the degree sign. */
+const ORN_CHAR="(?:(?![\\u00B0\\u2103\\u2109\\u2116])[\\p{So}\\u2020\\u2021\\u2022\\u2023\\u2043\\u2219\\u00B7*|\\u00A6\\uFE0F\\u20E3\\u200D\\u{1F3FB}-\\u{1F3FF}])";
+const ORN_RUN=new RegExp("(?:\\s*"+ORN_CHAR+")+\\s*","gu");
 const PAGE_NUMBER=/^(page\s*)?\d{1,4}(\s*(\/|of)\s*\d{1,4})?$|^[-\u2013\u2014]\s*\d{1,4}\s*[-\u2013\u2014]$/i;
 const ABBREV=new Set(["mr","mrs","ms","dr","prof","sr","jr","st","vs","etc","e.g","i.e","no","fig","inc","ltd","co","approx","dept","est","vol","ch","pp","cf"]);
 
@@ -130,12 +141,42 @@ function endsWithAbbrev(t){
     return !!w&&ABBREV.has(w.toLowerCase());
 }
 
+/* "God¹ said" -> "God 1<SUP> said";  "m²" -> "m squared";  "1ˢᵗ" -> "1st" */
+function supMark(s){
+    return s.replace(SUPER_CHARS,(m,off,str)=>{
+        const plain=m.normalize("NFKC");
+        if(/^(st|nd|rd|th)$/i.test(plain))return plain;
+        if(m==="²"||m==="³"){
+            const before=str.slice(0,off);
+            if(/(^|[^\p{L}])\p{L}{1,2}$/u.test(before)||/[)\]]$/.test(before))return m==="²"?" squared":" cubed";
+        }
+        return " "+plain+SUP;
+    });
+}
+
 function tidy(str){
-    return String(str||"")
+    return supMark(String(str||""))
         .normalize("NFKC")
         .replace(INVISIBLE," ")
         .replace(/\s+/g," ")
         .trim();
+}
+
+/* small, raised pieces of text next to normal-sized text (footnote numbers, verse numbers drawn as
+   superscripts in the PDF, not as special characters): returns the set of their positions in items */
+function findSuperscripts(items){
+    const found=new Set();
+    const hs=items.map(i=>i.h||0).filter(h=>h>0).sort((a,b)=>a-b);
+    if(hs.length<3)return found;
+    const body=hs[hs.length>>1];
+    items.forEach((it,i)=>{
+        const s=typeof it.s==="string"?it.s.trim():"";
+        if(!s||s.length>4||!(it.h>0)||it.h>0.78*body)return;
+        if(/^(st|nd|rd|th)$/i.test(s))return;           /* 1st, 2nd, 3rd, 4th */
+        const near=[items[i-1],items[i+1]].find(o=>o&&(o.h||0)>=0.9*body&&Math.abs(o.y-it.y)<=0.8*body);
+        if(near&&it.y-near.y>=0.15*body)found.add(i);
+    });
+    return found;
 }
 
 /* "Hello  world" -> items joined into visual lines */
@@ -143,9 +184,12 @@ function toLines(items){
     const lines=[];
     let cur=null;
     const push=()=>{if(cur&&cur.t.trim())lines.push(cur);cur=null;};
+    const sups=findSuperscripts(items);
 
-    for(const it of items){
-        const s=typeof it.s==="string"?it.s:"";
+    for(let n=0;n<items.length;n++){
+        const it=items[n];
+        let s=typeof it.s==="string"?it.s:"";
+        if(sups.has(n))s=" "+s.trim()+SUP;
         const h=it.h||0;
         if(cur){
             const sameBaseline=Math.abs(it.y-cur.y)<=0.6*Math.max(h,cur.h,1);
@@ -188,14 +232,25 @@ function buildParagraphs(data,ctx){
         const hadPrivate=PRIVATE_USE.test(l.raw);
         PRIVATE_USE.lastIndex=0;
         const leader=/(\.\s*){4,}/.test(l.t);     /* table-of-contents style "Chapter 1 ........ 5" */
-        let t=tidy(l.t.replace(PRIVATE_USE," ").replace(/(\.\s*){4,}/g," "));
         let bullet=pendingBullet;
         pendingBullet=false;
+
+        /* ornamental symbols are never described: at the start of a line they act as a bullet (a new item),
+           anywhere else as a full stop */
+        let ornStart=false,hadOrn=false;
+        const src=l.t.replace(PRIVATE_USE," ").replace(/(\.\s*){4,}/g," ").replace(ORN_RUN,(m,off,str)=>{
+            hadOrn=true;
+            if(!str.slice(0,off).trim()){ornStart=true;return "";}
+            if(!str.slice(off+m.length).trim())return "";
+            return /[.!?\u2026:;,]\s*$/.test(str.slice(0,off))?" ":". ";
+        });
+        let t=tidy(src);
+        if(ornStart)bullet=true;
         if(BULLET_START.test(t)){bullet=true;t=t.replace(BULLET_START,"");}
         else if(DASH_BULLET.test(t)){bullet=true;t=t.replace(DASH_BULLET,"");}
         if(!t){
-            /* a bullet drawn as its own glyph: the next line is a new item */
-            if(hadPrivate||/[\u2022\u25CF\u25AA\u25A0\u27A2]/.test(l.t))pendingBullet=true;
+            /* a bullet or ornament drawn as its own glyph: the next line is a new item */
+            if(hadPrivate||hadOrn||/[\u2022\u25CF\u25AA\u25A0\u27A2]/.test(l.t))pendingBullet=true;
             continue;
         }
         if(/^(\(?\d{1,2}[.)]|[a-z][.)])\s/i.test(t))bullet=true;
@@ -235,12 +290,22 @@ function buildParagraphs(data,ctx){
     };
     const isFull=l=>(l.x1-l.x0)>=0.8*colMax(l);   /* a wrapped line runs to within about one word of the margin */
 
+    /* the usual distance between two lines of the same paragraph on this page (median) */
+    const pitches=[];
+    for(let i=1;i<keep.length;i++){
+        const a=keep[i-1],b=keep[i],dy=a.y-b.y;
+        if(dy>0&&dy<=2.2*Math.max(a.h,b.h,8)&&Math.abs(a.h-b.h)<=0.15*Math.max(a.h,b.h)&&Math.abs(a.x0-b.x0)<=0.1*pageW)pitches.push(dy);
+    }
+    pitches.sort((p,q)=>p-q);
+    const pitch=pitches.length>=3?pitches[pitches.length>>1]:0;
+
     const continues=(prev,l)=>{
         if(l.bullet||prev.leader)return false;
         const dy=prev.y-l.y;
         const lineH=Math.max(prev.h,l.h,8);
         if(dy<=0||dy>2.2*lineH)return false;          /* new block, new column, or a big gap */
         if(Math.abs(prev.h-l.h)>0.15*Math.max(prev.h,l.h))return false;   /* a heading, caption or other type size */
+        if(pitch&&dy>1.4*pitch&&!/^[a-z]/.test(l.t))return false;   /* a visible gap between lines: a new paragraph, not a wrapped line */
         if(TERMINAL.test(prev.t)&&!endsWithAbbrev(prev.t)&&!/^[a-z]/.test(l.t))return false;   /* the sentence ended */
         if(!isFull(prev))return /^[a-z]/.test(l.t);   /* short line: only join mid-sentence */
         return true;                                  /* a wrapped line */
@@ -362,7 +427,25 @@ async function chunksForPage(p){
     let data=null;
     try{data=await Renderer.pageText(p);}catch(e){data=null;}
     ctx.page=p;
-    const chunks=splitSentences(buildParagraphs(data,ctx)).map(text=>({text,page:p}));
+    const chunks=[];
+    const R=window.ReadAloudRules;      /* optional: js/readAloudRules.js (how things are said) */
+    const gap=R&&R.gaps&&R.gaps.paragraph>0?R.gaps.paragraph:0;
+    for(const para of buildParagraphs(data,ctx)){
+        const parts=splitSentences([para]);
+        let lastOfParagraph=-1;
+        parts.forEach((raw,i)=>{
+            const plain=raw.replace(/\s*⁣\s*/g,". ").trim();    /* without the rules file a superscript is still a full stop */
+            let say=plain;
+            if(R&&typeof R.spoken==="function"){
+                try{say=R.spoken(raw,{end:i===parts.length-1})||"";}catch(e){say=plain;}
+            }
+            if(!/[\p{L}\p{N}]/u.test(say))return;
+            chunks.push({text:say,page:p,gap:0});
+            lastOfParagraph=chunks.length-1;
+        });
+        /* a real silence after every paragraph, title or line that stands alone */
+        if(lastOfParagraph>=0)chunks[lastOfParagraph].gap=gap;
+    }
     textCache.set(p,chunks);
     if(textCache.size>14)textCache.delete(textCache.keys().next().value);
     return chunks;
@@ -381,17 +464,24 @@ let errorRun=0;
 function speakList(list,from,token){
     return new Promise(resolve=>{
         let next=from,ended=from-1;
+        let holdAt=-1;                 /* a piece followed by a silent gap: nothing after it is queued until the gap is over */
         const total=list.length;
         cursor=from;
         const done=()=>{if(token===session)resolve(true);};
         const enqueue=()=>{
-            while(token===session&&next<total&&next-ended<=2){
+            while(token===session&&next<total&&next-ended<=2&&holdAt<0){
                 const i=next++;
                 const u=makeUtterance(list[i].text);
+                const gapMs=list[i].gap>0&&i<total-1?Math.round(list[i].gap/settings.rate):0;
+                if(gapMs>0)holdAt=i;
                 const finish=()=>{
                     if(token!==session)return;
                     ended=i;cursor=i+1;
-                    if(ended>=total-1)done();else enqueue();
+                    if(ended>=total-1)done();
+                    else if(holdAt===i){
+                        setTimeout(()=>{if(token!==session)return;holdAt=-1;enqueue();},gapMs);
+                    }
+                    else enqueue();
                 };
                 u.onend=()=>{errorRun=0;finish();};
                 u.onerror=ev=>{
