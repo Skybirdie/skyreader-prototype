@@ -11,13 +11,14 @@
    Every rule works on one sentence-sized piece of text at a time and
    is a pure function (no page, no network, no cost).
 
-   1. WORDS       a word that should be said another way (names, acronyms)
+   1. WORDS       a word that should be said another way (names, acronyms).
+                  MMICJ is spelled out wherever it appears, in any letter case
    2. ABBREVIATIONS  "e.g." -> "for example", "Dr." -> "Doctor", "U.S." -> "U S"
    3. PUNCTUATION colons, semicolons and dashes are never spoken, they only
                   separate what is before from what is after them
    4. LISTS       "apples, pears and oranges" -> "apples, pears, and oranges"
-   5. NUMBERS     "16 For God so loved" -> "16. For God so loved" (a pause after a
-                  number that starts a sentence)
+   5. NUMBERS     "16 For God so loved": the number is spoken on its own, then a real
+                  silent gap (GAPS.number), then the sentence
    6. SUPERSCRIPTS footnote and verse numbers: readAloud.js marks them, a full stop
                   is spoken after each one
    7. PAUSES      a real silent gap after every paragraph / forced line break
@@ -31,19 +32,23 @@ window.ReadAloudRules=(function(){
 const api={};
 
 /*=======================================================
-  EDIT HERE (1/3) - WORDS
-  [ "written word", "how to say it" ]
-  Whole words only, any capitals; "Liburd's" is covered by "Liburd".
-  Write the spoken form the way it should SOUND.
+  EDIT HERE (1/4) - WORDS
+  [ "written word", "how to say it", options ]
+  Write the spoken form the way it should SOUND (a voice reads "M M I C J"
+  as "m mic j", so letters are written out: "em em eye see jay").
+  Normally whole words only, any capitals; "Liburd's" is covered by "Liburd".
+  options.anywhere: replace it wherever these letters appear, even inside
+  another word or address (mmicj.com, MMICJs, mmicj-admin), any letter case,
+  and even if the PDF put a space or soft hyphen between the letters.
 =======================================================*/
 api.words=[
-    ["MMICJ",     "M M I C J"],        /* an acronym: read letter by letter */
+    ["MMICJ",     "em em eye see jay", {anywhere:true}],   /* always its letters: M M I C J */
     ["Liburd",    "Lie bird"],
     ["Naphatali", "Nah fah tah lee"]
 ];
 
 /*=======================================================
-  EDIT HERE (2/3) - ABBREVIATIONS
+  EDIT HERE (2/4) - ABBREVIATIONS
   [ "pattern", "how to say it", options ]
   The pattern is a regular expression for the abbreviation (dots escaped
   as \\. ). Capital letters at the start are kept: "E.g." -> "For example".
@@ -80,25 +85,30 @@ api.abbreviations=[
 
 /*=======================================================
   EDIT HERE (3/4) - NUMBERS AT THE START OF A SENTENCE
-  "16 For God so loved ..." and "3 Rules for Peace" are read with a full
-  stop after the number: "16. For God so loved ...". Not touched:
-  a number followed by a lower-case word ("2024 was a good year"), a date
-  ("5 November"), and the numbered books below ("1 Peter", "2 Kings").
+  "16 For God so loved ..." (a Bible verse) is read as the number "16",
+  then a real silent gap (GAPS.number below), then "For God so loved ...".
+  The same for "3:16 For God ...", "(1) Pray ..." and "3 Rules for Peace".
+  Numbers of 1 to 3 digits are treated this way. NOT touched: the numbered
+  books below ("1 Peter", "2 Kings"), dates ("5 November"), times and eras
+  ("10 a.m.", "70 AD"), and numbers of 4 digits or more ("2024 was ...").
 =======================================================*/
 api.numberedBooks=["Samuel","Kings","Chronicles","Corinthians","Thessalonians","Timothy","Peter","John","Esdras","Maccabees",
                    "Sam","Kgs","Chr","Cor","Thess","Tim","Pet","Jn"];
 api.months=["January","February","March","April","May","June","July","August","September","October","November","December",
             "Jan","Feb","Mar","Apr","Jun","Jul","Aug","Sep","Sept","Oct","Nov","Dec"];
+api.numberUnits=["a.m","p.m","am","pm","AD","BC","BCE","CE","percent"];
 
 /*=======================================================
   EDIT HERE (4/4) - GAPS (milliseconds of silence)
   paragraph: after a paragraph, a title, a line that stands on its own,
              or any other forced line break. At the normal speed this is
              about the length of the pause after a full stop.
-  The gap is shortened a little when the reader speeds the voice up.
-  Set to 0 to switch the extra gap off.
+  number:    after a number that starts a sentence (Bible verse numbers).
+             Longer than the paragraph gap so the number stands apart.
+  The gaps are shortened a little when the reader speeds the voice up.
+  Set one to 0 to switch it off.
 =======================================================*/
-api.gaps={paragraph:450};
+api.gaps={paragraph:450, number:800};
 
 /*=======================================================
   The machinery (no need to edit below this line)
@@ -114,10 +124,19 @@ function compile(){
     compiled={
         books:new RegExp(alt(api.numberedBooks),"i"),
         months:new RegExp(alt(api.months),"i"),
-        words:(api.words||[]).map(w=>({
-            re:new RegExp("(^|[^"+LET+"])("+esc(w[0])+")(?![" + LET + "])","giu"),
-            say:String(w[1])
-        })),
+        units:new RegExp(alt(api.numberUnits),"i"),
+        words:(api.words||[]).map(w=>{
+            const o=w[2]||{};
+            if(o.anywhere){
+                /* the letters in a row, with at most one space / soft hyphen / zero-width mark between two of them */
+                const between="[\\s\\u00AD\\u200B-\\u200D\\u2060\\uFEFF]?";
+                return {anywhere:true,re:new RegExp(Array.from(String(w[0])).map(esc).join(between),"giu"),say:String(w[1])};
+            }
+            return {
+                re:new RegExp("(^|[^"+LET+"])("+esc(w[0])+")(?![" + LET + "])","giu"),
+                say:String(w[1])
+            };
+        }),
         abbr:(api.abbreviations||[]).map(a=>({
             re:new RegExp("(^|[^"+LET+".])("+a[0]+")(?![" + LET + "])","giu"),
             say:String(a[1]),
@@ -129,7 +148,13 @@ function compile(){
 api.recompile=function(){compiled=null;};
 
 function words(t){
-    for(const w of compiled.words)t=t.replace(w.re,(m,pre)=>pre+w.say);
+    const isLet=c=>!!c&&/[\p{L}\p{N}]/u.test(c);
+    for(const w of compiled.words){
+        if(w.anywhere){
+            /* spoken form gets its own spaces when it was glued to other letters (MMICJs -> "... jay s") */
+            t=t.replace(w.re,(m,off,str)=>(isLet(str.charAt(off-1))?" ":"")+w.say+(isLet(str.charAt(off+m.length))?" ":""));
+        }else t=t.replace(w.re,(m,pre)=>pre+w.say);
+    }
     return t;
 }
 
@@ -159,27 +184,42 @@ function superscripts(t){
     return t.replace(/\s*⁣\s*/g,". ");
 }
 
-/* "16 For God so loved" -> "16. For God so loved";  "(1) Text" / "1) Text" -> "1. Text" */
-function leadingNumber(t){
-    const m=t.match(/^\(?(\d{1,4})[.)]?\s+(\p{Lu}[\p{L}]*)/u);
-    if(!m)return t;
-    const next=m[2];
-    if(/^\d$/.test(m[1])&&compiled.books.test(next))return t;      /* 1 Peter, 2 Kings */
-    if(compiled.months.test(next))return t;                          /* 5 November */
-    return t.replace(/^\(?(\d{1,4})[.)]?\s+/,"$1. ");
+/* A number that starts a sentence ("16 For God so loved", "3:16 For God", "(1) Pray"): returns
+   {num, rest} so the number can be spoken on its own, or null when it is not one (1 Peter, 5 November,
+   10 a.m., a number of 4 or more digits, a number followed by a digit). */
+const LEAD=/^\(?(\d{1,3}(?::\d{1,3}(?:\s*[-\u2013]\s*\d{1,3})?)?)[.):,]?\s+(?=\p{L})/u;
+function splitLead(t){
+    const m=t.match(LEAD);
+    if(!m)return null;
+    const rest=t.slice(m[0].length);
+    const next=((rest.match(/^\p{L}[\p{L}.'\u2019]*/u)||[""])[0]).replace(/\.+$/,"");
+    if(/^\d$/.test(m[1])&&compiled.books.test(next))return null;      /* 1 Peter, 2 Kings */
+    if(compiled.months.test(next))return null;                         /* 5 November */
+    if(compiled.units.test(next))return null;                          /* 10 a.m., 70 AD */
+    return {num:m[1],rest:rest};
+}
+
+/* Whatever is left of a colon, semicolon or dash after the rules below is removed here as well.
+   They are never said: they separate. (The same pass runs once more, last of all, in api.enforce.) */
+function sweep(t){
+    t=t.replace(/\s*(?:--+|[\u2012-\u2015\u2E3A\u2E3B\uFE58])\s*/g,", ");                /* long and short dashes, double hyphen */
+    t=t.replace(/\s+[-\u2010\u2011]+\s+/g,", ");                                /* a spaced hyphen: " - " */
+    t=t.replace(/([\p{L}\p{N}])[-\u2010\u2011]+(?=[\p{L}\p{N}])/gu,"$1 ");      /* well-known, COVID-19, e-mail */
+    t=t.replace(/[-\u2010\u2011]+(?!\d)/g," ");                                  /* any other stray hyphen (a minus sign before a digit stays) */
+    t=t.replace(/\s*[:;\uFF1A\uFF1B\uFE54\uFE55\u037E\u061B]\s*/g,", ");         /* a colon or semicolon wherever it is */
+    return t;
 }
 
 /* Colons, semicolons and dashes are never said; they separate. A comma gives the
-   short, even pause that every voice understands. Times and verses (10:30, 3:16)
-   have no space after the colon and are left to the voice. */
+   short, even pause that every voice understands. Chapter:verse and times (3:16, 10:30)
+   become two numbers ("3 16"); 5-10 and 3:16-18 are read "5 to 10", "3 16 to 18". */
 function separators(t,atEnd){
-    t=t.replace(/(\d)\s*–\s*(\d)/g,"$1\u0001$2");              /* 5-10 (en dash between numbers) */
-    t=t.replace(/\s*(?:--+|[–—―])\s*/g,", ");         /* dashes, long and short */
-    t=t.replace(/\s+-\s+/g,", ");                                    /* a spaced hyphen */
-    t=t.replace(/\s*:\s+/g,", ");
-    t=t.replace(/\s*:(?=\p{L})/gu,", ");                             /* "Note:Hello" */
-    t=t.replace(/\s*;\s*/g,", ");
-    t=t.replace(/\s*:\s*$/,atEnd?".":",");
+    t=t.replace(/(\d)\s*[\u2012\u2013]\s*(\d)/g,"$1\u0001$2");                       /* 5 - 10 (en dash between numbers) */
+    t=t.replace(/(^|[^\d\-])(\d{1,4})-(\d{1,4})(?![\d\-])/g,"$1$2\u0001$3");        /* 5-10, 16-18, 1914-1918 (hyphen between two numbers) */
+    t=t.replace(/\s*(?:--+|[\u2012-\u2015\u2E3A\u2E3B\uFE58])\s*/g,", ");           /* dashes, long and short */
+    t=t.replace(/(\d):(?=\d)/g,"$1 ");                                               /* 3:16, 10:30, 3:1 */
+    t=t.replace(/\s*:\s*$/,atEnd?".":",");                                           /* a title that ends in a colon */
+    t=sweep(t);
     t=t.replace(/(\s*,){2,}/g,",");
     t=t.replace(/([.!?…])\s*,/g,"$1");
     t=t.replace(/^[\s,]+/,"");
@@ -209,25 +249,59 @@ function serialComma(t){
     return parts.join(", ");
 }
 
-/*
- * text : one sentence-sized piece, as readAloud.js cut it
- * opts : {end:true} when the piece is the last of its paragraph (it then always ends in a full stop)
- * returns the text to hand to the voice
- */
-api.spoken=function(text,opts){
+/* the shared work of spoken() / spokenParts(): {lead, body}
+   lead = a number that starts the sentence (or null), body = the rest, ready for the voice */
+function run(text,opts){
     let t=String(text==null?"":text);
-    if(!t)return t;
+    if(!t)return {lead:null,body:t};
     if(!compiled)compile();
     const atEnd=!!(opts&&opts.end);
-    t=superscripts(t);
-    t=leadingNumber(t.trim());
+    t=superscripts(t).trim();
+    let lead=null;
+    const sp=splitLead(t);
+    if(sp){lead=sp.num;t=sp.rest;}
     t=words(t);
     t=abbreviations(t);
     t=separators(t,atEnd);
     t=serialComma(t);
     t=t.replace(/\s+([,.!?])/g,"$1").replace(/\s+/g," ").trim();
     if(atEnd)t=t.replace(/\s*[,;:—–-]+$/,".");
-    return t;
+    if(lead!==null)lead=separators(lead,false).replace(/\s+/g," ").trim();
+    return {lead:lead,body:t};
+}
+
+/*
+ * text : one sentence-sized piece, as readAloud.js cut it
+ * opts : {end:true} when the piece is the last of its paragraph (it then always ends in a full stop)
+ * returns the text to hand to the voice, as one string ("16. For God so loved ...")
+ */
+api.spoken=function(text,opts){
+    const r=run(text,opts);
+    if(r.lead===null)return r.body;
+    return r.body?r.lead+". "+r.body:r.lead+".";
+};
+
+/*
+ * Same, but as pieces: [{text, gap}]. A number that starts a sentence comes first, on its own, with
+ * gap = api.gaps.number (milliseconds of real silence before the next piece); the rest follows.
+ */
+api.spokenParts=function(text,opts){
+    const r=run(text,opts);
+    if(r.lead===null)return [{text:r.body,gap:0}];
+    const g=api.gaps&&api.gaps.number>0?api.gaps.number:0;
+    if(!g||!r.body)return [{text:r.body?r.lead+". "+r.body:r.lead+".",gap:0}];
+    return [{text:r.lead,gap:g},{text:r.body,gap:0}];
+};
+
+/* The last word before the voice: whatever came before, MMICJ is spelled and no colon, semicolon or dash
+   is left in the text. Safe to run on text that was already processed (it changes nothing then). */
+api.enforce=function(text){
+    let t=String(text==null?"":text);
+    if(!t)return t;
+    if(!compiled)compile();
+    t=words(t);
+    t=sweep(t);
+    return t.replace(/(\s*,){2,}/g,",").replace(/\s+([,.!?])/g,"$1").replace(/\s+/g," ").trim();
 };
 
 return api;

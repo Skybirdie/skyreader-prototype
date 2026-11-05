@@ -30,9 +30,17 @@ function load(withRules=true){
   const S=(t,end)=>w.ReadAloudRules.spoken(t,{end:!!end});
 
   /* names and acronyms */
-  ok(S('Welcome to MMICJ today.')==='Welcome to M M I C J today.','MMICJ -> letters: '+S('Welcome to MMICJ today.'));
-  ok(S('mmicj and Mmicj and MmIcJ')==='M M I C J and M M I C J and M M I C J','any capitals of mmicj');
-  ok(S("MMICJ's library")==="M M I C J's library",'MMICJ possessive');
+  const MJ='em em eye see jay';      /* how MMICJ is written for the voice: its letters, never "m mic j" */
+  ok(S('Welcome to MMICJ today.')==='Welcome to '+MJ+' today.','MMICJ -> letters: '+S('Welcome to MMICJ today.'));
+  ok(S('MMicj')===MJ,'MMicj (the way it is usually written) -> letters: '+S('MMicj'));
+  ok(S('mmicj and Mmicj and MmIcJ and MMICJ')===[MJ,'and',MJ,'and',MJ,'and',MJ].join(' '),'any capitals of mmicj: '+S('mmicj and Mmicj and MmIcJ and MMICJ'));
+  ok(S("MMICJ's library")==="em em eye see jay's library",'MMICJ possessive');
+  ok(S('Visit mmicj.com today')==='Visit '+MJ+'.com today','inside an address: '+S('Visit mmicj.com today'));
+  ok(S('the mmicj-admin portal')==='the '+MJ+' admin portal','joined with a hyphen: '+S('the mmicj-admin portal'));
+  ok(S('MMICJs library')===MJ+' s library','glued to a plural s: '+S('MMICJs library'));
+  ok(S('MM icj and MM\u00ADicj')===MJ+' and '+MJ,'a space or soft hyphen between its letters: '+S('MM icj and MM\u00ADicj'));
+  ok(S('(MMICJ)')==='('+MJ+')','in brackets');
+  ok(!/mmicj/i.test(S('x MMicj y mmicj. MMICJ, mMiCj;')),'no written form of mmicj survives');
   ok(S('Sister Liburd and Liburd\'s book')==="Sister Lie bird and Lie bird's book",'Liburd: '+S('Sister Liburd and Liburd\'s book'));
   ok(S('Naphatali spoke.')==='Nah fah tah lee spoke.','Naphatali');
   ok(S('Naphatalis')==='Naphatalis','a longer word that merely contains a name is left alone');
@@ -46,7 +54,7 @@ function load(withRules=true){
   ok(S('Apples, etc. The next')==='Apples, et cetera. The next','etc. before a capital keeps its full stop: '+S('Apples, etc. The next'));
   ok(S('Dr. Lee and Mrs. Jones met Prof. Smith.')==='Doctor Lee and Missus Jones met Professor Smith.','titles: '+S('Dr. Lee and Mrs. Jones met Prof. Smith.'));
   ok(S('Red vs. blue')==='Red versus blue','vs.');
-  ok(S('See p. 12 and pp. 3-4.')==='See page 12 and pages 3-4.','p. / pp.: '+S('See p. 12 and pp. 3-4.'));
+  ok(S('See p. 12 and pp. 3-4.')==='See page 12 and pages 3 to 4.','p. / pp.: '+S('See p. 12 and pp. 3-4.'));
   ok(S('Made in the U.S.A. and the U.K. today.')==='Made in the U S A and the U K today.','dotted capitals are spelled: '+S('Made in the U.S.A. and the U.K. today.'));
   ok(S('Back in the U.S.',true)==='Back in the U S.','dotted capitals at the end keep one full stop: '+S('Back in the U.S.',true));
   ok(S('At 5 p.m. we leave.')==='At 5 P M we leave.','p.m.: '+S('At 5 p.m. we leave.'));
@@ -59,8 +67,14 @@ function load(withRules=true){
   ok(S('Peace — true peace – is rare.')==='Peace, true peace, is rare.','dashes (long, short): '+S('Peace — true peace – is rare.'));
   ok(S('Peace--true peace')==='Peace, true peace','double hyphen');
   ok(S('Peace - true peace')==='Peace, true peace','spaced hyphen');
-  ok(S('A well-known fact')==='A well-known fact','hyphen inside a word stays');
-  ok(S('At 10:30 on John 3:16 and 3:1 odds')==='At 10:30 on John 3:16 and 3:1 odds','times and verses are left alone');
+  ok(S('A well-known fact')==='A well known fact','hyphen inside a word is silent: '+S('A well-known fact'));
+  ok(S('At 10:30 on John 3:16 and 3:1 odds')==='At 10 30 on John 3 16 and 3 1 odds','times and verses: the colon is never said: '+S('At 10:30 on John 3:16 and 3:1 odds'));
+  ok(S('John 3:16-18 says')==='John 3 16 to 18 says','verse range: '+S('John 3:16-18 says'));
+  ok(S('The war of 1914-1918 and 5-10 items')==='The war of 1914 to 1918 and 5 to 10 items','number ranges with a hyphen: '+S('The war of 1914-1918 and 5-10 items'));
+  ok(S('COVID-19 and e-mail and well\u2010known')==='COVID 19 and e mail and well known','hyphens between letters and digits: '+S('COVID-19 and e-mail and well\u2010known'));
+  ok(S('A\u2012B')==='A, B'&&S('C\u2015D')==='C, D'&&S('E\u2E3AF')==='E, F','other dash characters: '+S('A\u2012B')+' | '+S('C\u2015D')+' | '+S('E\u2E3AF'));
+  ok(S('Note:Hello')==='Note, Hello'&&S('x;y')==='x, y'&&S('a\uFF1Ab\uFF1Bc')==='a, b, c','colon and semicolon in every form, with or without spaces: '+S('Note:Hello')+' | '+S('x;y')+' | '+S('a\uFF1Ab\uFF1Bc'));
+  ok(S('Rate -5 degrees')==='Rate -5 degrees','a minus sign in front of a digit stays');
   ok(S('Pages 5–10 only')==='Pages 5 to 10 only','a range of numbers: '+S('Pages 5–10 only'));
   ok(S('Ingredients:',true)==='Ingredients.','a title ending in a colon ends with a full stop');
   ok(S('Ingredients:')==='Ingredients,','a colon ending a cut piece is a comma');
@@ -68,6 +82,7 @@ function load(withRules=true){
   ok(S('Hello. — Next')==='Hello. Next','a dash after a full stop is dropped');
   ok(S('Title —',true)==='Title.','a dash at the end of a paragraph');
   ok(!/[:;—–]/.test(S('a: b; c — d – e')),'none of : ; — – is left in the spoken text');
+  ok(!/[:;\u2012-\u2015\u2010\u2011-]/.test(S('a: b; c — d – e - f -g h- i--j k‐l 1:2 3-4 x:y;z')),'no colon, semicolon or hyphen/dash of any kind survives: '+S('a: b; c — d – e - f -g h- i--j k‐l 1:2 3-4 x:y;z'));
 
   /* lists */
   ok(S('apples, pears and oranges')==='apples, pears, and oranges','list comma added: '+S('apples, pears and oranges'));
@@ -85,7 +100,35 @@ function load(withRules=true){
   ok(S('1 Peter 3 is long')==='1 Peter 3 is long','1 Peter is a book, not a verse number');
   ok(S('2 Kings says')==='2 Kings says','2 Kings');
   ok(S('5 November 2026 was Thursday')==='5 November 2026 was Thursday','a date is left alone');
-  ok(S('2024 was a good year')==='2024 was a good year','a number followed by a lower-case word is left alone');
+  ok(S('2024 was a good year')==='2024 was a good year','a number of 4 digits followed by a lower-case word is left alone');
+  ok(S('16 and he said')==='16. and he said','a verse that continues in lower case also gets the pause: '+S('16 and he said'));
+  ok(S('3:16 For God so loved')==='3 16. For God so loved','chapter:verse at the start: '+S('3:16 For God so loved'));
+  ok(S('10 a.m. we leave')==='10 A M we leave','a time is not a verse number: '+S('10 a.m. we leave'));
+  ok(S('70 AD was the year')==='70 AD was the year','an era is not a verse number');
+  const PN=t=>JSON.stringify(w.ReadAloudRules.spokenParts(t,{end:true}));
+  const GN=w.ReadAloudRules.gaps.number;
+  ok(GN>w.ReadAloudRules.gaps.paragraph,'the pause after a number ('+GN+' ms) is longer than the paragraph gap ('+w.ReadAloudRules.gaps.paragraph+' ms)');
+  ok(PN('16 For God so loved the world.')===JSON.stringify([{text:'16',gap:GN},{text:'For God so loved the world.',gap:0}]),'a verse number is its own piece followed by a gap: '+PN('16 For God so loved the world.'));
+  ok(PN('3:16-18 For God')===JSON.stringify([{text:'3 16 to 18',gap:GN},{text:'For God',gap:0}]),'a verse reference: '+PN('3:16-18 For God'));
+  ok(PN('1 Peter 3 is long')===JSON.stringify([{text:'1 Peter 3 is long',gap:0}]),'numbered book: one piece, no gap');
+  ok(PN('It was good.')===JSON.stringify([{text:'It was good.',gap:0}]),'an ordinary sentence: one piece, no gap');
+  w.ReadAloudRules.gaps.number=0;
+  ok(PN('16 For God')===JSON.stringify([{text:'16. For God',gap:0}]),'gap switched off: one piece as before');
+  w.ReadAloudRules.gaps.number=GN;
+  const EN=t=>w.ReadAloudRules.enforce(t);
+  ok(EN('Hi MMicj: a; b — c - d')==='Hi em em eye see jay, a, b, c, d','enforce(): the last pass spells MMICJ and removes : ; and dashes: '+EN('Hi MMicj: a; b — c - d'));
+  ok(EN(EN('Hi MMicj: a; b — c - d'))===EN('Hi MMicj: a; b — c - d'),'enforce() can safely run twice');
+  /* whatever the input, nothing that is spoken contains a colon, semicolon, dash or a written mmicj */
+  const junk=['a',' ','MMicj','mmicj','MMICJ',':',';','-','--','—','–','1','2',':16','3:','. ',', ','x','( )','"'];
+  let bad=null;
+  for(let n=0;n<4000&&!bad;n++){
+    let t='';for(let k=0;k<12;k++)t+=junk[(Math.random()*junk.length)|0];
+    for(const o of [{end:true},{end:false}]){
+      const out=w.ReadAloudRules.spokenParts(t,o).map(x=>x.text).join(' | ');
+      if(/[:;\u2010-\u2015]|mmicj|(^|[^\d])-(?!\d)/i.test(out)){bad={t,out};break;}
+    }
+  }
+  ok(!bad,'4000 random strings: nothing spoken has : ; a dash or a written mmicj'+(bad?' - '+JSON.stringify(bad):''));
   ok(S('3.5 million people')==='3.5 million people','a decimal is left alone');
 
   /* superscripts: the mark becomes a full stop */
@@ -179,7 +222,9 @@ function makeEnv(o){
   win.window=win;vm.createContext(win);
   if(o.rules!==false)vm.runInContext(RULES,win);
   if(o.gap!==undefined&&win.ReadAloudRules)win.ReadAloudRules.gaps.paragraph=o.gap;
-  vm.runInContext(SRC,win);
+  if(o.numberGap!==undefined&&win.ReadAloudRules)win.ReadAloudRules.gaps.number=o.numberGap;
+  if(o.breakRules&&win.ReadAloudRules){const boom=()=>{throw new Error('rule failed')};win.ReadAloudRules.spokenParts=boom;win.ReadAloudRules.spoken=boom;win.ReadAloudRules.enforce=boom;}
+  vm.runInContext(o.src||SRC,win);
   return {RA:win.ReadAloud,log,stamps,win,button};
 }
 
@@ -188,7 +233,7 @@ function makeEnv(o){
   const e=makeEnv({gap:0,pages:[lines(['Welcome to MMICJ: Naphatali Liburd, e.g. Dr. Lee — and friends.'],{w:400})]});
   e.RA.start();
   await until(()=>e.log.length>=1&&e.RA.state()==='idle');
-  ok(e.log.join('|')==='Welcome to M M I C J, Nah fah tah lee Lie bird, for example Doctor Lee, and friends.','the loop speaks the rule-adjusted text: '+e.log.join('|'));
+  ok(e.log.join('|')==='Welcome to em em eye see jay, Nah fah tah lee Lie bird, for example Doctor Lee, and friends.','the loop speaks the rule-adjusted text: '+e.log.join('|'));
 }
 {
   /* a real silence after a paragraph / title, none between sentences of one paragraph */
@@ -225,7 +270,49 @@ function makeEnv(o){
   const e=makeEnv({rules:false,pages:[lines(['God¹ said it: be kind.'],{w:300})]});
   e.RA.start();
   await until(()=>e.RA.state()==='idle'&&e.log.length>=1);
-  ok(e.log.join('|')==='God 1. said it: be kind.','no rules file: spoken as tidied, superscript is a full stop: '+e.log.join('|'));
+  ok(e.log.join('|')==='God 1. said it, be kind.','no rules file: superscript is a full stop and the colon is still not spoken: '+e.log.join('|'));
+}
+{
+  /* the safety net: no rules file, MMICJ is still spelled and nothing is left for the voice to pronounce */
+  const e=makeEnv({rules:false,pages:[lines(['Welcome to MMicj: peace; love \u2014 joy, and well-known mmicj.com.'],{w:500})]});
+  e.RA.start();
+  await until(()=>e.RA.state()==='idle'&&e.log.length>=1);
+  ok(e.log.join('|')==='Welcome to em em eye see jay, peace, love, joy, and well known em em eye see jay.com.','no rules file: '+e.log.join('|'));
+}
+{
+  /* the safety net: a rule that fails does not let raw text through */
+  const e=makeEnv({breakRules:true,pages:[lines(['Hear MMicj: peace; love \u2014 joy.'],{w:400})]});
+  e.RA.start();
+  await until(()=>e.RA.state()==='idle'&&e.log.length>=1);
+  ok(e.log.join('|')==='Hear em em eye see jay, peace, love, joy.','a failing rules file: '+e.log.join('|'));
+  ok(e.RA._enforce('MMICJ: x')==='em em eye see jay, x','enforce() works on its own');
+}
+{
+  /* a number that starts a sentence is spoken on its own, then a real silence */
+  const GAP=350;
+  const e=makeEnv({gap:0,numberGap:GAP,pages:[lines(['16 For God so loved the world, that he gave his only Son.'],{w:500})]});
+  e.RA.start();
+  await until(()=>e.RA.state()==='idle'&&e.log.length>=2,8000);
+  ok(e.log.join('|')==='16|For God so loved the world, that he gave his only Son.','the verse number is its own spoken piece: '+e.log.join('|'));
+  const d=e.stamps[1]-e.stamps[0];
+  ok(d>=GAP-30,'a longer silence follows the number ('+d+' ms)');
+}
+{
+  /* the Listen button: hidden until switched on in Settings (SHOW_BUTTON_BY_DEFAULT) */
+  const e=makeEnv({pages:[lines(['One title'],{w:100})]});
+  ok(e.RA.isButtonVisible()===false&&e.button.hidden===true&&e.button.style.display==='none','the button starts hidden');
+  e.RA.setButtonVisible(true);
+  ok(e.RA.isButtonVisible()===true&&e.button.hidden===false&&e.button.style.display==='','ticking the setting shows it');
+  ok(JSON.parse(e.win.localStorage.getItem('mm-readaloud')).showButton===true,'the choice is remembered in this browser');
+  e.RA.start();
+  await until(()=>e.RA.state()!=='idle');
+  e.RA.setButtonVisible(false);
+  ok(e.button.hidden===true&&e.RA.state()==='idle','unticking hides it and stops any reading');
+  ok(/const SHOW_BUTTON_BY_DEFAULT=false;/.test(SRC),'the initial state is one constant: SHOW_BUTTON_BY_DEFAULT');
+  const v=makeEnv({src:SRC.replace('const SHOW_BUTTON_BY_DEFAULT=false;','const SHOW_BUTTON_BY_DEFAULT=true;'),pages:[lines(['One title'],{w:100})]});
+  ok(v.RA.isButtonVisible()===true&&v.button.hidden===false,'changing the constant to true makes the button visible by default');
+  v.RA.setButtonVisible(false);
+  ok(v.RA.isButtonVisible()===false,'a reader can still switch it off');
 }
 {
   /* the gap is shorter at a faster speed */

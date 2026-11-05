@@ -31,7 +31,9 @@
 
    How things are SAID (names, acronyms, "e.g.", colons / semicolons / dashes,
    list commas, the silence after a paragraph) lives in js/readAloudRules.js.
-   That file is optional: without it the text is spoken as tidied here.
+   That file is optional: without it the text is spoken as tidied here. Whatever happens
+   (rules file missing, a rule failing) enforce() below still spells MMICJ and removes colons,
+   semicolons and dashes from the very last text handed to the voice.
 
    Page turns it makes itself are silent (the turn sound would talk over the voice).
 
@@ -45,6 +47,12 @@ window.ReadAloud=(function(){
 const api={};
 
 const KEY="mm-readaloud";
+
+/* Is the Listen (headphones) button shown to a reader who has not touched the setting?
+   TESTING PHASE: false = hidden until "Show Listen (read aloud) button" is ticked in Settings.
+   WHEN TESTING IS FINISHED: change this one word to true and the button is visible for everybody
+   (a reader who explicitly switched it off or on keeps their own choice). */
+const SHOW_BUTTON_BY_DEFAULT=false;
 const MAX_CHUNK=220;
 const RATE_MIN=0.6,RATE_MAX=1.8;
 
@@ -67,9 +75,9 @@ const clampRate=v=>{
 function loadSettings(){
     try{
         const o=JSON.parse(localStorage.getItem(KEY)||"{}");
-        return {rate:clampRate(o.rate||1),voice:typeof o.voice==="string"?o.voice:""};
+        return {rate:clampRate(o.rate||1),voice:typeof o.voice==="string"?o.voice:"",showButton:typeof o.showButton==="boolean"?o.showButton:null};
     }catch(e){
-        return {rate:1,voice:""};
+        return {rate:1,voice:"",showButton:null};
     }
 }
 
@@ -80,6 +88,16 @@ function saveSettings(){
 }
 
 api.getSettings=()=>({rate:settings.rate,voice:settings.voice});
+
+/* button visibility: null in settings = the reader never chose, so SHOW_BUTTON_BY_DEFAULT decides */
+api.isButtonVisible=()=>settings.showButton===null?SHOW_BUTTON_BY_DEFAULT:!!settings.showButton;
+api.setButtonVisible=function(v){
+    settings.showButton=!!v;
+    saveSettings();
+    applyVisibility();
+    if(!settings.showButton)api.stop();      /* hiding the button also stops any reading in progress */
+    return api.isButtonVisible();
+};
 api.setRate=function(v){settings.rate=clampRate(v);saveSettings();return settings.rate;};
 api.setVoice=function(uri){settings.voice=String(uri||"");saveSettings();};
 api.rateRange=()=>({min:RATE_MIN,max:RATE_MAX});
@@ -434,14 +452,21 @@ async function chunksForPage(p){
         const parts=splitSentences([para]);
         let lastOfParagraph=-1;
         parts.forEach((raw,i)=>{
-            const plain=raw.replace(/\s*⁣\s*/g,". ").trim();    /* without the rules file a superscript is still a full stop */
-            let say=plain;
-            if(R&&typeof R.spoken==="function"){
-                try{say=R.spoken(raw,{end:i===parts.length-1})||"";}catch(e){say=plain;}
+            const plain=raw.replace(/\s*\u2063\s*/g,". ").trim();    /* without the rules file a superscript is still a full stop */
+            const end=i===parts.length-1;
+            let pieces;
+            try{
+                if(R&&typeof R.spokenParts==="function")pieces=R.spokenParts(raw,{end:end});
+                else if(R&&typeof R.spoken==="function")pieces=[{text:R.spoken(raw,{end:end}),gap:0}];
+                else pieces=[{text:plain,gap:0}];
+            }catch(e){pieces=[{text:plain,gap:0}];}
+            /* a number that starts a sentence (a verse number) arrives as its own piece with its own silent gap */
+            for(const pc of pieces){
+                const say=enforce(pc&&pc.text||"");
+                if(!/[\p{L}\p{N}]/u.test(say))continue;
+                chunks.push({text:say,page:p,gap:pc.gap>0?pc.gap:0});
+                lastOfParagraph=chunks.length-1;
             }
-            if(!/[\p{L}\p{N}]/u.test(say))return;
-            chunks.push({text:say,page:p,gap:0});
-            lastOfParagraph=chunks.length-1;
         });
         /* a real silence after every paragraph, title or line that stands alone */
         if(lastOfParagraph>=0)chunks[lastOfParagraph].gap=gap;
@@ -451,8 +476,31 @@ async function chunksForPage(p){
     return chunks;
 }
 
+/* The last word before the voice. Runs on every piece that is spoken, so the rules hold even when
+   js/readAloudRules.js is missing or one of its rules fails: MMICJ is always spelled letter by letter,
+   and no colon, semicolon or dash is ever left in the text for the voice to pronounce. */
+function basicEnforce(t){
+    return String(t==null?"":t)
+        .replace(/m[\s\u00AD\u200B-\u200D\u2060\uFEFF]?m[\s\u00AD\u200B-\u200D\u2060\uFEFF]?i[\s\u00AD\u200B-\u200D\u2060\uFEFF]?c[\s\u00AD\u200B-\u200D\u2060\uFEFF]?j/gi," em em eye see jay ")
+        .replace(/\s*[:;\uFF1A\uFF1B\u037E]\s*/g,", ")
+        .replace(/\s*(?:--+|[\u2012-\u2015])\s*/g,", ")
+        .replace(/\s+[-\u2010\u2011]+\s+/g,", ")
+        .replace(/[-\u2010\u2011]+(?!\d)/g," ")
+        .replace(/(\s*,){2,}/g,",").replace(/\s+([,.!?])/g,"$1").replace(/\s+/g," ").trim();
+}
+
+function enforce(text){
+    const R=window.ReadAloudRules;
+    let t=String(text==null?"":text);
+    if(R&&typeof R.enforce==="function"){
+        try{t=R.enforce(t);}catch(e){}
+    }
+    return basicEnforce(t);
+}
+api._enforce=enforce;
+
 function makeUtterance(text){
-    const u=new Utter(text);
+    const u=new Utter(enforce(text));
     u.rate=settings.rate;
     const v=chosenVoice();
     if(v){u.voice=v;u.lang=v.lang;}
@@ -743,14 +791,20 @@ function onBookChange(){
     resetBookMemory();
 }
 
+/* the headphones button is shown only when the reader switched it on in Settings
+   (or, once testing is over, when SHOW_BUTTON_BY_DEFAULT is true) and the browser can speak */
+function applyVisibility(){
+    if(!button)return;
+    const show=!!SS&&api.isButtonVisible();
+    button.hidden=!show;
+    button.style.display=show?"":"none";
+}
+
 api.init=function(){
     button=document.getElementById("listenButton");
     if(!button)return;
-    if(!SS){
-        button.hidden=true;
-        button.style.display="none";
-        return;
-    }
+    applyVisibility();
+    if(!SS)return;
     renderButton();
     button.addEventListener("click",()=>api.toggle());
 

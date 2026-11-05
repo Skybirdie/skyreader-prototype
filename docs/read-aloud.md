@@ -1,6 +1,11 @@
 # Read aloud ("Listen")
 
-A headphones button in the Reader toolbar reads the open book aloud with the device's own voices.
+A button in the Reader toolbar (headphones resting on a book) reads the open book aloud with the device's own voices.
+
+## Showing the button (testing phase)
+The button is **hidden** until a reader ticks *Show Listen (read aloud) button* in Settings (gear). The choice is kept in this browser.
+To make it visible for everybody once testing is finished, change one word at the top of `js/readAloud.js`:
+`const SHOW_BUTTON_BY_DEFAULT=false;` -> `true`. (A reader who has ticked or unticked the box keeps their own choice.)
 
 ## Cost
 Zero. Nothing is sent anywhere and no extra request is made: the text of a page comes from the PDF the Reader already has open
@@ -27,15 +32,20 @@ Chrome bug that silences long speech.
 This is the file to edit when something is read the wrong way. It only changes what the voice is given, never what is shown.
 Each rule has a short, commented list at the top of the file.
 
-- **Words**: `MMICJ` is spelled out (M M I C J), `Liburd` -> "Lie bird", `Naphatali` -> "Nah fah tah lee". Add a name as `["Written", "how it sounds"]`.
+- **Words**: `MMICJ` is always spelled out letter by letter (written "em em eye see jay" for the voice), wherever those letters appear and in any case
+  (MMicj, mmicj, MMICJ, mmicj.com, MMICJs, even with a space between the letters). `Liburd` -> "Lie bird", `Naphatali` -> "Nah fah tah lee".
+  Add a name as `["Written", "how it sounds"]`; add `{anywhere:true}` as a third item to replace it inside other words too.
 - **Abbreviations**: `e.g.` -> "for example", `i.e.` -> "that is", `etc.` -> "et cetera", `Dr.` -> "Doctor", `p.` -> "page" and so on.
   Dotted capitals not listed (`U.S.A.`, `N.B.`) are spelled out as letters ("U S A").
-- **Colons, semicolons, dashes** are never spoken. They become a short pause (a comma). A title that ends in a colon ends with a full stop.
-  Times and verses (`10:30`, `John 3:16`) are left to the voice; `5-10` is read "5 to 10".
+- **Colons, semicolons, dashes** are never spoken, in any form (`: ; - -- en/em/figure dashes`, full-width colon). They become a short pause (a comma).
+  A title that ends in a colon ends with a full stop. In `10:30` and `John 3:16` the colon is dropped ("10 30", "John 3 16");
+  `5-10`, `1914-1918` and `3:16-18` are read "5 to 10", "1914 to 1918", "3 16 to 18"; a hyphen inside a word (`well-known`, `COVID-19`) is silent ("well known").
+  A minus sign in front of a digit (`-5`) is left to the voice.
 - **Lists**: "apples, pears and oranges" -> "apples, pears, and oranges". Sentences that open with an introductory word or phrase
   ("However, he and she ...") are not treated as lists.
-- **Numbers at the start of a sentence** get a full stop after them ("16 For God ..." -> "16. For God ..."), except numbered books
-  (1 Peter, 2 Kings), dates (5 November) and a number followed by a lower-case word (2024 was ...).
+- **Numbers at the start of a sentence** (1 to 3 digits, `3:16`, `(1)`) are spoken on their own, followed by a real silent gap
+  (`gaps.number`, 800 ms, longer than the paragraph gap): "16" ... "For God so loved ...". Not touched: numbered books
+  (1 Peter, 2 Kings), dates (5 November), times and eras (10 a.m., 70 AD) and numbers of 4+ digits (2024 was ...).
 - **Superscripts** (footnote and verse numbers, as special characters or as small raised text in the PDF) are followed by a full stop.
   `m²` / `m³` are read "squared" / "cubed". `1st`, `2nd` written with raised letters stay ordinary.
 - **Ornamental symbols** (stars, diamonds, dingbats, emoji, `*`, dagger, `|` ...) are never described. At the start of a line they
@@ -47,6 +57,9 @@ Each rule has a short, commented list at the top of the file.
 
 The file is optional: if it is missing, the text is still spoken as tidied, and superscripts still get a full stop.
 
+**Always enforced.** Whatever happens (rules file missing, a rule throwing an error), the very last text handed to the voice goes through
+`enforce()` (in `readAloudRules.js`, with a smaller built-in copy in `readAloud.js`): MMICJ is spelled out and no colon, semicolon or dash is left in it.
+
 ## Limits
 - A page with no text layer (a scan, a picture) is skipped; three empty spreads in a row stop with a note.
   Scanned books need OCR first, on the admin side, so readers' devices are not burdened.
@@ -56,8 +69,8 @@ The file is optional: if it is missing, the text is still spoken as tidied, and 
 
 ## Files
 - `js/readAloud.js` (new): text tidying, speech loop, button, state.
-- `js/readAloudRules.js` (new): how things are said (see above). `readAloudRules.test.mjs`: `node readAloudRules.test.mjs`.
+- `js/readAloudRules.js` (new): how things are said (see above). `readAloudRules.test.mjs`: `node readAloudRules.test.mjs` (also covers the loop, the number gap, the safety net and the button setting).
 - `js/renderer.js`: `Renderer.pageText(n)` (page text from the open PDF).
 - `js/reader.js`: `emit()` now also dispatches `skyreader:<event>` DOM events (the single-slot `Reader.on` callbacks are unchanged).
-- `js/settingsPanel.js`, `css/style.css`, `css/reader.css`, `index.html`, `js/analytics.js`: button, settings rows, styling, usage count.
+- `js/settingsPanel.js` ("Show Listen button" checkbox), `css/style.css`, `css/reader.css`, `index.html`, `js/analytics.js`: button, settings rows, styling, usage count.
 - `readAloud.test.mjs`: `node readAloud.test.mjs`.
