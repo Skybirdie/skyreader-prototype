@@ -879,7 +879,7 @@ function diagBegin(){
     try{if(window.AudioController&&AudioController.isMuted)muted=!!AudioController.isMuted();}catch(e){}
     diag={
         t0:Date.now(),
-        mode:"panel",showBox:false,note:"",copied:0,sawBad:false,sawEnd:false,sig:"",ended:null,
+        mode:"panel",showBox:false,note:"",copied:0,ackBad:false,sig:"",ended:null,
         book:{id:String(b.id||""),title:String(b.title||"")},
         env:{
             time:new Date().toISOString(),
@@ -1021,8 +1021,9 @@ function diagReportText(){
 /* ---- the panel and the tab ----
    The panel is a sheet at the BOTTOM of the screen (the toolbar with the Listen button is at the top, and stays reachable).
    "Minimize" folds it into a small tab at the bottom left that shows the result and has its own Copy button, so a reader who
-   closed it before reading it still has a second chance. It also opens by itself, once each, when a problem is found and when
-   the reading ends. The last report is kept in this browser too: a tab for it appears the next time the speech test document
+   closed it before reading it still has a second chance. Nothing ever pops up over the page while someone is reading: when a
+   problem is found while the panel is minimized, the TAB turns reddish orange and glows until it is tapped, and tapping it
+   opens the panel. The last report is kept in this browser too: a tab for it appears the next time the speech test document
    is opened, even after the book was closed or the page reloaded. */
 const CHECK_KEY="mm-readaloud-check";
 let diagEl=null,chipEl=null;
@@ -1052,8 +1053,12 @@ function diagStyle(){
 ".sr-diag-box{width:100%;height:130px;margin-top:8px;font:12px/1.3 monospace}"+
 ".sr-diag-chip{position:fixed;left:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 10px);z-index:2000001;display:flex;align-items:stretch;border-radius:999px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,.35);font:600 13px/1.2 -apple-system,system-ui,Roboto,Arial,sans-serif}"+
 ".sr-diag-chip button{border:0;color:#fff;font:inherit;padding:9px 12px}"+
-".sr-diag-chip .sr-diag-main{background:#8a95a1;padding-left:14px}.sr-diag-chip.ok .sr-diag-main{background:#0f7a4a}.sr-diag-chip.bad .sr-diag-main{background:#c0392b}"+
-".sr-diag-chip .sr-diag-tabcopy{background:#1a1a1a;padding-right:14px}";
+".sr-diag-chip .sr-diag-main{background:#8a95a1;padding-left:14px}.sr-diag-chip.ok .sr-diag-main{background:#0f7a4a}.sr-diag-chip.bad .sr-diag-main{background:#d94418}"+
+".sr-diag-chip .sr-diag-tabcopy{background:#1a1a1a;padding-right:14px}"+
+/* a problem found while the tab is minimized: the tab glows (a slow pulse) until it is tapped; it never opens by itself */
+"@keyframes sr-diag-glow{0%{box-shadow:0 0 0 0 rgba(255,106,40,.8),0 4px 16px rgba(0,0,0,.35)}70%{box-shadow:0 0 0 14px rgba(255,106,40,0),0 4px 16px rgba(0,0,0,.35)}100%{box-shadow:0 0 0 0 rgba(255,106,40,0),0 4px 16px rgba(0,0,0,.35)}}"+
+".sr-diag-chip.alert{animation:sr-diag-glow 1.6s ease-out infinite}"+
+"@media (prefers-reduced-motion:reduce){.sr-diag-chip.alert{animation:none;box-shadow:0 0 0 4px rgba(255,120,50,.65),0 4px 16px rgba(0,0,0,.35)}}";
         (document.head||document.documentElement||document.body).appendChild(st);
     }catch(e){}
 }
@@ -1103,20 +1108,19 @@ function diagRender(){
     const V=diagView();
     if(!V){diagRemoveEls();return;}
     const st=V.state;
-    if(V.live){
-        /* second chances: a problem, and the end of the reading, each bring the panel back once */
-        if(V.st==="bad"&&!st.sawBad){st.sawBad=true;if(st.mode==="chip")st.mode="panel";}
-        if(st.ended&&!st.sawEnd){st.sawEnd=true;if(st.mode==="chip")st.mode="panel";}
-        diagSave(V);
-    }
+    if(V.live)diagSave(V);
+    /* a problem the reader has had in front of them (the panel was open while it was showing) is "seen" */
+    if(st.mode==="panel"&&V.st==="bad")st.ackBad=true;
     diagStyle();
     if(!diagEl)diagEl=diagMake("sr-diag","Speech check");
     if(!chipEl)chipEl=diagMake("sr-diag-chip","");
 
     const copied=st.copied&&Date.now()-st.copied<2500;
     if(st.mode==="chip"){
-        const label=V.live?(V.st==="ok"?"OK":V.st==="bad"?"PROBLEM":"checking..."):"last result: "+(V.st==="ok"?"OK":V.st==="bad"?"PROBLEM":"unknown");
-        chipEl.className="sr-diag-chip "+V.st;
+        const label=V.live?(V.st==="ok"?"OK":V.st==="bad"?"PROBLEM - tap to open":"checking..."):"last result: "+(V.st==="ok"?"OK":V.st==="bad"?"PROBLEM":"unknown");
+        /* reddish orange all the time while there is a problem; it also glows until the reader has looked at it */
+        const alert=V.live&&V.st==="bad"&&!st.ackBad;
+        chipEl.className="sr-diag-chip "+V.st+(alert?" alert":"");
         chipEl.innerHTML=
             '<button type="button" class="sr-diag-main" data-act="open">Speech check: '+escHtml(label)+'</button>'+
             '<button type="button" class="sr-diag-tabcopy" data-act="copy">'+(copied?"Copied":"Copy")+'</button>';
@@ -1137,7 +1141,7 @@ function diagRender(){
         }
         diagEl.innerHTML=
             '<div class="sr-diag-head"><b>'+(V.live?"Speech check":"Last speech check")+'</b><button type="button" class="sr-diag-x" data-act="minimize">Minimize</button></div>'+
-            '<div class="sr-diag-tip">If anything goes wrong, tap <b>Copy report</b> and send it to the admin. <b>Minimize</b> shrinks this box to a small tab at the bottom of the screen; the tab has its own Copy button, and this box opens again by itself when there is a problem and when the reading ends.</div>'+
+            '<div class="sr-diag-tip">If anything goes wrong, tap <b>Copy report</b> and send it to the admin. <b>Minimize</b> shrinks this box to a small tab at the bottom of the screen. The tab has its own Copy button, and it turns reddish orange and glows if a problem is found: tap it to open this box again.</div>'+
             '<button type="button" class="sr-diag-copy" data-act="copy">'+(copied?"Report copied":"Copy report")+'</button>'+
             (st.note?'<div class="sr-diag-note">'+escHtml(st.note)+'</div>':'')+
             body+

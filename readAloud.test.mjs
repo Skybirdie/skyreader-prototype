@@ -437,17 +437,28 @@ const P1=(...t)=>lines(t,{w:300});
   q.button.click();await until(()=>q.RA.state()==='idle'&&q.log.length>1);
   ok(!!q.panel(),'tapping Listen again shows the panel again');
 
-  /* closed too soon, then something goes wrong: the panel comes back by itself, once */
+  /* minimized, then something goes wrong: nothing opens over the page; the TAB turns reddish orange and glows */
   const r=makeEnv({bookId:DIAG,pages:[P1x('Text.'),P1x('Text.'),P1x('Text.')],single:true,textError:'Promise.withResolvers is not a function'});
   r.win.navigator={userAgent:'RetryPhone/3',language:'en-US',clipboard:{writeText:async t=>{copied=t}}};
   r.button.click();
   r.press(r.panel(),'minimize');
-  ok(!r.panel()&&!!r.chip(),'(minimized at the start, before anything happened)');
+  ok(!r.panel()&&!!r.chip()&&!/alert/.test(r.chip().className),'(minimized at the start: a calm tab, no alert)');
   await until(()=>r.RA.state()==='idle'&&/Couldn/.test(r.toastText()));
-  ok(!!r.panel()&&/PROBLEM/.test(r.panel().innerHTML)&&!r.chip(),'a problem opens the panel again by itself');
-  r.press(r.panel(),'minimize');
+  ok(!r.panel(),'a problem does NOT open the panel over the page the reader is reading');
+  ok(!!r.chip()&&/\bbad\b/.test(r.chip().className)&&/\balert\b/.test(r.chip().className)&&/PROBLEM - tap to open/.test(r.chip().innerHTML),'the minimized tab turns reddish orange (bad) and glows (alert) instead');
   r.press(r.chip(),'copy');await sleep(20);
-  ok(!!r.chip()&&!r.panel()&&/Copied/.test(r.chip().innerHTML),'after minimizing again it stays a tab (the same event does not pop it up twice)');
+  ok(/\balert\b/.test(r.chip().className)&&/Copied/.test(r.chip().innerHTML)&&/RetryPhone\/3/.test(copied),'copying from the tab works and does not clear the glow (the reader has not looked at the problem yet)');
+  r.press(r.chip(),'open');
+  ok(!!r.panel()&&!r.chip()&&/PROBLEM/.test(r.panel().innerHTML),'tapping the tab opens the panel with the problem');
+  r.press(r.panel(),'minimize');
+  ok(!!r.chip()&&/\bbad\b/.test(r.chip().className)&&!/\balert\b/.test(r.chip().className),'once it has been looked at, the tab stays reddish orange but stops glowing');
+
+  /* a problem that happens while the panel is open is already in front of the reader: no glow when it is minimized later */
+  const u2=makeEnv({bookId:DIAG,pages:[P1x('Text.'),P1x('Text.'),P1x('Text.')],single:true,textError:'boom'});
+  u2.button.click();await until(()=>u2.RA.state()==='idle'&&/Couldn/.test(u2.toastText()));
+  ok(!!u2.panel()&&/PROBLEM/.test(u2.panel().innerHTML),'(the panel was open while the problem happened, and it stays open)');
+  u2.press(u2.panel(),'minimize');
+  ok(/\bbad\b/.test(u2.chip().className)&&!/\balert\b/.test(u2.chip().className),'minimizing a problem that was already on screen: reddish orange, no glow');
 
   /* the tab's Copy button on a device with no clipboard access: the report opens in a box to copy by hand */
   const s2=makeEnv({bookId:DIAG,pages:[P1x('No clipboard.')],single:true});
@@ -457,12 +468,12 @@ const P1=(...t)=>lines(t,{w:300});
   s2.press(s2.chip(),'copy');await sleep(20);
   ok(!!s2.panel()&&!s2.chip()&&/<textarea[^>]*readonly>MMICJ speech check/.test(s2.panel().innerHTML)&&/Select All/.test(s2.panel().innerHTML),'the tab\'s Copy without clipboard access opens the panel with the report to select');
 
-  /* closed too soon, and the reading ends well: the panel comes back at the end */
+  /* minimized, and the reading ends well: the tab turns green, nothing pops up */
   const w=makeEnv({bookId:DIAG,pages:[P1x('One short page.')],single:true});
   w.button.click();
   w.press(w.panel(),'minimize');
   await until(()=>w.RA.state()==='idle'&&w.log.length>0);
-  ok(!!w.panel()&&/Reached the end of the document/.test(w.panel().innerHTML),'the end of the reading opens the panel again');
+  ok(!w.panel()&&!!w.chip()&&/\bok\b/.test(w.chip().className)&&!/\balert\b/.test(w.chip().className)&&/Speech check: OK/.test(w.chip().innerHTML),'the end of the reading does not open anything: the tab just shows OK (green, no glow)');
 
   /* the last report is kept, and comes back as a tab when the document is opened again */
   q.doc.dispatchEvent({type:'skyreader:closed'});
@@ -481,7 +492,7 @@ const P1=(...t)=>lines(t,{w:300});
   const z=makeEnv({bookId:DIAG,pages:[P1x('Text.'),P1x('Text.'),P1x('Text.')],single:true,textError:'boom'});
   z.button.click();await until(()=>z.RA.state()==='idle'&&/Couldn/.test(z.toastText()));
   z.doc.dispatchEvent({type:'skyreader:closed'});z.doc.dispatchEvent({type:'skyreader:bookOpened'});
-  ok(!!z.chip()&&/last result: PROBLEM/.test(z.chip().innerHTML),'a problem is the report that is kept ("last result: PROBLEM")');
+  ok(!!z.chip()&&/last result: PROBLEM/.test(z.chip().innerHTML)&&/\bbad\b/.test(z.chip().className)&&!/\balert\b/.test(z.chip().className),'a problem is the report that is kept ("last result: PROBLEM", reddish orange, no glow: it is an old result)');
 
   /* an ordinary document never gets the tab */
   const y=makeEnv({bookId:'ordinary',pages:[P1x('Plain.')],single:true});
