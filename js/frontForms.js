@@ -904,7 +904,13 @@
             b.type = "button";
             b.appendChild(svg(icon));
             b.appendChild(document.createTextNode(label));
-            b.addEventListener("click", function(){ closeMenu(false); openForm(key); });
+            if(!formOn(key)){
+                b.disabled = true;
+                b.classList.add("is-off");
+                b.setAttribute("aria-disabled", "true");
+                b.setAttribute("title", "Not available right now");
+            }
+            b.addEventListener("click", function(){ if(!formOn(key)) return; closeMenu(false); openForm(key); });
             return b;
         }
         m.appendChild(choice("Join", ICON.join, "join"));
@@ -934,7 +940,7 @@
         placeMenu();
         window.requestAnimationFrame(function(){ menu.classList.add("is-open"); });
         button.setAttribute("aria-expanded", "true");
-        var first = menu.querySelector("button");
+        var first = menu.querySelector("button:not(:disabled)");
         if(first) first.focus({ preventScroll: true });
     }
 
@@ -947,19 +953,22 @@
     }
 
     function openForm(key){
+        if(!formOn(key)) return;
         if(!shell) shell = buildShell();
         if(!forms[key]) forms[key] = key === "join" ? createJoin() : createTestify();
         shell.show(forms[key]);
     }
 
-    /* The backend switch: the Worker variable JOIN_BUTTON_ENABLED reaches the page as window.__MMICJ_JOIN_ENABLED.
-       Only an explicit false switches the button off (not set, or any other value, means on). While off the button
-       stays where it is, dimmed, and cannot be tapped. */
-    function joinEnabled(){ return window.__MMICJ_JOIN_ENABLED !== false; }
+    /* The backend switches: the Worker variables JOIN_BUTTON_ENABLED and TESTIFY_BUTTON_ENABLED reach the page as
+       window.__MMICJ_JOIN_ENABLED and window.__MMICJ_TESTIFY_ENABLED. Only an explicit false switches a form off (not set,
+       or any other value, means on). An off form stays in the menu, dimmed and not tappable. The small button itself is
+       dimmed only when BOTH are off. */
+    function formOn(key){ return (key === "testify" ? window.__MMICJ_TESTIFY_ENABLED : window.__MMICJ_JOIN_ENABLED) !== false; }
+    function anyFormOn(){ return formOn("join") || formOn("testify"); }
 
     function applyEnabled(){
         if(!button) return;
-        var on = joinEnabled();
+        var on = anyFormOn();
         button.disabled = !on;
         button.classList.toggle("is-off", !on);
         if(on){
@@ -984,7 +993,7 @@
         applyEnabled();
 
         button.addEventListener("click", function(){
-            if(!joinEnabled()) return;
+            if(!anyFormOn()) return;
             if(shell && shell.root.classList.contains("is-open")) return;
             (menu && !menu.hidden) ? closeMenu(false) : openMenu();
         });
@@ -1005,5 +1014,5 @@
     else init();
 
     /* a handle for tests / support (does not open anything by itself) */
-    window.FrontForms = { open: function(k){ if(host && joinEnabled()) openForm(k === "testify" ? "testify" : "join"); } };
+    window.FrontForms = { open: function(k){ if(host) openForm(k === "testify" ? "testify" : "join"); } };
 })();

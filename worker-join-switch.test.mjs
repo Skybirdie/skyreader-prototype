@@ -1,5 +1,5 @@
 /*
- * Join button switch tests (Worker side).
+ * Join / Testify switch tests (Worker side).
  *   cp worker.js worker.mjs && node worker-join-switch.test.mjs
  */
 import worker from "./worker.mjs";
@@ -40,13 +40,20 @@ const check = (name, cond) => { console.log((cond ? "PASS" : "FAIL") + "  " + na
 {
   const w = await fresh();
   let html = await (await get(w, makeEnv(), "/")).text();
-  check("variable not set: the page says the Join button is ON", html.includes("window.__MMICJ_JOIN_ENABLED = true;"));
+  check("variables not set: the page says Join is ON", html.includes("window.__MMICJ_JOIN_ENABLED = true;"));
+  check("variables not set: the page says Testify is ON", html.includes("window.__MMICJ_TESTIFY_ENABLED = true;"));
   check("the Share Mode flag is still the first thing in <head>", /<head[^>]*><script>window\.__SKY_SHARE_MODE_ENABLED/.test(html));
   html = await (await get(w, makeEnv({ JOIN_BUTTON_ENABLED: "false" }), "/")).text();
-  check("variable false: the page says the Join button is OFF", html.includes("window.__MMICJ_JOIN_ENABLED = false;"));
+  check("JOIN_BUTTON_ENABLED false: Join is OFF", html.includes("window.__MMICJ_JOIN_ENABLED = false;"));
+  check("JOIN_BUTTON_ENABLED false: Testify stays ON", html.includes("window.__MMICJ_TESTIFY_ENABLED = true;"));
+  html = await (await get(w, makeEnv({ TESTIFY_BUTTON_ENABLED: "false" }), "/")).text();
+  check("TESTIFY_BUTTON_ENABLED false: Testify is OFF and Join stays ON", html.includes("window.__MMICJ_TESTIFY_ENABLED = false;") && html.includes("window.__MMICJ_JOIN_ENABLED = true;"));
+  html = await (await get(w, makeEnv({ JOIN_BUTTON_ENABLED: "off", TESTIFY_BUTTON_ENABLED: "off" }), "/")).text();
+  check("both variables off: both OFF", html.includes("window.__MMICJ_JOIN_ENABLED = false;") && html.includes("window.__MMICJ_TESTIFY_ENABLED = false;"));
+  html = await (await get(w, makeEnv({ JOIN_BUTTON_ENABLED: "false" }), "/")).text();
   check("the OFF page still has the Share Mode flag", html.includes("window.__SKY_SHARE_MODE_ENABLED = "));
   html = await (await get(w, makeEnv({ JOIN_BUTTON_ENABLED: "false" }), "/?view=video&item=video%2Fx")).text();
-  check("state links carry the switch too", html.includes("window.__MMICJ_JOIN_ENABLED = false;"));
+  check("state links carry the switches too", html.includes("window.__MMICJ_JOIN_ENABLED = false;") && html.includes("window.__MMICJ_TESTIFY_ENABLED = true;"));
 }
 
 for (const [v, expect] of [["false", false], ["FALSE", false], ["0", false], ["off", false], ["no", false], [" Off ", false],
@@ -54,6 +61,8 @@ for (const [v, expect] of [["false", false], ["FALSE", false], ["0", false], ["o
   const w = await fresh();
   const html = await (await get(w, makeEnv({ JOIN_BUTTON_ENABLED: v }), "/")).text();
   check("JOIN_BUTTON_ENABLED=" + JSON.stringify(v) + " -> " + (expect ? "ON" : "OFF"), html.includes("__MMICJ_JOIN_ENABLED = " + expect + ";"));
+  const h2 = await (await get(w, makeEnv({ TESTIFY_BUTTON_ENABLED: v }), "/")).text();
+  check("TESTIFY_BUTTON_ENABLED=" + JSON.stringify(v) + " -> " + (expect ? "ON" : "OFF"), h2.includes("__MMICJ_TESTIFY_ENABLED = " + expect + ";"));
 }
 
 console.log(failures ? "\n" + failures + " FAILED" : "\nall ok");

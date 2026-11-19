@@ -5938,42 +5938,49 @@ function isShareModeEnabled(
 }
 
 /* =========================================================
-   JOIN BUTTON SWITCH  (front page, js/frontForms.js)
+   FRONT PAGE FORM SWITCHES  (js/frontForms.js)
 
-   Variable  JOIN_BUTTON_ENABLED  (Cloudflare dashboard -> this
-   Worker -> Settings -> Variables and Secrets, next to
-   SHARE_MODE_ENABLED / MAINTENANCE):
+   The small button next to Share opens a menu with Join and
+   Testify. Each one has its own switch, a plain variable
+   (Cloudflare dashboard -> this Worker -> Settings -> Variables
+   and Secrets, next to SHARE_MODE_ENABLED / MAINTENANCE):
 
-     "true"  (or not set)  the button works as usual
+     JOIN_BUTTON_ENABLED      the Join row of the menu
+     TESTIFY_BUTTON_ENABLED   the Testify row of the menu
+
+     "true"  (or not set)  that row works as usual
      "false" / "0" / "off" / "no"
-                           the button stays on the front page
-                           but is dimmed and cannot be tapped
+                           that row stays in the menu but is
+                           dimmed and cannot be tapped
+
+   When BOTH are off, the small button itself is dimmed too.
 
    No deploy is needed: edit the variable and the next page load
    follows it. Because "keep_vars" is on in wrangler.jsonc, a value
-   set in the dashboard survives later deploys. (Do not also put it
-   in "vars" there: a value in that file would overwrite the
+   set in the dashboard survives later deploys. (Do not also put
+   them in "vars" there: a value in that file would overwrite the
    dashboard value on every deploy.)
 
-   The page is told through window.__MMICJ_JOIN_ENABLED, written
-   into <head> by serveBasePage() below. Anything other than an
-   explicit "off" value means ON, so a typo can never lock the
-   button by accident.
+   The page is told through window.__MMICJ_JOIN_ENABLED and
+   window.__MMICJ_TESTIFY_ENABLED, written into <head> by
+   serveBasePage() below. Anything other than an explicit "off"
+   value means ON, so a typo can never lock a form by accident.
 
-   This only dims and disables the button in the app. The intake
-   Worker (mmicj-intake) is a separate Worker and is not changed
-   by this switch.
+   These switches only dim and disable the controls in the app.
+   The intake Worker (mmicj-intake) is a separate Worker and is
+   not changed by them.
 ========================================================= */
 
-function isJoinButtonEnabled(
-  env
+function isSwitchOn(
+  env,
+  name
 ) {
   const raw =
     env &&
-    env.JOIN_BUTTON_ENABLED !== undefined &&
-    env.JOIN_BUTTON_ENABLED !== null
+    env[name] !== undefined &&
+    env[name] !== null
       ? String(
-          env.JOIN_BUTTON_ENABLED
+          env[name]
         )
           .trim()
           .toLowerCase()
@@ -5986,6 +5993,24 @@ function isJoinButtonEnabled(
     "no"
   ].includes(
     raw
+  );
+}
+
+function isJoinButtonEnabled(
+  env
+) {
+  return isSwitchOn(
+    env,
+    "JOIN_BUTTON_ENABLED"
+  );
+}
+
+function isTestifyButtonEnabled(
+  env
+) {
+  return isSwitchOn(
+    env,
+    "TESTIFY_BUTTON_ENABLED"
   );
 }
 
@@ -6596,12 +6621,20 @@ async function serveBasePage(
                 }
               );
 
-              /* Join button switch (see JOIN_BUTTON_ENABLED above).
-                 After the share-mode flag, which must stay first. */
+              /* Join / Testify switches (see FRONT PAGE FORM SWITCHES
+                 above). After the share-mode flag, which must stay first. */
               element.append(
                 "<script>window.__MMICJ_JOIN_ENABLED = " +
                   (
                     isJoinButtonEnabled(
+                      env
+                    )
+                      ? "true"
+                      : "false"
+                  ) +
+                  ";window.__MMICJ_TESTIFY_ENABLED = " +
+                  (
+                    isTestifyButtonEnabled(
                       env
                     )
                       ? "true"
