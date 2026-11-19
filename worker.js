@@ -40,6 +40,120 @@ const OG_IMAGE_PATH =
   "/__sky_og_image";
 
 /* =========================================================
+   BASE URL PREVIEW  ( https://<this worker>/ )
+
+   The base URL's link card uses the thumbnail of the item that
+   is currently the Front Page centerpiece (see resolveDoors() in
+   js/frontPage.js), badged with the logo exactly like the
+   per-item /s/<section>/<id> cards.
+
+   When there is no usable centerpiece item (no snapshot yet,
+   nothing visible, no absolute thumbnail, or the thumbnail cannot
+   be loaded) the card uses assets/base-logo.jpg instead.
+
+   That applies to the bare base URL only. A state link
+   (/?view=<section>&item=<section>/<id>, kept in the browser's
+   address bar by js/browserAddress.js) gets the open item's own
+   card instead; see BASE_STATE_VIEWS below.
+========================================================= */
+
+const BASE_LOGO_PATH =
+  "/assets/base-logo.jpg";
+
+/*
+ * The plain base address (the front page: #frontShareButton, and the
+ * browser's own share while the front page is showing) is previewed with
+ * the square poster, assets/mmicj-poster.png.
+ *
+ * Section and item links (/?view=...&item=...) are unaffected: they keep
+ * the open item's own card, else assets/base-logo.jpg.
+ *
+ * To use the logo for the front page instead, point
+ * FRONT_PREVIEW_IMAGE_PATH at BASE_LOGO_PATH (and the size at
+ * BASE_LOGO_SIZE). The poster file must be deployed with the app
+ * (assets/mmicj-poster.png); worker-state-preview.test.mjs checks it
+ * exists.
+ */
+const FRONT_PREVIEW_IMAGE_PATH =
+  "/assets/mmicj-poster.png";
+
+/* Pixel size of the poster (square); only used for the
+   og:image:width / og:image:height hints. */
+const FRONT_PREVIEW_IMAGE_SIZE =
+  720;
+
+/* false  the poster above (current choice; also costs no KV read)
+   true   the Front Page centerpiece's thumbnail, with the poster only as
+          its fallback (the original behaviour) */
+const FRONT_PREVIEW_USES_CENTERPIECE =
+  false;
+
+/* Pixel size of assets/base-logo.jpg (it is square). Only used for
+   the og:image:width / og:image:height hints. */
+const BASE_LOGO_SIZE =
+  1500;
+
+const BASE_PREVIEW_TITLE =
+  "Meditation Mornings in Christ Jesus";
+
+/* Item release dates (YYYYMMDDHHmm) are compared against "now" in
+   this time zone, because the browser compares them against the
+   viewer's local clock. Change it if releases are scheduled in
+   another zone. */
+const BASE_PREVIEW_TIMEZONE =
+  "America/Port_of_Spain";
+
+/* Same seven-category fallback as DEFAULT_CATEGORIES in
+   js/frontPage.js. A frontPage.categories list of exactly seven
+   values inside the catalog snapshot overrides it, as in the app. */
+const BASE_PREVIEW_CATEGORIES = [
+  "Book Club",
+  "Affirmations",
+  "Feed My Sheep",
+  "BYOB",
+  "Sayings",
+  "Meditation",
+  "Testimonies"
+];
+
+/* The chosen centerpiece is remembered per isolate for this long,
+   so a burst of visits / crawlers costs no extra KV reads. */
+const BASE_PREVIEW_MEMORY_TTL_MS =
+  60000;
+
+/* =========================================================
+   COMPOSED OG IMAGE STORE (KV)
+
+   The Images binding bills every compose, and workers.dev has no
+   edge cache for Worker-made responses, so each finished preview
+   image is kept in KV and served from there afterwards.
+
+   The key is derived from the thumbnail URL (plus the logo and a
+   format version), so a changed thumbnail finds no stored copy and
+   is composed again, while an unchanged one costs a KV read only.
+   Applies to item links and the base link alike.
+
+   - Bump OG_CACHE_VERSION to force every preview to be rebuilt
+     (e.g. after changing the logo badge position or size).
+   - Copies expire after OG_CACHE_TTL_SECONDS, which also clears
+     out the copies of thumbnails that were replaced.
+   - A thumbnail replaced IN PLACE (same URL, new picture) is not
+     noticed until that expiry or a version bump.
+========================================================= */
+
+const OG_CACHE_PREFIX =
+  "og:v1:";
+
+const OG_CACHE_VERSION =
+  "1";
+
+const OG_CACHE_TTL_SECONDS =
+  60 * 60 * 24 * 30;
+
+const OG_CACHE_CONTROL =
+  "public, max-age=86400, stale-while-revalidate=604800";
+
+/* =========================================================
    PDF RANGE PROXY
 
    Book PDFs are hosted on the Glide GCS bucket — a different
@@ -65,62 +179,26 @@ const PDF_PROXY_PATH =
   "/__sky_pdf_proxy";
 
 /* Only ever proxy to hosts we expect book PDFs to live on. This
-   is not an open relay for arbitrary URLs.
+   is not an open relay for arbitrary URLs. */
+const PDF_PROXY_ALLOWED_HOSTS =
+  new Set([
+    "storage.googleapis.com"
+  ]);
 
-   Hosts: set the plain variable PDF_PROXY_ALLOWED_HOSTS to a
-   comma-separated list of host names (a leading "*." allows any
-   sub-domain, e.g. "*.r2.dev"). Unset, the default is Glide's bucket
-   host, so existing deployments behave exactly as before. */
-const PDF_PROXY_DEFAULT_HOSTS = [
-  "storage.googleapis.com"
-];
-
-function pdfProxyHostAllowed(
-  env,
-  hostname
-) {
-  const configured =
-    String(
-      env?.PDF_PROXY_ALLOWED_HOSTS || ""
-    )
-      .split(",")
-      .map(value => value.trim().toLowerCase())
-      .filter(Boolean);
-
-  const hosts =
-    configured.length
-      ? configured
-      : PDF_PROXY_DEFAULT_HOSTS;
-
-  const host =
-    String(hostname || "").toLowerCase();
-
-  return hosts.some(
-    entry =>
-      entry.startsWith("*.")
-        ? host.endsWith(entry.slice(1))
-        : host === entry
-  );
-}
-
-/* Path prefixes. storage.googleapis.com is a shared host, so an
-   un-configured proxy only relays this Glide app's own uploads there
-   (otherwise it would relay anybody's files and spend THIS Worker's
-   request quota). To change or widen it without a redeploy, set the
+/* Narrower than the host check: only this Glide app's own uploads may
+   be proxied, so the route cannot be used as a relay for anybody
+   else's files on storage.googleapis.com (that would spend THIS
+   Worker's request quota). To change it without a redeploy, set the
    plain variable PDF_PROXY_ALLOWED_PREFIXES to a comma-separated list
-   of path prefixes, each starting with "/"; when set it applies to every
-   allowed host. Hosts you added yourself via PDF_PROXY_ALLOWED_HOSTS
-   (your own bucket) need no prefix unless you set one. The check runs
-   on the parsed URL, so "../" and "%2e%2e" tricks are already
-   normalised. */
+   of path prefixes, each starting with "/". The check runs on the
+   parsed URL, so "../" and "%2e%2e" tricks are already normalised. */
 const PDF_PROXY_DEFAULT_PATH_PREFIXES = [
   "/glide-prod.appspot.com/uploads-v2/mKxnsa8ky8uPGbBKpTyv/"
 ];
 
 function pdfProxyPathAllowed(
   env,
-  pathname,
-  hostname
+  pathname
 ) {
   const configured =
     String(
@@ -130,24 +208,15 @@ function pdfProxyPathAllowed(
       .map(value => value.trim())
       .filter(value => value.startsWith("/"));
 
-  if (configured.length) {
-    return configured.some(
-      prefix =>
-        pathname.startsWith(prefix)
-    );
-  }
+  const prefixes =
+    configured.length
+      ? configured
+      : PDF_PROXY_DEFAULT_PATH_PREFIXES;
 
-  if (
-    String(hostname || "").toLowerCase() ===
-    "storage.googleapis.com"
-  ) {
-    return PDF_PROXY_DEFAULT_PATH_PREFIXES.some(
-      prefix =>
-        pathname.startsWith(prefix)
-    );
-  }
-
-  return true;
+  return prefixes.some(
+    prefix =>
+      pathname.startsWith(prefix)
+  );
 }
 
 /* Bumped once, deliberately: an earlier version of this proxy could
@@ -1923,6 +1992,7 @@ function injectContractBootstrap(
 ) {
   const item =
     manifest?.content?.[0] ||
+    imageQuery?.previewItem ||
     null;
 
   const section =
@@ -1935,12 +2005,37 @@ function injectContractBootstrap(
       item?.id || ""
     ).trim();
 
+  /* No manifest = target-only share: the app loads its normal data
+     and resolves the item itself, so no contract is injected. */
+  const contractLine =
+    manifest
+      ? "window.SkyMediaContract = " +
+        JSON.stringify(
+          manifest
+        ) +
+        ";"
+      : "";
+
+  const switchLine =
+    typeof imageQuery?.shareModeEnabled ===
+    "boolean"
+      ? "window.__SKY_SHARE_MODE_ENABLED = " +
+        (
+          imageQuery.shareModeEnabled
+            ? "true"
+            : "false"
+        ) +
+        ";"
+      : "";
+
   const script = `
 <script>
 (function () {
   "use strict";
 
-  window.SkyMediaContract = ${JSON.stringify(manifest)};
+  ${contractLine}
+
+  ${switchLine}
 
   window.__SKY_SHARE_MODE = true;
 
@@ -2161,7 +2256,12 @@ async function serveWithContract(
           manifest.content[0].id
       },
       {
-        key
+        key,
+
+        shareModeEnabled:
+          isShareModeEnabled(
+            env
+          )
       }
     ),
     {
@@ -2178,6 +2278,48 @@ async function serveWithContract(
    SERVE DIRECT SHARE
 ========================================================= */
 
+/* /s/<section>/<id>  ->  /?view=<section>&item=<section>/<id>
+   (the format js/browserAddress.js writes and js/appSwitcher.js opens).
+   Used when the Share Mode switch is off. */
+function redirectToAppItem(
+  request,
+  target
+) {
+  const destination =
+    new URL(
+      "/",
+      request.url
+    );
+
+  destination.searchParams.set(
+    "view",
+    target.section
+  );
+
+  destination.searchParams.set(
+    "item",
+    target.section +
+      "/" +
+      target.id
+  );
+
+  return new Response(
+    null,
+    {
+      status:
+        302,
+
+      headers: {
+        Location:
+          destination.toString(),
+
+        "Cache-Control":
+          "no-store"
+      }
+    }
+  );
+}
+
 async function serveDirectShare(
   request,
   env,
@@ -2189,17 +2331,25 @@ async function serveDirectShare(
       target
     );
 
-  if (!record) {
-    return new Response(
-      "MMicjMedia shared item was not found.",
-      {
-        status:
-          404,
+  /*
+   * No KV record. An item that exists only in the R2 published catalog
+   * is still shareable: the page is served with just the share target
+   * (no one-item contract), and Share Mode resolves the item from the
+   * normal app data, exactly like a direct-ID share. Anything unknown
+   * (or not released yet) gets the "unavailable" page.
+   */
+  const publishedItem =
+    record
+      ? null
+      : await getPublishedCatalogItem(
+          target
+        );
 
-        headers:
-          textHeaders()
-      }
-    );
+  if (
+    !record &&
+    !publishedItem
+  ) {
+    return friendlyResponse("unavailable", request, "MMicjMedia shared item was not found.");
   }
 
   const html =
@@ -2218,11 +2368,21 @@ async function serveDirectShare(
   const modified =
     injectContractBootstrap(
       html,
-      record.manifest,
+      record
+        ? record.manifest
+        : null,
       request,
       target,
       {
-        target
+        target,
+
+        previewItem:
+          publishedItem,
+
+        shareModeEnabled:
+          isShareModeEnabled(
+            env
+          )
       }
     );
 
@@ -2277,7 +2437,12 @@ async function serveCatalogShare(
       request,
       target,
       {
-        target
+        target,
+
+        shareModeEnabled:
+          isShareModeEnabled(
+            env
+          )
       }
     );
 
@@ -2297,9 +2462,125 @@ async function serveCatalogShare(
    OG IMAGE
 ========================================================= */
 
+async function ogCacheKey(
+  thumbnailUrl
+) {
+  return (
+    OG_CACHE_PREFIX +
+    (
+      await sha256Hex(
+        OG_CACHE_VERSION +
+        "\n" +
+        thumbnailUrl +
+        "\n" +
+        OG_LOGO
+      )
+    ).slice(
+      0,
+      40
+    )
+  );
+}
+
+/* A previously composed image, as a Response, or null. Never throws. */
+async function readStoredOgImage(
+  env,
+  cacheKey
+) {
+  try {
+    const bytes =
+      await env.MEDIA_KV.get(
+        cacheKey,
+        {
+          type:
+            "arrayBuffer",
+
+          /* The key changes whenever the picture should, so the
+             stored bytes never go stale. */
+          cacheTtl:
+            3600
+        }
+      );
+
+    if (
+      !bytes ||
+      !bytes.byteLength
+    ) {
+      return null;
+    }
+
+    return new Response(
+      bytes,
+      {
+        status:
+          200,
+
+        headers: {
+          "Content-Type":
+            "image/webp",
+
+          "Cache-Control":
+            OG_CACHE_CONTROL
+        }
+      }
+    );
+  } catch (error) {
+    logLimited(
+      "warn",
+      "og-store-read",
+      "MMicjMedia stored OG image read failed; composing instead:",
+      error
+    );
+
+    return null;
+  }
+}
+
+/* Saves a composed image. Never throws, never delays the response
+   when waitUntil is available. */
+function storeOgImage(
+  env,
+  ctx,
+  cacheKey,
+  bytes
+) {
+  const write =
+    env.MEDIA_KV.put(
+      cacheKey,
+      bytes,
+      {
+        expirationTtl:
+          OG_CACHE_TTL_SECONDS
+      }
+    ).catch(
+      error =>
+        logLimited(
+          "warn",
+          "og-store-write",
+          "MMicjMedia OG image could not be stored:",
+          error
+        )
+    );
+
+  if (
+    ctx &&
+    typeof ctx.waitUntil ===
+      "function"
+  ) {
+    ctx.waitUntil(
+      write
+    );
+
+    return undefined;
+  }
+
+  return write;
+}
+
 async function serveOgImage(
   request,
-  env
+  env,
+  ctx
 ) {
   if (!env.IMAGES) {
     return new Response(
@@ -2465,7 +2746,19 @@ async function serveOgImage(
         );
     }
 
-    if (!record) {
+    /* Not in KV: an item that exists only in the R2 published
+       catalog still gets its own card image. */
+    const publishedItem =
+      record
+        ? null
+        : await getPublishedCatalogItem(
+            target
+          );
+
+    if (
+      !record &&
+      !publishedItem
+    ) {
       return new Response(
         "MMicjMedia shared item was not found.",
         {
@@ -2479,7 +2772,9 @@ async function serveOgImage(
     }
 
     item =
-      record.item;
+      record
+        ? record.item
+        : publishedItem;
   }
 
   if (!item) {
@@ -2505,6 +2800,21 @@ async function serveOgImage(
       OG_DEFAULT_THUMBNAIL;
   }
 
+  const cacheKey =
+    await ogCacheKey(
+      thumbnailUrl
+    );
+
+  const stored =
+    await readStoredOgImage(
+      env,
+      cacheKey
+    );
+
+  if (stored) {
+    return stored;
+  }
+
   const OG_SOURCE_FETCH = {
     cf: {
       cacheTtl:
@@ -2514,6 +2824,9 @@ async function serveOgImage(
         true
     }
   };
+
+  let usedFallbackThumbnail =
+    false;
 
   let baseResponse =
     await fetch(
@@ -2529,6 +2842,9 @@ async function serveOgImage(
       thumbnailUrl !==
       OG_DEFAULT_THUMBNAIL
     ) {
+      usedFallbackThumbnail =
+        true;
+
       baseResponse =
         await fetch(
           OG_DEFAULT_THUMBNAIL,
@@ -2588,11 +2904,54 @@ async function serveOgImage(
     thumbnailUrl;
 
   try {
-    return await composeOgImage(
-      env,
-      baseResponse,
-      logoResponse
-    );
+    const composed =
+      await composeOgImage(
+        env,
+        baseResponse,
+        logoResponse
+      );
+
+    /* Keep it for next time, but never pin the stand-in picture
+       used when the real thumbnail could not be loaded: it would
+       outlive the outage. */
+    if (
+      composed.ok &&
+      !usedFallbackThumbnail
+    ) {
+      try {
+        const bytes =
+          await composed
+            .clone()
+            .arrayBuffer();
+
+        if (
+          bytes.byteLength
+        ) {
+          const pending =
+            storeOgImage(
+              env,
+              ctx,
+              cacheKey,
+              bytes
+            );
+
+          if (
+            pending
+          ) {
+            await pending;
+          }
+        }
+      } catch (error) {
+        logLimited(
+          "warn",
+          "og-store",
+          "MMicjMedia OG image store step failed:",
+          error
+        );
+      }
+    }
+
+    return composed;
   } catch (error) {
     logLimited(
       "warn",
@@ -2715,7 +3074,7 @@ async function composeOgImage(
     {
       headers: {
         "Cache-Control":
-          "public, max-age=86400, stale-while-revalidate=604800"
+          OG_CACHE_CONTROL
       }
     }
   );
@@ -2763,8 +3122,7 @@ async function handlePdfProxy(
 
   if (
     target.protocol !== "https:" ||
-    !pdfProxyHostAllowed(
-      env,
+    !PDF_PROXY_ALLOWED_HOSTS.has(
       target.hostname
     )
   ) {
@@ -2777,8 +3135,7 @@ async function handlePdfProxy(
   if (
     !pdfProxyPathAllowed(
       env,
-      target.pathname,
-      target.hostname
+      target.pathname
     )
   ) {
     return new Response(
@@ -3387,6 +3744,27 @@ async function handleDirectShare(
     return null;
   }
 
+  trackShareOpen(
+    request,
+    env,
+    target
+  );
+
+  /*
+   * Share Mode switched off: every /s/<section>/<id> link goes to the
+   * main app instead (no KV read at all).
+   */
+  if (
+    !isShareModeEnabled(
+      env
+    )
+  ) {
+    return redirectToAppItem(
+      request,
+      target
+    );
+  }
+
   /*
    * Catalog takes priority.
    *
@@ -3495,16 +3873,7 @@ async function handleShortShare(
   }
 
   if (!payload) {
-    return new Response(
-      "MMicjMedia publication not found.",
-      {
-        status:
-          404,
-
-        headers:
-          textHeaders()
-      }
-    );
+    return friendlyResponse("unavailable", request, "MMicjMedia publication not found.");
   }
 
   if (
@@ -5034,10 +5403,1558 @@ if (storedCount > 0) {
 }
 
 /* =========================================================
+   BASE URL PREVIEW (handlers)
+========================================================= */
+
+let basePreviewMemo =
+  null;
+
+/* The parsed catalog snapshot, kept for as long as the snapshot text
+   is unchanged, so looking up the item a state link points at does
+   not re-parse the whole catalog on every request. */
+let baseParsedMemo =
+  null;
+
+/* "now" as YYYYMMDDHHmm in BASE_PREVIEW_TIMEZONE. */
+function baseNowKey(
+  date = new Date()
+) {
+  const parts =
+    new Intl.DateTimeFormat(
+      "en-CA",
+      {
+        timeZone:
+          BASE_PREVIEW_TIMEZONE,
+
+        year:
+          "numeric",
+
+        month:
+          "2-digit",
+
+        day:
+          "2-digit",
+
+        hour:
+          "2-digit",
+
+        minute:
+          "2-digit",
+
+        hourCycle:
+          "h23"
+      }
+    ).formatToParts(
+      date
+    );
+
+  const p = {};
+
+  for (
+    const part of
+    parts
+  ) {
+    p[part.type] =
+      part.value;
+  }
+
+  return (
+    p.year +
+    p.month +
+    p.day +
+    p.hour +
+    p.minute
+  );
+}
+
+/* Same rules as SkyDate.key() / SkyDate.validKey() in
+   js/dateVisibility.js. Returns "" for a missing or invalid date. */
+function baseDateKey(
+  value
+) {
+  let d =
+    String(
+      value ?? ""
+    )
+      .trim()
+      .replace(
+        /[^0-9]/g,
+        ""
+      );
+
+  if (
+    /^\d{8}$/.test(
+      d
+    )
+  ) {
+    d += "0000";
+  }
+
+  if (
+    !/^\d{12}$/.test(
+      d
+    )
+  ) {
+    return "";
+  }
+
+  const y =
+    Number(d.slice(0, 4));
+
+  const mo =
+    Number(d.slice(4, 6));
+
+  const day =
+    Number(d.slice(6, 8));
+
+  const h =
+    Number(d.slice(8, 10));
+
+  const mi =
+    Number(d.slice(10, 12));
+
+  if (
+    mo < 1 ||
+    mo > 12 ||
+    day < 1 ||
+    h > 23 ||
+    mi > 59
+  ) {
+    return "";
+  }
+
+  const daysInMonth =
+    new Date(
+      Date.UTC(
+        y,
+        mo,
+        0
+      )
+    ).getUTCDate();
+
+  return day > daysInMonth
+    ? ""
+    : d;
+}
+
+/*
+ * Mirrors resolveDoors() in js/frontPage.js: the newest visible item
+ * of each of the seven categories, and of those seven the newest one
+ * is the centerpiece. Ties go to the earlier item, as in the app.
+ */
+function pickBaseCenterpiece(
+  snapshot,
+  nowKey
+) {
+  const items =
+    Array.isArray(
+      snapshot?.content
+    )
+      ? snapshot.content
+      : [];
+
+  const configured =
+    Array.isArray(
+      snapshot?.frontPage?.categories
+    )
+      ? snapshot.frontPage.categories
+          .map(
+            value =>
+              cleanString(
+                value
+              )
+          )
+          .filter(
+            Boolean
+          )
+      : [];
+
+  const categories =
+    configured.length === 7
+      ? configured
+      : BASE_PREVIEW_CATEGORIES;
+
+  const visible =
+    [];
+
+  for (
+    const item of
+    items
+  ) {
+    const category =
+      cleanString(
+        item?.category
+      ).toLowerCase();
+
+    const date =
+      baseDateKey(
+        item?.date
+      );
+
+    if (
+      !category ||
+      !date ||
+      date > nowKey
+    ) {
+      continue;
+    }
+
+    visible.push({
+      item,
+      category,
+      date
+    });
+  }
+
+  let best =
+    null;
+
+  for (
+    const name of
+    categories
+  ) {
+    const wanted =
+      name.toLowerCase();
+
+    let categoryBest =
+      null;
+
+    for (
+      const entry of
+      visible
+    ) {
+      if (
+        entry.category ===
+          wanted &&
+        (
+          !categoryBest ||
+          entry.date >
+            categoryBest.date
+        )
+      ) {
+        categoryBest =
+          entry;
+      }
+    }
+
+    if (
+      categoryBest &&
+      (
+        !best ||
+        categoryBest.date >
+          best.date
+      )
+    ) {
+      best =
+        categoryBest;
+    }
+  }
+
+  return best
+    ? best.item
+    : null;
+}
+
+/* The catalog snapshot text, through the same per-isolate memory the
+   /__sky_catalog route uses (so the two share one KV read a minute). */
+async function getCatalogSnapshotText(
+  env
+) {
+  const now =
+    Date.now();
+
+  if (
+    catalogSnapshotMemo &&
+    now -
+      catalogSnapshotMemo.at <
+      CATALOG_SNAPSHOT_MEMORY_TTL_MS
+  ) {
+    return catalogSnapshotMemo.value;
+  }
+
+  try {
+    const stored =
+      await env.MEDIA_KV.getWithMetadata(
+        CATALOG_SNAPSHOT_KEY
+      );
+
+    if (
+      !stored ||
+      stored.value === null
+    ) {
+      return catalogSnapshotMemo
+        ? catalogSnapshotMemo.value
+        : null;
+    }
+
+    const hash =
+      stored.metadata?.hash
+        ? String(
+            stored.metadata.hash
+          )
+        : await sha256Hex(
+            stored.value
+          );
+
+    catalogSnapshotMemo = {
+      value:
+        stored.value,
+
+      etag:
+        '"' +
+        hash.slice(
+          0,
+          32
+        ) +
+        '"',
+
+      at:
+        now
+    };
+
+    return stored.value;
+  } catch (error) {
+    logLimited(
+      "error",
+      "base-preview-snapshot-kv",
+      "MMicjMedia base preview snapshot KV read failure:",
+      error
+    );
+
+    return catalogSnapshotMemo
+      ? catalogSnapshotMemo.value
+      : null;
+  }
+}
+
+/* The current Front Page centerpiece item, or null. Never throws. */
+async function getBaseCenterpiece(
+  env
+) {
+  const now =
+    Date.now();
+
+  if (
+    basePreviewMemo &&
+    now -
+      basePreviewMemo.at <
+      BASE_PREVIEW_MEMORY_TTL_MS
+  ) {
+    return basePreviewMemo.item;
+  }
+
+  let item =
+    null;
+
+  try {
+    const text =
+      await getCatalogSnapshotText(
+        env
+      );
+
+    if (text) {
+      item =
+        pickBaseCenterpiece(
+          JSON.parse(
+            text
+          ),
+          baseNowKey()
+        );
+    }
+  } catch (error) {
+    logLimited(
+      "warn",
+      "base-preview-pick",
+      "MMicjMedia base preview could not choose a centerpiece:",
+      error
+    );
+  }
+
+  basePreviewMemo = {
+    item,
+    at:
+      now
+  };
+
+  return item;
+}
+
+/*
+ * STATE LINKS  ( /?view=<section>[&item=<section>/<id>] )
+ *
+ * The app keeps the browser's address bar in step with what is
+ * open (js/browserAddress.js), so the browser's own share command
+ * shares a link that reflects the open item or section. For such a
+ * link the card shows that item's own thumbnail and title, or the
+ * base logo when no item is open (or it cannot be found).
+ *
+ * The bare base URL (no parameters) is unchanged: it keeps the
+ * Front Page centerpiece card used by the in-app Front Page share.
+ */
+const BASE_STATE_VIEWS =
+  new Set([
+    "front",
+    "reader",
+    "video",
+    "slideshow"
+  ]);
+
+/* "video/abc" -> { section: "video", id: "abc" }, or null. */
+function parseBaseStateItem(
+  value
+) {
+  const text =
+    String(
+      value || ""
+    ).trim();
+
+  const cut =
+    text.indexOf(
+      "/"
+    );
+
+  if (
+    cut < 1
+  ) {
+    return null;
+  }
+
+  const section =
+    normalizeSection(
+      text.slice(
+        0,
+        cut
+      )
+    );
+
+  const id =
+    text.slice(
+      cut + 1
+    );
+
+  return isPlausibleShareTarget(
+    section,
+    id
+  )
+    ? {
+        section,
+        id
+      }
+    : null;
+}
+
+/* The catalog item with this section and id, from the snapshot the
+   base preview already reads. Never throws; null when not found. */
+/* =========================================================
+   R2 PUBLISHED CATALOG  (preview fallback)
+
+   The admin portal publishes the catalog to R2 as one public
+   file (the same file the app reads in js/manifest.js). The
+   KV catalog snapshot only knows what the Glide publish wrote,
+   so an item that exists only in R2 had no preview card.
+
+   Preview lookups therefore fall back to that file when KV has
+   no match: no KV read, no R2 binding, and at most one fetch
+   per isolate per PUBLISHED_CATALOG_MEMORY_TTL_MS (5 minutes,
+   the same as the file's own max-age). Items that are not
+   released yet are never previewed, the same rule the app
+   applies (SkyDate.isVisible).
+
+   The memory copy is the ONLY cache layer on purpose: the
+   subrequest is not edge-cached as well, so the two never add
+   up. When an item is deleted in the admin portal (which
+   rewrites published.json straight away), its preview card and
+   its /s/ link stop working within 5 minutes.
+========================================================= */
+
+/* =========================================================
+   SHARE MODE SWITCH
+
+   true   Individual-item links are Share Mode links:
+            /s/<section>/<id>  ->  the standalone Share Viewer.
+          The in-app and in-viewer Share buttons create /s/ links,
+          and a link copied from the browser address bar
+          (/?view=<section>&item=<section>/<id>) is handed to the
+          Share Viewer when someone arrives at it (see the small
+          script at the top of index.html).
+
+   false  Individual-item links open the item inside the main app:
+            /?view=<section>&item=<section>/<id>
+          The Share buttons create those links, and any /s/ link
+          still in circulation is redirected to them.
+          (Old 16-character /s/<key> links keep working either way.)
+
+   To switch: change the constant below and deploy, or set a
+   Worker variable named SHARE_MODE_ENABLED to "true" / "false"
+   (when it is set it wins; no deploy needed). The page tells the
+   browser which way it is set, so the Worker and the app can
+   never disagree.
+========================================================= */
+
+const SHARE_MODE_ENABLED =
+  true;
+
+function isShareModeEnabled(
+  env
+) {
+  const raw =
+    env &&
+    env.SHARE_MODE_ENABLED !== undefined &&
+    env.SHARE_MODE_ENABLED !== null
+      ? String(
+          env.SHARE_MODE_ENABLED
+        )
+          .trim()
+          .toLowerCase()
+      : "";
+
+  if (
+    [
+      "false",
+      "0",
+      "off",
+      "no"
+    ].includes(
+      raw
+    )
+  ) {
+    return false;
+  }
+
+  if (
+    [
+      "true",
+      "1",
+      "on",
+      "yes"
+    ].includes(
+      raw
+    )
+  ) {
+    return true;
+  }
+
+  return SHARE_MODE_ENABLED;
+}
+
+/* =========================================================
+   JOIN BUTTON SWITCH  (front page, js/frontForms.js)
+
+   Variable  JOIN_BUTTON_ENABLED  (Cloudflare dashboard -> this
+   Worker -> Settings -> Variables and Secrets, next to
+   SHARE_MODE_ENABLED / MAINTENANCE):
+
+     "true"  (or not set)  the button works as usual
+     "false" / "0" / "off" / "no"
+                           the button stays on the front page
+                           but is dimmed and cannot be tapped
+
+   No deploy is needed: edit the variable and the next page load
+   follows it. Because "keep_vars" is on in wrangler.jsonc, a value
+   set in the dashboard survives later deploys. (Do not also put it
+   in "vars" there: a value in that file would overwrite the
+   dashboard value on every deploy.)
+
+   The page is told through window.__MMICJ_JOIN_ENABLED, written
+   into <head> by serveBasePage() below. Anything other than an
+   explicit "off" value means ON, so a typo can never lock the
+   button by accident.
+
+   This only dims and disables the button in the app. The intake
+   Worker (mmicj-intake) is a separate Worker and is not changed
+   by this switch.
+========================================================= */
+
+function isJoinButtonEnabled(
+  env
+) {
+  const raw =
+    env &&
+    env.JOIN_BUTTON_ENABLED !== undefined &&
+    env.JOIN_BUTTON_ENABLED !== null
+      ? String(
+          env.JOIN_BUTTON_ENABLED
+        )
+          .trim()
+          .toLowerCase()
+      : "";
+
+  return ![
+    "false",
+    "0",
+    "off",
+    "no"
+  ].includes(
+    raw
+  );
+}
+
+const PUBLISHED_CATALOG_URL =
+  "https://media.mmicj.com/catalog/published.json";
+
+const PUBLISHED_CATALOG_MEMORY_TTL_MS =
+  300000;
+
+/* After a failed read, try again after this long, not on every request. */
+const PUBLISHED_CATALOG_RETRY_MS =
+  30000;
+
+const PUBLISHED_CATALOG_TIMEOUT_MS =
+  4000;
+
+/* { items: Map("<section>/<id>" -> cleaned item), at } */
+let publishedCatalogMemo =
+  null;
+
+let publishedCatalogPending =
+  null;
+
+async function loadPublishedCatalogIndex() {
+  const controller =
+    new AbortController();
+
+  const timer =
+    setTimeout(
+      () =>
+        controller.abort(),
+      PUBLISHED_CATALOG_TIMEOUT_MS
+    );
+
+  try {
+    const response =
+      await fetch(
+        PUBLISHED_CATALOG_URL,
+        {
+          signal:
+            controller.signal
+        }
+      );
+
+    if (!response.ok) {
+      throw new Error(
+        "Published catalog request failed (" +
+        response.status +
+        ")."
+      );
+    }
+
+    const data =
+      await response.json();
+
+    if (
+      !data ||
+      !Array.isArray(
+        data.content
+      )
+    ) {
+      throw new Error(
+        "Published catalog has no content list."
+      );
+    }
+
+    const items =
+      new Map();
+
+    for (
+      const raw of
+      data.content
+    ) {
+      const item =
+        normalizeCatalogPublishItem(
+          raw
+        );
+
+      if (!item) {
+        continue;
+      }
+
+      const section =
+        sectionFromItem(
+          item
+        );
+
+      if (!section) {
+        continue;
+      }
+
+      items.set(
+        section +
+          "/" +
+          item.id,
+        item
+      );
+    }
+
+    return items;
+  } finally {
+    clearTimeout(
+      timer
+    );
+  }
+}
+
+async function getPublishedCatalogItem(
+  target
+) {
+  try {
+    const now =
+      Date.now();
+
+    if (
+      !publishedCatalogMemo ||
+      now -
+        publishedCatalogMemo.at >=
+        PUBLISHED_CATALOG_MEMORY_TTL_MS
+    ) {
+      if (!publishedCatalogPending) {
+        publishedCatalogPending =
+          loadPublishedCatalogIndex()
+            .then(
+              items => {
+                publishedCatalogMemo = {
+                  items,
+                  at:
+                    Date.now()
+                };
+              }
+            )
+            .catch(
+              error => {
+                logLimited(
+                  "warn",
+                  "published-catalog",
+                  "MMicjMedia could not read the R2 published catalog:",
+                  error
+                );
+
+                publishedCatalogMemo = {
+                  items:
+                    publishedCatalogMemo
+                      ? publishedCatalogMemo.items
+                      : new Map(),
+
+                  at:
+                    Date.now() -
+                    (
+                      PUBLISHED_CATALOG_MEMORY_TTL_MS -
+                      PUBLISHED_CATALOG_RETRY_MS
+                    )
+                };
+              }
+            )
+            .finally(
+              () => {
+                publishedCatalogPending =
+                  null;
+              }
+            );
+      }
+
+      await publishedCatalogPending;
+    }
+
+    const item =
+      publishedCatalogMemo
+        ? publishedCatalogMemo.items.get(
+            target.section +
+              "/" +
+              target.id
+          )
+        : null;
+
+    if (!item) {
+      return null;
+    }
+
+    const date =
+      baseDateKey(
+        item.date
+      );
+
+    return date &&
+      date <=
+        baseNowKey()
+      ? item
+      : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+/* The item a state link points at: the KV catalog snapshot first
+   (unchanged behaviour), then the R2 published catalog. */
+async function getBaseSnapshotItem(
+  env,
+  target
+) {
+  const fromSnapshot =
+    await getKvSnapshotItem(
+      env,
+      target
+    );
+
+  if (fromSnapshot) {
+    return fromSnapshot;
+  }
+
+  return getPublishedCatalogItem(
+    target
+  );
+}
+
+async function getKvSnapshotItem(
+  env,
+  target
+) {
+  try {
+    const text =
+      await getCatalogSnapshotText(
+        env
+      );
+
+    if (!text) {
+      return null;
+    }
+
+    if (
+      !baseParsedMemo ||
+      baseParsedMemo.text !==
+        text
+    ) {
+      const parsed =
+        JSON.parse(
+          text
+        );
+
+      baseParsedMemo = {
+        text,
+
+        items:
+          Array.isArray(
+            parsed?.content
+          )
+            ? parsed.content
+            : []
+      };
+    }
+
+    for (
+      const item of
+      baseParsedMemo.items
+    ) {
+      if (
+        cleanString(
+          item?.id
+        ) ===
+          target.id &&
+        sectionFromItem(
+          item
+        ) ===
+          target.section
+      ) {
+        return item;
+      }
+    }
+
+    return null;
+  } catch (error) {
+    logLimited(
+      "warn",
+      "base-state-item",
+      "MMicjMedia base preview could not look up the item:",
+      error
+    );
+
+    return null;
+  }
+}
+
+function buildBaseOgTags(
+  origin,
+  item,
+  options = {}
+) {
+  const section =
+    item
+      ? sectionFromItem(
+          item
+        )
+      : "";
+
+  const id =
+    item
+      ? cleanString(
+          item.id
+        )
+      : "";
+
+  const thumbnail =
+    item
+      ? cleanMediaUrl(
+          item.thumbnail
+        )
+      : "";
+
+  let imageUrl;
+  let width;
+  let height;
+
+  /* Only an absolute http(s) thumbnail can be composed by the OG
+     image route; anything else goes straight to the fallback. */
+  if (
+    section &&
+    isPlausibleShareTarget(
+      section,
+      id
+    ) &&
+    /^https?:\/\//i.test(
+      thumbnail
+    )
+  ) {
+    const image =
+      new URL(
+        OG_IMAGE_PATH,
+        origin
+      );
+
+    image.searchParams.set(
+      "section",
+      section
+    );
+
+    image.searchParams.set(
+      "id",
+      id
+    );
+
+    image.searchParams.set(
+      "base",
+      "1"
+    );
+
+    imageUrl =
+      image.toString();
+
+    width =
+      1200;
+
+    height =
+      630;
+  } else {
+    const fallback =
+      options.fallbackImage || {
+        path:
+          BASE_LOGO_PATH,
+
+        size:
+          BASE_LOGO_SIZE
+      };
+
+    imageUrl =
+      origin +
+      fallback.path;
+
+    width =
+      fallback.size;
+
+    height =
+      fallback.size;
+  }
+
+  const pageUrl =
+    options.pageUrl ||
+    (
+      origin +
+      "/"
+    );
+
+  const title =
+    options.title ||
+    BASE_PREVIEW_TITLE;
+
+  return (
+    `<meta property="og:type" content="website">` +
+    `<meta property="og:title" content="${escapeHtml(title)}">` +
+    `<meta property="og:site_name" content="${escapeHtml(OG_SITE_NAME)}">` +
+    `<meta property="og:url" content="${escapeHtml(pageUrl)}">` +
+    `<meta property="og:image" content="${escapeHtml(imageUrl)}">` +
+    `<meta property="og:image:width" content="${width}">` +
+    `<meta property="og:image:height" content="${height}">` +
+    `<meta name="twitter:card" content="summary_large_image">`
+  );
+}
+
+/*
+ * GET / : the normal application page with the preview tags added.
+ *
+ * Any failure serves the plain page exactly as before this existed,
+ * and links carrying a Glide contract (?contractz=, ?contract=, ?k=)
+ * are passed straight through untouched.
+ */
+async function serveBasePage(
+  request,
+  env
+) {
+  const url =
+    new URL(
+      request.url
+    );
+
+  if (
+    url.searchParams.has(
+      "contractz"
+    ) ||
+    url.searchParams.has(
+      "contract"
+    ) ||
+    url.searchParams.has(
+      "k"
+    )
+  ) {
+    return env.ASSETS.fetch(
+      request
+    );
+  }
+
+  try {
+    let assetResponse =
+      null;
+
+    for (
+      const path of
+      [
+        "/index.html",
+        "/"
+      ]
+    ) {
+      const candidate =
+        await env.ASSETS.fetch(
+          new Request(
+            new URL(
+              path,
+              url.origin
+            ).toString(),
+            {
+              method:
+                "GET"
+            }
+          )
+        );
+
+      if (
+        candidate.ok
+      ) {
+        assetResponse =
+          candidate;
+
+        break;
+      }
+    }
+
+    if (
+      !assetResponse
+    ) {
+      return env.ASSETS.fetch(
+        request
+      );
+    }
+
+    /* Link-preview crawlers can arrive over plain http (a pasted
+       "mmicj.com" is treated as http://). The preview image and
+       page address must always be https. */
+    const origin =
+      url.origin.replace(
+        /^http:/i,
+        "https:"
+      );
+
+    const view =
+      normalizeSection(
+        url.searchParams.get(
+          "view"
+        )
+      );
+
+    const stateItem =
+      parseBaseStateItem(
+        url.searchParams.get(
+          "item"
+        )
+      );
+
+    let tags;
+
+    if (
+      BASE_STATE_VIEWS.has(
+        view
+      ) ||
+      stateItem
+    ) {
+      /* State link: the open item's own card, else the base logo. */
+      const item =
+        stateItem
+          ? await getBaseSnapshotItem(
+              env,
+              stateItem
+            )
+          : null;
+
+      const pageUrl =
+        new URL(
+          "/",
+          origin
+        );
+
+      if (
+        BASE_STATE_VIEWS.has(
+          view
+        )
+      ) {
+        pageUrl.searchParams.set(
+          "view",
+          view
+        );
+      }
+
+      if (
+        item
+      ) {
+        pageUrl.searchParams.set(
+          "item",
+          stateItem.section +
+            "/" +
+            stateItem.id
+        );
+      }
+
+      tags =
+        buildBaseOgTags(
+          origin,
+          item,
+          {
+            pageUrl:
+              pageUrl.toString(),
+
+            title:
+              cleanString(
+                item?.title
+              )
+          }
+        );
+    } else {
+      tags =
+        buildBaseOgTags(
+          origin,
+          FRONT_PREVIEW_USES_CENTERPIECE
+            ? await getBaseCenterpiece(
+                env
+              )
+            : null,
+          {
+            fallbackImage: {
+              path:
+                FRONT_PREVIEW_IMAGE_PATH,
+
+              size:
+                FRONT_PREVIEW_IMAGE_SIZE
+            }
+          }
+        );
+    }
+
+    const transformed =
+      new HTMLRewriter()
+        .on(
+          "head",
+          {
+            element(
+              element
+            ) {
+              /* First thing in <head>, so the arrival script at the top
+                 of index.html can read it. */
+              element.prepend(
+                "<script>window.__SKY_SHARE_MODE_ENABLED = " +
+                  (
+                    isShareModeEnabled(
+                      env
+                    )
+                      ? "true"
+                      : "false"
+                  ) +
+                  ";</script>",
+                {
+                  html:
+                    true
+                }
+              );
+
+              element.append(
+                tags,
+                {
+                  html:
+                    true
+                }
+              );
+
+              /* Join button switch (see JOIN_BUTTON_ENABLED above).
+                 After the share-mode flag, which must stay first. */
+              element.append(
+                "<script>window.__MMICJ_JOIN_ENABLED = " +
+                  (
+                    isJoinButtonEnabled(
+                      env
+                    )
+                      ? "true"
+                      : "false"
+                  ) +
+                  ";</script>",
+                {
+                  html:
+                    true
+                }
+              );
+            }
+          }
+        )
+        .transform(
+          assetResponse
+        );
+
+    return new Response(
+      transformed.body,
+      {
+        status:
+          200,
+
+        headers: {
+          "content-type":
+            "text/html; charset=UTF-8",
+
+          "cache-control":
+            "public, max-age=0, must-revalidate"
+        }
+      }
+    );
+  } catch (error) {
+    logLimited(
+      "error",
+      "base-page",
+      "MMicjMedia base page preview failed; serving the plain page:",
+      error
+    );
+
+    return env.ASSETS.fetch(
+      request
+    );
+  }
+}
+
+/*
+ * The base URL's preview image: the existing OG image route, except
+ * that any failure sends the crawler to assets/base-logo.jpg instead
+ * of an error page or the Glide default thumbnail.
+ */
+async function serveBaseOgImage(
+  request,
+  env,
+  ctx
+) {
+  const fallback =
+    new Response(
+      null,
+      {
+        status:
+          302,
+
+        headers: {
+          "Location":
+            new URL(
+              BASE_LOGO_PATH,
+              request.url
+            ).toString(),
+
+          "Cache-Control":
+            "public, max-age=300"
+        }
+      }
+    );
+
+  try {
+    const response =
+      await serveOgImage(
+        request,
+        env,
+        ctx
+      );
+
+    return (
+      response.ok ||
+      (
+        response.status >=
+          300 &&
+        response.status <
+          400
+      )
+    )
+      ? response
+      : fallback;
+  } catch (error) {
+    logLimited(
+      "warn",
+      "base-og-image",
+      "MMicjMedia base preview image failed; using the base logo:",
+      error
+    );
+
+    return fallback;
+  }
+}
+
+/* =========================================================
    WORKER
 ========================================================= */
 
-export default {
+/* =========================================================
+   FRIENDLY ERROR PAGES
+
+   People who land on a page that cannot be shown (a share link whose
+   item was removed, a Worker error, or maintenance mode) see a short
+   picture page instead of a line of plain text. Anything that is not a
+   page load (scripts, fetches, images, crawlers' API calls) still gets
+   the same short plain-text answer and the same status code as before.
+
+   Pictures: /assets/errors/{unavailable,error,maintenance}.webp (static
+   files: free, never counted as Worker requests). The words are in the
+   picture; the <h1>/<p> are for screen readers (class "sr"). If your
+   final artwork has no words, remove class="sr" in friendlyHtml().
+
+   MAINTENANCE MODE: add a plain variable  MAINTENANCE = 1  to the
+   mmicj Worker (Settings -> Variables and Secrets) and Deploy: the base
+   address and share links answer with the maintenance page and a 503
+   until you delete the variable (or set it to 0). Static files such as
+   /index.html and the PDF/OG endpoints are not affected.
+========================================================= */
+
+const FRIENDLY_PAGES = {
+  unavailable: {
+    status: 404,
+    image: "unavailable",
+    alt: "Link no longer available. This item was moved or removed.",
+    title: "Link no longer available",
+    line: "This item was moved or removed.",
+    retry: false
+  },
+  error: {
+    status: 500,
+    image: "error",
+    alt: "Something went wrong. It\u2019s on our side. Please try again in a moment.",
+    title: "Something went wrong",
+    line: "It\u2019s on our side. Please try again in a moment.",
+    retry: true
+  },
+  maintenance: {
+    status: 503,
+    image: "maintenance",
+    alt: "Be right back. We\u2019re tending the garden. Back shortly.",
+    title: "Be right back",
+    line: "We\u2019re tending the garden. Back shortly.",
+    retry: true
+  }
+};
+
+/* A page load asks for text/html. Scripts, styles, images, fetch() calls and the like never do, so that alone is the test.
+   The Sec-Fetch-Dest header is only used to rule OUT things that are plainly not pages: some browsers change it to "empty"
+   when the service worker forwards a page load, and an older version of this check then wrongly showed plain text. */
+const NON_PAGE_DESTINATIONS = new Set([
+  "script", "style", "image", "font", "audio", "video", "track", "manifest",
+  "worker", "sharedworker", "serviceworker", "audioworklet", "paintworklet",
+  "object", "embed", "report", "xslt"
+]);
+
+function wantsHtml(request) {
+  if (request.method !== "GET" && request.method !== "HEAD") return false;
+  const accept = request.headers.get("accept") || "";
+  if (!accept.includes("text/html")) return false;
+  const dest = (request.headers.get("sec-fetch-dest") || "").toLowerCase();
+  return !NON_PAGE_DESTINATIONS.has(dest);
+}
+
+function friendlyHtml(page) {
+  return `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
+<title>${page.title} \u00b7 MMicj</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{--page:#f3fbfa;--ink:#107740;--btn:#107740;--btn-ink:#fff;--btn2:#d9efed}
+@media (prefers-color-scheme:dark){:root{--page:#0e2a1f;--ink:#d9efed;--btn:#36b84c;--btn-ink:#0e2a1f;--btn2:#17402f}}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%}
+body{display:grid;place-items:center;min-height:100vh;padding:24px;background:var(--page);color:var(--ink);font:500 16px/1.5 Montserrat,Poppins,system-ui,-apple-system,"Segoe UI",sans-serif;text-align:center}
+main{width:min(100%,560px)}img{display:block;width:100%;height:auto;aspect-ratio:4/3;border-radius:28px}
+.sr{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+h1{margin:20px 0 4px;font-size:1.6rem}p{margin:0 0 4px}.actions{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin-top:24px}
+.btn{display:inline-block;padding:12px 22px;border:0;border-radius:999px;background:var(--btn);color:var(--btn-ink);font:700 16px/1.2 Montserrat,Poppins,system-ui,sans-serif;text-decoration:none;cursor:pointer}
+.btn.alt{background:var(--btn2);color:var(--ink)}.btn:focus-visible{outline:3px solid #e3be09;outline-offset:3px}
+</style></head><body><main>
+<img src="/assets/errors/${page.image}.webp" width="1200" height="900" alt="${page.alt}">
+<h1 class="sr">${page.title}</h1><p class="sr">${page.line}</p>
+<div class="actions">${page.retry ? '<button type="button" class="btn" onclick="location.reload()">Try again</button><a class="btn alt" href="/">Go to MMicj</a>' : '<a class="btn" href="/">Go to MMicj</a>'}</div>
+</main></body></html>`;
+}
+
+function friendlyResponse(kind, request, plainText) {
+  const page = FRIENDLY_PAGES[kind];
+  const headers = {
+    "cache-control": "no-store, no-cache, must-revalidate",
+    "pragma": "no-cache"
+  };
+  if (kind === "maintenance") headers["retry-after"] = "600";
+
+  if (!request || !wantsHtml(request)) {
+    return new Response(plainText || page.title, {
+      status: page.status,
+      headers: { ...headers, "content-type": "text/plain; charset=UTF-8" }
+    });
+  }
+  return new Response(friendlyHtml(page), {
+    status: page.status,
+    headers: { ...headers, "content-type": "text/html; charset=UTF-8" }
+  });
+}
+
+function maintenanceOn(env) {
+  const v = env && env.MAINTENANCE;
+  if (v === undefined || v === null) return false;
+  return !["", "0", "false", "off", "no"].includes(String(v).trim().toLowerCase());
+}
+
+/* =========================================================
+   ANALYTICS (admin-only usage counts)  -  v1.0.0
+
+   Two small pieces, both behind ONE switch:
+
+     POST /__sky_collect   the app's js/analytics.js sends one small summary
+                           of counters here (about once per visit). Each line
+                           becomes one Analytics Engine data point.
+     share_open            a share link (/s/<section>/<id>) was opened. Counted
+                           right here on the server, so no browser code is
+                           involved. Link-preview robots (WhatsApp, Facebook,
+                           Telegram ...) are recorded separately as "preview".
+
+   THE SWITCH: variable  ANALYTICS_ENABLED  (Cloudflare dashboard -> this
+   Worker -> Settings -> Variables, next to MAINTENANCE / SHARE_MODE_ENABLED).
+     true / on / 1 / yes   counting is on
+     anything else, or missing   OFF: nothing is written, the collect route
+                           answers {"on":false} and every app pauses itself
+                           for 6 hours. No redeploy is needed.
+
+   Cost: no KV, no R2. One Worker request per app visit (batched in the
+   browser) and one Analytics Engine data point per summary line. Free plan:
+   100,000 data points per day. A failure here is swallowed: it can never
+   change what a visitor or a share link receives.
+   ========================================================= */
+
+const ANALYTICS_PATH = "/__sky_collect";
+const ANALYTICS_EVENTS = new Set([
+  "session", "section_view", "item_open", "share_tap", "share_tile", "share_done", "feature_use"
+]);
+const ANALYTICS_SECTIONS = new Set(["front", "reader", "video", "slideshow"]);
+const ANALYTICS_SURFACES = new Set(["embed", "pwa", "browser", "share"]);
+const ANALYTICS_MAX_BODY = 8192;
+const ANALYTICS_MAX_ENTRIES = 60;
+const ANALYTICS_PREVIEW_BOTS =
+  /bot|crawl|spider|preview|facebookexternalhit|whatsapp|telegram|slack|discord|skype|linkedin|pinterest|embedly|vkshare|quora|headless/i;
+
+function analyticsOn(env) {
+  const v = env && env.ANALYTICS_ENABLED;
+  if (v === undefined || v === null) return false;
+  return ["true", "on", "1", "yes"].includes(String(v).trim().toLowerCase());
+}
+
+function analyticsReady(env) {
+  return analyticsOn(env) && !!(env.ANALYTICS_AE && typeof env.ANALYTICS_AE.writeDataPoint === "function");
+}
+
+function analyticsJson(body, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json; charset=UTF-8", "cache-control": "no-store" }
+  });
+}
+
+const analyticsClean = (v, max, pattern) =>
+  String(v === undefined || v === null ? "" : v).replace(pattern, "_").slice(0, max);
+
+async function handleAnalyticsCollect(request, env) {
+  if (request.method !== "POST") {
+    return new Response(null, { status: 405, headers: { allow: "POST", "cache-control": "no-store" } });
+  }
+
+  /* switched off (or the binding is missing): tell the app to pause itself, write nothing */
+  if (!analyticsReady(env)) return analyticsJson({ on: false });
+
+  let text = "";
+  try { text = await request.text(); } catch (_) { return analyticsJson({ on: true, stored: 0 }, 400); }
+  if (text.length > ANALYTICS_MAX_BODY) return analyticsJson({ on: true, stored: 0 }, 413);
+
+  let payload = null;
+  try { payload = JSON.parse(text); } catch (_) { return analyticsJson({ on: true, stored: 0 }, 400); }
+  if (!payload || payload.v !== 1 || !Array.isArray(payload.e)) return analyticsJson({ on: true, stored: 0 }, 400);
+
+  const visitor = analyticsClean(payload.a, 32, /[^A-Za-z0-9]/g);
+  const surface = ANALYTICS_SURFACES.has(payload.p) ? payload.p : "browser";
+  const country = analyticsClean(request.cf && request.cf.country, 2, /[^A-Za-z]/g);
+
+  let stored = 0;
+  for (const row of payload.e.slice(0, ANALYTICS_MAX_ENTRIES)) {
+    if (!Array.isArray(row) || row.length < 5) continue;
+    const [event, section, id, detail, n] = row;
+    if (!ANALYTICS_EVENTS.has(event)) continue;
+    const count = Math.floor(Number(n));
+    if (!Number.isFinite(count) || count < 1) continue;
+    try {
+      env.ANALYTICS_AE.writeDataPoint({
+        indexes: [event],
+        blobs: [
+          event,
+          ANALYTICS_SECTIONS.has(section) ? section : "",
+          analyticsClean(id, 64, /[^A-Za-z0-9_\-.:~]/g),
+          analyticsClean(String(detail || "").toLowerCase(), 24, /[^a-z0-9_\-]/g),
+          surface,
+          country,
+          visitor
+        ],
+        doubles: [Math.min(count, 1000)]
+      });
+      stored++;
+    } catch (_) { /* never let counting fail the request */ }
+  }
+  return analyticsJson({ on: true, stored });
+}
+
+/* A share link was opened. Synchronous and fire-and-forget: no await, no KV, no R2. */
+function trackShareOpen(request, env, target) {
+  try {
+    if (!analyticsReady(env) || !target) return;
+    const ua = request.headers.get("user-agent") || "";
+    const preview = request.method === "HEAD" || ANALYTICS_PREVIEW_BOTS.test(ua);
+    env.ANALYTICS_AE.writeDataPoint({
+      indexes: ["share_open"],
+      blobs: [
+        "share_open",
+        ANALYTICS_SECTIONS.has(target.section) ? target.section : "",
+        analyticsClean(target.id, 64, /[^A-Za-z0-9_\-.:~]/g),
+        preview ? "preview" : "visitor",
+        "link",
+        analyticsClean(request.cf && request.cf.country, 2, /[^A-Za-z]/g),
+        ""
+      ],
+      doubles: [1]
+    });
+  } catch (_) { /* counting must never affect a share link */ }
+}
+
+const workerHandlers = {
 
   async fetch(
     request,
@@ -5057,7 +6974,42 @@ export default {
       url.pathname ===
       OG_IMAGE_PATH
     ) {
+      if (
+        url.searchParams.get(
+          "base"
+        ) === "1"
+      ) {
+        return serveBaseOgImage(
+          request,
+          env,
+          ctx
+        );
+      }
+
       return serveOgImage(
+        request,
+        env,
+        ctx
+      );
+    }
+
+    /* -----------------------------------------------------
+       Base URL (needs run_worker_first: ["/"] in
+       wrangler.jsonc, otherwise the asset layer answers
+       "/" before the Worker is ever invoked)
+    ----------------------------------------------------- */
+
+    if (
+      url.pathname ===
+        "/" &&
+      (
+        request.method ===
+          "GET" ||
+        request.method ===
+          "HEAD"
+      )
+    ) {
+      return serveBasePage(
         request,
         env
       );
@@ -5100,6 +7052,20 @@ export default {
       "/__sky_catalog_publish"
     ) {
       return handleCatalogPublishTest(
+        request,
+        env
+      );
+    }
+
+    /* -----------------------------------------------------
+       Analytics (admin-only usage counts; see ANALYTICS_ENABLED)
+    ----------------------------------------------------- */
+
+    if (
+      url.pathname ===
+      ANALYTICS_PATH
+    ) {
+      return handleAnalyticsCollect(
         request,
         env
       );
@@ -5242,16 +7208,7 @@ export default {
       }
 
       if (!payload) {
-        return new Response(
-          "MMicjMedia publication not found.",
-          {
-            status:
-              404,
-
-            headers:
-              textHeaders()
-          }
-        );
+        return friendlyResponse("unavailable", request, "MMicjMedia publication not found.");
       }
 
       return serveWithContract(
@@ -5306,5 +7263,25 @@ export default {
     return env.ASSETS.fetch(
       request
     );
+  }
+};
+
+/* The public entry point: maintenance switch first, then the normal handler,
+   and any error the handler throws becomes a friendly page (with the real
+   status) instead of Cloudflare's own Worker-error page. */
+export default {
+  async fetch(request, env, ctx) {
+    try {
+      if (maintenanceOn(env)) {
+        const path = new URL(request.url).pathname;
+        if (path === "/" || path.startsWith(SHARE_PATH_PREFIX)) {
+          return friendlyResponse("maintenance", request, "MMicj is briefly down for maintenance. Please try again shortly.");
+        }
+      }
+      return await workerHandlers.fetch(request, env, ctx);
+    } catch (error) {
+      console.error("MMicjMedia unhandled Worker error:", error);
+      return friendlyResponse("error", request, "MMicj: something went wrong on our side. Please try again in a moment.");
+    }
   }
 };

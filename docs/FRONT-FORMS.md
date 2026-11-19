@@ -15,6 +15,24 @@ Tapping it opens a little menu above it with **Join** and **Testify**. Each open
 
 Nothing else changed. The front page, share panel, service worker and Worker are untouched.
 
+## Switching the button on and off (backend)
+Cloudflare dashboard, then the **mmicj** Worker, then **Settings, Variables and Secrets**: add a plain variable
+`JOIN_BUTTON_ENABLED`.
+
+| Value | Result |
+|---|---|
+| `true`, or the variable not set | The button works as usual |
+| `false`, `0`, `off` or `no` | The button stays in place but is **dimmed and cannot be tapped** (its tooltip says "Not available right now") |
+
+No deploy is needed: the next page load follows the variable. `keep_vars` is on in `wrangler.jsonc`, so a value set in the dashboard
+survives later deploys. Do **not** also add it to `vars` in `wrangler.jsonc`: a value in that file would replace the dashboard value on every deploy.
+Any other value (a typo, for example) counts as ON, so the button can never be switched off by accident.
+
+How it works: the Worker writes `window.__MMICJ_JOIN_ENABLED = true/false;` into the page's `<head>` (it already rewrites the page for the link preview,
+so this costs no extra request). `js/frontForms.js` reads it. Links that carry a Glide contract (`?contract=`, `?contractz=`, `?k=`) are passed to the
+page untouched by the Worker, so on those the button is shown as ON.
+The switch dims and disables the button in the app; it does not change the intake Worker (`mmicj-intake`), which would still accept a request sent to it directly.
+
 ## Settings (top of `js/frontForms.js`)
 * `INTAKE_URL` = `https://mmicj-intake.meditation-mornings-icj.workers.dev`
 * `TURNSTILE_SITE_KEY` = your public site key. Leave it `""` only for local testing (the Worker then must not have `TURNSTILE_SECRET`).
@@ -26,6 +44,7 @@ Nothing else changed. The front page, share panel, service worker and Worker are
   The security check (Cloudflare Turnstile) loads only when a form is first opened.
 * **Join:** name (required), birthday as month and day (optional), email and phone (at least one of the two is required: "Please provide at least 1 contact method for our records."), consent box.
   Confirmation: "Welcome to the MMicj garden! Let's grow together."
+  The confirmation circle shows `assets/garden.png` (set by `JOIN_DONE_IMAGE`); if the picture is missing or fails to load, the drawn sprout circle shows instead.
 * **Testify!:** Title and Name or nickname (required), Description, Media upload (photo, video or PDF, type detected from the file),
   Audio upload (switched off, with a note, when the media is a video), "Share anonymously" (only the admins ever see the name).
   Text alone, a file alone, or both are fine. There is no date or release field: the time is stamped by the Worker and every

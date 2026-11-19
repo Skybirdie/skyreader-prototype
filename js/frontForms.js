@@ -952,6 +952,28 @@
         shell.show(forms[key]);
     }
 
+    /* The backend switch: the Worker variable JOIN_BUTTON_ENABLED reaches the page as window.__MMICJ_JOIN_ENABLED.
+       Only an explicit false switches the button off (not set, or any other value, means on). While off the button
+       stays where it is, dimmed, and cannot be tapped. */
+    function joinEnabled(){ return window.__MMICJ_JOIN_ENABLED !== false; }
+
+    function applyEnabled(){
+        if(!button) return;
+        var on = joinEnabled();
+        button.disabled = !on;
+        button.classList.toggle("is-off", !on);
+        if(on){
+            button.setAttribute("title", "Join or testify");
+            button.setAttribute("aria-label", "Join or testify");
+            button.removeAttribute("aria-disabled");
+        }else{
+            button.setAttribute("title", "Not available right now");
+            button.setAttribute("aria-label", "Join or testify (not available right now)");
+            button.setAttribute("aria-disabled", "true");
+            closeMenu(false);
+        }
+    }
+
     function init(){
         host = document.getElementById("frontPage");
         button = document.getElementById("frontFormsButton");
@@ -959,8 +981,10 @@
         button.dataset.ffBound = "true";
         button.setAttribute("aria-haspopup", "true");
         button.setAttribute("aria-expanded", "false");
+        applyEnabled();
 
         button.addEventListener("click", function(){
+            if(!joinEnabled()) return;
             if(shell && shell.root.classList.contains("is-open")) return;
             (menu && !menu.hidden) ? closeMenu(false) : openMenu();
         });
@@ -981,5 +1005,5 @@
     else init();
 
     /* a handle for tests / support (does not open anything by itself) */
-    window.FrontForms = { open: function(k){ if(host) openForm(k === "testify" ? "testify" : "join"); } };
+    window.FrontForms = { open: function(k){ if(host && joinEnabled()) openForm(k === "testify" ? "testify" : "join"); } };
 })();
