@@ -472,7 +472,32 @@ container.appendChild(b);
             el.appendChild(cap);
         }
 
-        return {element:el,ready:Promise.resolve(img)};
+        /*
+         * Wait for the image to actually load/decode before the transition
+         * starts. Otherwise the old slide fades away and the new one pops in
+         * half-way through, which reads as a blink. The timeout keeps a slow
+         * or broken image from stalling the slideshow.
+         */
+        const ready=new Promise(resolve=>{
+            let finished=false;
+            const finish=()=>{
+                if(finished)return;
+                finished=true;
+                clearTimeout(giveUp);
+                resolve(img);
+            };
+            const giveUp=setTimeout(finish,4000);
+            if(typeof img.decode==="function"){
+                img.decode().then(finish,finish);
+            }else if(img.complete){
+                finish();
+            }else{
+                img.addEventListener("load",finish,{once:true});
+                img.addEventListener("error",finish,{once:true});
+            }
+        });
+
+        return {element:el,ready};
     }
 
     async function buildPdfSlide(pageNumber){

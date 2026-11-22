@@ -994,7 +994,7 @@ cleanupFn=()=>{
 
     const audio=setupAudio(item);
 
-    const img=document.createElement("img");
+    let img=document.createElement("img");
     img.className="front-media-slide";
     img.alt=item.title||"";
     img.draggable=false;
@@ -1003,10 +1003,75 @@ cleanupFn=()=>{
     const zoom=window.SkyMediaZoom ? SkyMediaZoom.create(ui.content) : null;
     if(zoom) zoom.setTarget(img);
 
+    // Used to ignore a slide that finishes loading after the viewer has
+    // already moved on (fast taps on next/previous).
+    let showTicket=0;
+
     function clear(){
         if(timer){
             clearTimeout(timer);
             timer=null;
+        }
+    }
+
+    /*
+     * Cross fade between slides.
+     *
+     * The next image is loaded and decoded off-screen first, then placed on
+     * top of the current one and faded in while the current image stays
+     * opaque underneath. The old image only fades out near the end.
+     * Re-using a single <img> and swapping its src made the old picture
+     * vanish before the new one was ready (a blink).
+     */
+    function crossFadeTo(src,alt,ticket){
+        const incoming=document.createElement("img");
+        incoming.className="front-media-slide";
+        incoming.alt=alt;
+        incoming.draggable=false;
+
+        let revealed=false;
+
+        const reveal=()=>{
+            if(revealed) return;
+            revealed=true;
+            clearTimeout(giveUp);
+
+            if(token!==generation || ticket!==showTicket) return;
+
+            const outgoing=img;
+
+            // Drop any leftover layer from a previous, interrupted fade.
+            ui.content.querySelectorAll(".front-media-slide").forEach(el=>{
+                if(el!==outgoing) el.remove();
+            });
+
+            incoming.classList.add("is-fading-in");
+            ui.content.appendChild(incoming);
+            void incoming.offsetWidth;
+            incoming.classList.add("is-visible");
+
+            outgoing.classList.add("is-fading-out");
+
+            img=incoming;
+            if(zoom) zoom.setTarget(incoming);
+
+            window.setTimeout(()=>{
+                if(outgoing!==img) outgoing.remove();
+                incoming.classList.remove("is-fading-in","is-visible");
+            },700);
+        };
+
+        const giveUp=setTimeout(reveal,4000);
+
+        incoming.src=src;
+
+        if(typeof incoming.decode==="function"){
+            incoming.decode().then(reveal,reveal);
+        }else if(incoming.complete){
+            reveal();
+        }else{
+            incoming.addEventListener("load",reveal,{once:true});
+            incoming.addEventListener("error",reveal,{once:true});
         }
     }
 
@@ -1017,12 +1082,18 @@ cleanupFn=()=>{
 
         if(!s) return;
 
-        img.classList.remove("is-entering");
-        void img.offsetWidth;
+        const ticket=++showTicket;
+        const src=s.image||"";
+        const alt=s.title||item.title||"";
 
-        img.src=s.image||"";
-        img.alt=s.title||item.title||"";
-        img.classList.add("is-entering");
+        if(!img.getAttribute("src")){
+            // First slide: nothing to cross fade from.
+            img.alt=alt;
+            img.src=src;
+            img.classList.add("is-entering");
+        }else{
+            crossFadeTo(src,alt,ticket);
+        }
 
         ui.status.textContent=
             `${index+1} / ${slides.length}`;

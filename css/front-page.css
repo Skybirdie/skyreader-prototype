@@ -626,7 +626,11 @@ html[data-theme="dark"] #frontPage{
     object-fit:contain;
 }
 .front-media-video{width:100%;height:100%;background:transparent;}
-.front-media-slide{width:100%;height:100%;object-fit:contain;}
+.front-media-slide{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;}
+/* Cross fade layers for the image slideshow centerpiece. */
+.front-media-slide.is-fading-in{opacity:0;z-index:2;}
+.front-media-slide.is-fading-in.is-visible{opacity:1;transition:opacity .65s ease-in-out;}
+.front-media-slide.is-fading-out{opacity:0;z-index:1;transition:opacity .25s ease-in .4s;}
 .front-media-pdf{background:#fff;box-shadow:0 4px 20px rgba(0,0,0,.24);}
 .front-media-fallback{width:100%;height:100%;object-fit:cover;}
 .front-media-slide.is-entering,.front-media-pdf.is-entering{animation:frontMediaEnter .28s ease both;}
