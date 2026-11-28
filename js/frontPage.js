@@ -364,6 +364,17 @@ if (!centerpiece) {
                  * animation frame after AppSwitcher.show().
                  */
 
+                /*
+                 * An item released after this tab loaded (the Manifest
+                 * re-checks release times on every call, the section
+                 * libraries do not) is missing from its library, and the
+                 * select below would silently do nothing. Refresh the
+                 * destination library first if it lacks the item.
+                 */
+                if (window.LibrarySync) {
+                    LibrarySync.ensure(item.section, item.id);
+                }
+
                 if (item.section === "reader") {
 
                     if (!window.Library || typeof Library.select !== "function") {

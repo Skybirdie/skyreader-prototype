@@ -102,6 +102,18 @@ function openFull(item){
 
         requestAnimationFrame(()=>{
     try{
+        /*
+         * The Front Page asks the Manifest, which re-checks release times
+         * on every call, so in a long-open tab it can be showing an item
+         * released after the section libraries took their startup
+         * snapshot. Their select()/open() silently ignore an unknown id,
+         * which used to leave a fullscreen black viewer with no video.
+         * Make sure the destination library holds the item first.
+         */
+        if(window.LibrarySync){
+            LibrarySync.ensure(item.section, item.id);
+        }
+
         if(item.section === "reader" &&
            window.Library &&
            typeof Library.open === "function"){
@@ -163,13 +175,23 @@ function openFull(item){
                      * available viewer space through the existing viewer CSS.
                      */
                     const viewer = document.getElementById("videoViewer");
-                    if(viewer && !document.fullscreenElement){
+                    /* Only go fullscreen if this video really opened:
+                       fullscreening a viewer that has nothing in it is the
+                       black screen. isOpen() is null when the viewer cannot
+                       say, which keeps the old behaviour. */
+                    const videoOpened =
+                        !window.LibrarySync ||
+                        LibrarySync.isOpen("video", item.id) !== false;
+                    if(viewer && videoOpened && !document.fullscreenElement){
                         viewer.requestFullscreen?.().catch(()=>{});
                     }
                 }
                 else if(item.section === "slideshow"){
                     const viewer = document.getElementById("slideshowViewer");
-                    if(viewer && !document.fullscreenElement){
+                    const slideshowOpened =
+                        !window.LibrarySync ||
+                        LibrarySync.isOpen("slideshow", item.id) !== false;
+                    if(viewer && slideshowOpened && !document.fullscreenElement){
                         viewer.requestFullscreen?.().catch(()=>{});
                     }
                 }
