@@ -33,8 +33,19 @@ const OG_SITE_NAME =
 const OG_DEFAULT_THUMBNAIL =
   "https://storage.googleapis.com/glide-prod.appspot.com/uploads-v2/mKxnsa8ky8uPGbBKpTyv/pub/lu8ys9mg3bqa2jgeWIFB.webp";
 
-const OG_LOGO =
-  "https://storage.googleapis.com/glide-prod.appspot.com/uploads-v2/mKxnsa8ky8uPGbBKpTyv/pub/Qysgcds56u8OmAi76mCC.webp";
+/*
+ * The badge drawn in the corner of every composed item preview.
+ *
+ * It is a static file shipped with the app (free to read, no outside
+ * request), made from assets/logo.png with its transparent margins
+ * trimmed off so it sits snugly in the corner. To change the logo:
+ *   1. replace assets/logo.png
+ *   2. regenerate the trimmed copy (see the note in README.txt:
+ *      "Link-preview badge") or replace assets/logo-badge.png directly
+ *   3. bump OG_CACHE_VERSION below so stored previews are rebuilt
+ */
+const OG_LOGO_PATH =
+  "/assets/logo-badge.png";
 
 const OG_IMAGE_PATH =
   "/__sky_og_image";
@@ -134,7 +145,9 @@ const BASE_PREVIEW_MEMORY_TTL_MS =
    Applies to item links and the base link alike.
 
    - Bump OG_CACHE_VERSION to force every preview to be rebuilt
-     (e.g. after changing the logo badge position or size).
+     (e.g. after changing the logo badge picture, position or size;
+     the badge file is not part of the key, only its path is).
+     "2" = badge switched to assets/logo-badge.png (new logo).
    - Copies expire after OG_CACHE_TTL_SECONDS, which also clears
      out the copies of thumbnails that were replaced.
    - A thumbnail replaced IN PLACE (same URL, new picture) is not
@@ -145,7 +158,7 @@ const OG_CACHE_PREFIX =
   "og:v1:";
 
 const OG_CACHE_VERSION =
-  "1";
+  "2";
 
 const OG_CACHE_TTL_SECONDS =
   60 * 60 * 24 * 30;
@@ -2473,7 +2486,7 @@ async function ogCacheKey(
         "\n" +
         thumbnailUrl +
         "\n" +
-        OG_LOGO
+        OG_LOGO_PATH
       )
     ).slice(
       0,
@@ -2869,10 +2882,19 @@ async function serveOgImage(
     );
   }
 
+  /* The badge is a static asset of this app (see OG_LOGO_PATH). */
   const logoResponse =
-    await fetch(
-      OG_LOGO,
-      OG_SOURCE_FETCH
+    await env.ASSETS.fetch(
+      new Request(
+        new URL(
+          OG_LOGO_PATH,
+          request.url
+        ).toString(),
+        {
+          method:
+            "GET"
+        }
+      )
     );
 
   if (

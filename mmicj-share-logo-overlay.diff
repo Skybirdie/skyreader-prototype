@@ -1,0 +1,129 @@
+--- a/worker.js	2026-11-19 08:04:14.000000000 +0000
++++ b/worker.js	2026-11-28 04:22:56.197232963 +0000
+@@ -33,8 +33,19 @@
+ const OG_DEFAULT_THUMBNAIL =
+   "https://storage.googleapis.com/glide-prod.appspot.com/uploads-v2/mKxnsa8ky8uPGbBKpTyv/pub/lu8ys9mg3bqa2jgeWIFB.webp";
+ 
+-const OG_LOGO =
+-  "https://storage.googleapis.com/glide-prod.appspot.com/uploads-v2/mKxnsa8ky8uPGbBKpTyv/pub/Qysgcds56u8OmAi76mCC.webp";
++/*
++ * The badge drawn in the corner of every composed item preview.
++ *
++ * It is a static file shipped with the app (free to read, no outside
++ * request), made from assets/logo.png with its transparent margins
++ * trimmed off so it sits snugly in the corner. To change the logo:
++ *   1. replace assets/logo.png
++ *   2. regenerate the trimmed copy (see the note in README.txt:
++ *      "Link-preview badge") or replace assets/logo-badge.png directly
++ *   3. bump OG_CACHE_VERSION below so stored previews are rebuilt
++ */
++const OG_LOGO_PATH =
++  "/assets/logo-badge.png";
+ 
+ const OG_IMAGE_PATH =
+   "/__sky_og_image";
+@@ -134,7 +145,9 @@
+    Applies to item links and the base link alike.
+ 
+    - Bump OG_CACHE_VERSION to force every preview to be rebuilt
+-     (e.g. after changing the logo badge position or size).
++     (e.g. after changing the logo badge picture, position or size;
++     the badge file is not part of the key, only its path is).
++     "2" = badge switched to assets/logo-badge.png (new logo).
+    - Copies expire after OG_CACHE_TTL_SECONDS, which also clears
+      out the copies of thumbnails that were replaced.
+    - A thumbnail replaced IN PLACE (same URL, new picture) is not
+@@ -145,7 +158,7 @@
+   "og:v1:";
+ 
+ const OG_CACHE_VERSION =
+-  "1";
++  "2";
+ 
+ const OG_CACHE_TTL_SECONDS =
+   60 * 60 * 24 * 30;
+@@ -2473,7 +2486,7 @@
+         "\n" +
+         thumbnailUrl +
+         "\n" +
+-        OG_LOGO
++        OG_LOGO_PATH
+       )
+     ).slice(
+       0,
+@@ -2869,10 +2882,19 @@
+     );
+   }
+ 
++  /* The badge is a static asset of this app (see OG_LOGO_PATH). */
+   const logoResponse =
+-    await fetch(
+-      OG_LOGO,
+-      OG_SOURCE_FETCH
++    await env.ASSETS.fetch(
++      new Request(
++        new URL(
++          OG_LOGO_PATH,
++          request.url
++        ).toString(),
++        {
++          method:
++            "GET"
++        }
++      )
+     );
+ 
+   if (
+--- a/worker-og-cache.test.mjs	2026-10-14 23:38:30.000000000 +0000
++++ b/worker-og-cache.test.mjs	2026-11-28 04:23:04.527473193 +0000
+@@ -8,8 +8,10 @@
+ const fresh = async () => (await import("./worker.mjs?i=" + (++n))).default;
+ 
+ let composes = 0, thumbFetches = 0, failThumb = false;
++const remoteFetches = [], assetFetches = [];
+ globalThis.fetch = async url => {
+   url = String(url);
++  remoteFetches.push(url);
+   if (url.includes("thumb")) { thumbFetches++; if (failThumb) return new Response("no", { status: 500 }); }
+   return new Response("img:" + url);
+ };
+@@ -23,7 +25,7 @@
+       async getWithMetadata(k) { ops.gwm++; const e = store.get(k); return e ? { value: e.value, metadata: e.metadata ?? null } : { value: null, metadata: null }; },
+       async put(k, v, o) { ops.put++; puts.push({ k, o }); store.set(k, { value: v, metadata: o?.metadata }); }
+     },
+-    ASSETS: { fetch: async () => new Response("a") },
++    ASSETS: { fetch: async req => { assetFetches.push(new URL(req.url ?? req).pathname); return new Response("a"); } },
+     IMAGES: {
+       async info() { return { width: 1200 }; },
+       input() { const p = { transform() { return p; }, draw() { return p; },
+@@ -51,6 +53,10 @@
+ check("1st fetch stores one og:v1: entry with a 30-day expiry", env.puts.length === 1 && env.puts[0].k.startsWith("og:v1:") && env.puts[0].o.expirationTtl === 2592000, JSON.stringify(env.puts));
+ const body1 = await r.text();
+ 
++// the corner badge is the app's own new logo, not the old Glide-hosted one
++check("badge is read from the app's static assets (/assets/logo-badge.png)", assetFetches.includes("/assets/logo-badge.png"), assetFetches.join(","));
++check("no request goes out for the old Glide logo", !remoteFetches.some(u => u.includes("Qysgcds56u8OmAi76mCC")), remoteFetches.join(","));
++
+ // repeats come from KV
+ thumbFetches = 0;
+ r = await og(w, env); const body2 = await r.text();
+--- a/README.txt	2026-10-14 23:38:30.000000000 +0000
++++ b/README.txt	2026-11-28 04:23:04.527703753 +0000
+@@ -13,3 +13,17 @@
+ Cloudflare Workers KV still counts one KV write per key written. Sending many changed items in one HTTP request does NOT make those KV writes count as one KV write. A true one-KV-write bulk snapshot would require storing the whole catalog as one KV value and changing the catalog lookup architecture.
+ 
+ The existing catalog:test:last status record is still written once per publish request in this version. That is separate from item writes. If you want absolutely zero KV writes when nothing changed, the next change should make the status record write conditional on storedCount > 0 (or move status reporting entirely to the HTTP response).
++
++
++Link-preview badge (the logo in the corner of shared item previews)
++------------------------------------------------------------------
++The badge drawn on every item preview (WhatsApp etc.) is assets/logo-badge.png,
++a copy of assets/logo.png with the transparent margins cropped off. The Worker
++reads it from its own static assets (OG_LOGO_PATH in worker.js).
++
++After changing assets/logo.png, regenerate the trimmed copy:
++
++  python3 -c "from PIL import Image; im=Image.open('assets/logo.png').convert('RGBA'); im.crop(im.getchannel('A').getbbox()).save('assets/logo-badge.png', optimize=True)"
++
++then bump OG_CACHE_VERSION in worker.js (stored previews are rebuilt) and deploy.
++Chat apps keep their own copy of a preview for a while; see the deploy notes.
